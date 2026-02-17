@@ -1,0 +1,28 @@
+# Vérifie que le build prod passe sur Linux (même environnement que le VPS).
+# À chaque push sur main (ou manuel) : build API + frontend.
+# Si c'est vert → le code peut être déployé sur le VPS sans surprise.
+
+name: Build prod (Linux)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API
+        run: docker build -f Dockerfile.api.prod -t fab-api:latest .
+
+      - name: Build Frontend
+        run: |
+          docker build -f frontend/Dockerfile.prod \
+            --build-arg NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 \
+            -t fab-frontend:latest \
+            ./frontend

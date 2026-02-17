@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.DS_Store
+coverage
+*.log
+/.idea
+/.vscode
+
+# Fichier ngrok avec identifiants de démo (ne pas committer)
+ngrok-demo-policy.yml
+
+# Dump base (données sensibles)
+backup_fab.sql

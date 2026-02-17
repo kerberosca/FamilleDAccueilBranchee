@@ -1,0 +1,15 @@
+# Exemple de policy ngrok pour protéger le tunnel frontend (basic auth).
+# Copie ce fichier en ngrok-demo-policy.yml et remplace DEMO_PASSWORD_ICI par un vrai mot de passe.
+# Lance le tunnel frontend avec :
+#   ngrok http 3002 --traffic-policy-file=ngrok-demo-policy.yml
+#
+# Alternative sans fichier (plus simple) :
+#   ngrok http 3002 --basic-auth="demo:TonMotDePasse"
+
+version: "1"
+on_http_request:
+  - actions:
+      - type: basic-auth
+        config:
+          credentials:
+            - "demo:DEMO_PASSWORD_ICI"

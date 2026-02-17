@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  FAMILY
+  RESOURCE
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+}
+
+enum ResourceVerificationStatus {
+  DRAFT
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+}
+
+enum ResourcePublishStatus {
+  HIDDEN
+  PUBLISHED
+  SUSPENDED
+}
+
+enum ResourceOnboardingState {
+  DRAFT
+  PENDING_PAYMENT
+  PENDING_VERIFICATION
+  VERIFIED
+  PUBLISHED
+  SUSPENDED
+}
+
+enum SubscriptionStatus {
+  INACTIVE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+model User {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  passwordHash     String
+  refreshTokenHash String?
+  role             Role
+  status           UserStatus @default(ACTIVE)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  familyProfile   FamilyProfile?
+  resourceProfile ResourceProfile?
+  subscriptions   Subscription[]
+  adminAuditLogs  AdminAuditLog[] @relation("AdminActor")
+
+  sentMessages Message[] @relation("MessageSender")
+}
+
+model FamilyProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  displayName  String
+  postalCode   String
+  city         String
+  region       String
+  bio          String?
+  needsTags    String[]
+  availability Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  conversations Conversation[] @relation("ConversationFamily")
+}
+
+model ResourceProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  displayName        String
+  postalCode         String
+  city               String
+  region             String
+  bio                String?
+  skillsTags         String[]
+  hourlyRate         Decimal? @db.Decimal(10, 2)
+  availability       Json?
+  verificationStatus ResourceVerificationStatus @default(DRAFT)
+  publishStatus      ResourcePublishStatus @default(HIDDEN)
+  onboardingState    ResourceOnboardingState @default(DRAFT)
+  contactEmail       String?
+  contactPhone       String?
+  averageRating      Decimal? @db.Decimal(3, 2)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  conversations Conversation[] @relation("ConversationResource")
+}
+
+model Subscription {
+  id                 String   @id @default(cuid())
+  userId             String
+  status             SubscriptionStatus @default(INACTIVE)
+  stripeCustomerId   String?
+  stripeSubscriptionId String? @unique
+  currentPeriodEnd   DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id         String   @id @default(cuid())
+  familyId   String
+  resourceId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  family   FamilyProfile   @relation("ConversationFamily", fields: [familyId], references: [id], onDelete: Cascade)
+  resource ResourceProfile @relation("ConversationResource", fields: [resourceId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([familyId, resourceId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderUserId   String
+  content        String
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("MessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+}
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String
+  action      String
+  targetType  String
+  targetId    String
+  payload     Json?
+  createdAt   DateTime @default(now())
+
+  actorUser User @relation("AdminActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([actorUserId, createdAt])
+  @@index([createdAt])
+}

@@ -1,0 +1,24 @@
+services:
+  api:
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    command: >
+      sh -c "
+      if [ ! -d node_modules/@nestjs ]; then
+        npm install --legacy-peer-deps;
+      fi;
+      npm run prisma:generate;
+      npm run start:dev
+      "
+  frontend:
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    command: >
+      sh -c "
+      if [ ! -d node_modules/next ]; then
+        npm install;
+      fi;
+      npm run dev
+      "

@@ -1,0 +1,28 @@
+# Frontend Next.js - production (build at image build time)
+FROM node:20-bullseye-slim AS builder
+
+WORKDIR /app
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Éviter manque de mémoire sur petit VPS pendant next build
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV NEXT_TELEMETRY_DISABLED=1
+
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN mkdir -p public
+RUN npm run build
+
+FROM node:20-bullseye-slim
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3002
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/public ./public
+
+EXPOSE 3002
+CMD ["npm", "run", "start"]
