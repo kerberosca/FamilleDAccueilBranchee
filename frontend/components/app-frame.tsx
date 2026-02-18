@@ -7,6 +7,8 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { useAuth } from "../lib/auth-context";
 import { useDevMode } from "../lib/dev-mode";
+import { useMaintenance } from "../lib/maintenance-context";
+import { MaintenancePage } from "./maintenance-page";
 
 function NavLink({
   href,
@@ -44,6 +46,12 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, logout } = useAuth();
   const { isDevMode, setDevMode } = useDevMode();
+  const { maintenance } = useMaintenance();
+  const pathname = usePathname();
+
+  if (maintenance === true && pathname !== "/admin") {
+    return <MaintenancePage />;
+  }
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoSrc, setLogoSrc] = useState("/images/logo.png");
   const [logoError, setLogoError] = useState(false);

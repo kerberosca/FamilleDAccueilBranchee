@@ -6,6 +6,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { DevModule } from "./modules/dev/dev.module";
 import { HealthModule } from "./modules/health/health.module";
+import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { MessagingModule } from "./modules/messaging/messaging.module";
 import { ProfilesModule } from "./modules/profiles/profiles.module";
 import { SearchModule } from "./modules/search/search.module";
@@ -41,6 +42,7 @@ const isProduction = process.env.NODE_ENV === "production";
       { ttl: 60_000, limit: 60 }
     ]),
     PrismaModule,
+    MaintenanceModule,
     AuthModule,
     ProfilesModule,
     SearchModule,

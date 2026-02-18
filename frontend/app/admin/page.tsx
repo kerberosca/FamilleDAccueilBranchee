@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
-import { apiGet, apiPatch } from "../../lib/api";
+import { apiGet, apiPatch, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 
 type Tab = "families" | "resources" | "audit";
@@ -49,6 +49,8 @@ type AuditItem = {
 };
 type AuditResponse = PageMeta & { items: AuditItem[] };
 
+type MaintenanceStatus = { enabled: boolean; updatedAt: string; updatedBy: string | null };
+
 const SELECT_CLASS = "rounded-md border border-slate-700 bg-slate-900 px-3 py-2";
 
 export default function AdminPage() {
@@ -80,6 +82,8 @@ export default function AdminPage() {
 
   const [selectedFamilyIds, setSelectedFamilyIds] = useState<string[]>([]);
   const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>([]);
+  const [maintenanceStatus, setMaintenanceStatus] = useState<MaintenanceStatus | null>(null);
+  const [maintenanceBusy, setMaintenanceBusy] = useState(false);
 
   const isAdmin = me?.role === "ADMIN";
 
@@ -149,6 +153,21 @@ export default function AdminPage() {
     };
     void run();
   }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken || !isAdmin) {
+      return;
+    }
+    const fetchMaintenance = async () => {
+      try {
+        const data = await apiGet<MaintenanceStatus>("/maintenance/status", { token: accessToken });
+        setMaintenanceStatus(data);
+      } catch {
+        setMaintenanceStatus(null);
+      }
+    };
+    void fetchMaintenance();
+  }, [accessToken, isAdmin]);
 
   useEffect(() => {
     if (!accessToken || !isAdmin) {
@@ -302,6 +321,22 @@ export default function AdminPage() {
     setSelectedResourceIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
+  const setMaintenance = async (enabled: boolean) => {
+    if (!accessToken) {
+      return;
+    }
+    setMaintenanceBusy(true);
+    setError(null);
+    try {
+      const data = await apiPost<MaintenanceStatus>("/maintenance", { token: accessToken, body: { enabled } });
+      setMaintenanceStatus(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors du changement de mode maintenance");
+    } finally {
+      setMaintenanceBusy(false);
+    }
+  };
+
   return (
     <main className="mx-auto max-w-6xl space-y-4 p-6">
       <h1 className="text-2xl font-semibold">Console Admin</h1>
@@ -312,6 +347,36 @@ export default function AdminPage() {
 
         {isAdmin ? (
           <>
+            <Card className="mb-4 space-y-2">
+              <h2 className="text-lg font-medium">Mode maintenance</h2>
+              <p className="text-sm text-slate-400">
+                {maintenanceStatus?.enabled
+                  ? "Le site affiche une page maintenance pour les visiteurs. Seuls /health et cette console restent utilisables."
+                  : "Le site est normalement accessible."}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={maintenanceStatus?.enabled ? "primary" : "secondary"}
+                  disabled={maintenanceBusy}
+                  onClick={() => void setMaintenance(true)}
+                >
+                  Activer la maintenance
+                </Button>
+                <Button
+                  variant={!maintenanceStatus?.enabled ? "primary" : "secondary"}
+                  disabled={maintenanceBusy}
+                  onClick={() => void setMaintenance(false)}
+                >
+                  Desactiver la maintenance
+                </Button>
+              </div>
+              {maintenanceStatus?.updatedAt ? (
+                <p className="text-xs text-slate-500">
+                  Derniere modification : {new Date(maintenanceStatus.updatedAt).toLocaleString("fr-CA")}
+                </p>
+              ) : null}
+            </Card>
+
             <div className="flex flex-wrap gap-2">
               <Button variant={tab === "families" ? "primary" : "secondary"} onClick={() => setTab("families")}>
                 Familles

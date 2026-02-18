@@ -3,6 +3,7 @@ import { Outfit } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../lib/auth-context";
 import { DevModeProvider } from "../lib/dev-mode";
+import { MaintenanceProvider } from "../lib/maintenance-context";
 import { AppFrame } from "../components/app-frame";
 
 const outfit = Outfit({
@@ -21,9 +22,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" className={outfit.variable}>
       <body className="min-h-screen font-sans">
         <AuthProvider>
-          <DevModeProvider>
-            <AppFrame>{children}</AppFrame>
-          </DevModeProvider>
+          <MaintenanceProvider>
+            <DevModeProvider>
+              <AppFrame>{children}</AppFrame>
+            </DevModeProvider>
+          </MaintenanceProvider>
         </AuthProvider>
       </body>
     </html>
