@@ -163,14 +163,16 @@ export class AuthService {
       status: user.status,
       email: user.email
     };
-    const accessToken = await this.jwtService.signAsync(payload, {
+    const accessOptions = {
       secret: this.configService.getOrThrow<string>("JWT_ACCESS_SECRET"),
-      expiresIn: this.configService.get<string>("JWT_ACCESS_EXPIRES_IN", "15m")
-    });
-    const refreshToken = await this.jwtService.signAsync(payload, {
+      expiresIn: this.configService.get("JWT_ACCESS_EXPIRES_IN", "15m")
+    };
+    const refreshOptions = {
       secret: this.configService.getOrThrow<string>("JWT_REFRESH_SECRET"),
-      expiresIn: this.configService.get<string>("JWT_REFRESH_EXPIRES_IN", "30d")
-    });
+      expiresIn: this.configService.get("JWT_REFRESH_EXPIRES_IN", "30d")
+    };
+    const accessToken = await this.jwtService.signAsync(payload, accessOptions as Parameters<JwtService["signAsync"]>[1]);
+    const refreshToken = await this.jwtService.signAsync(payload, refreshOptions as Parameters<JwtService["signAsync"]>[1]);
     const refreshTokenHash = await argon2.hash(refreshToken);
     await this.prisma.user.update({ where: { id: user.id }, data: { refreshTokenHash } });
     return { accessToken, refreshToken };

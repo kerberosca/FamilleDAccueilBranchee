@@ -37,10 +37,9 @@ const isProduction = process.env.NODE_ENV === "production";
         STRIPE_WEBHOOK_SECRET: Joi.string().allow("").optional()
       })
     }),
-    ThrottlerModule.forRoot({
-      ttl: 60,
-      limit: 60
-    }),
+    ThrottlerModule.forRoot([
+      { ttl: 60_000, limit: 60 }
+    ]),
     PrismaModule,
     AuthModule,
     ProfilesModule,

@@ -2,7 +2,7 @@
 # Sauvegarde de la base PostgreSQL FAB (production).
 # Usage : à lancer depuis le VPS dans le dossier du projet, ou via cron.
 #   ./scripts/backup-db.sh
-# Crée des archives dans backups/ et garde les 7 derniers jours.
+# Crée des archives dans backups/ et garde les 3 derniers jours (limite l’espace disque).
 
 set -e
 
@@ -21,5 +21,5 @@ docker compose -f docker-compose.prod.yml exec -T postgres \
 gzip "$FILE"
 echo "Backup: ${FILE}.gz"
 
-# Garder seulement les 7 derniers jours
-find "$BACKUP_DIR" -name "fab_*.sql.gz" -mtime +7 -delete
+# Garder seulement les 3 derniers jours
+find "$BACKUP_DIR" -name "fab_*.sql.gz" -mtime +3 -delete

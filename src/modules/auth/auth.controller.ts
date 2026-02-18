@@ -25,7 +25,7 @@ export class AuthController {
 
   @Public()
   @UseGuards(ThrottlerGuard)
-  @Throttle(5, 60)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post("login")
   async login(@Body() body: LoginDto) {
     return this.authService.login(body.email, body.password);
@@ -33,7 +33,7 @@ export class AuthController {
 
   @Public()
   @UseGuards(ThrottlerGuard)
-  @Throttle(10, 60)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post("refresh")
   async refresh(@Body() body: RefreshDto) {
     return this.authService.refreshWithToken(body.refreshToken);
