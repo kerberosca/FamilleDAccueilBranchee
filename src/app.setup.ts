@@ -3,9 +3,17 @@ import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import { INestApplication } from "@nestjs/common";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
+import helmet from "helmet";
 
 export function setupApp(app: INestApplication) {
   const configService = app.get(ConfigService);
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" }
+    })
+  );
 
   app.setGlobalPrefix("api");
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
