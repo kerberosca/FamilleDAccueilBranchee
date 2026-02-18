@@ -123,14 +123,16 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
             >
               {isAuthenticated ? "Connecté" : "Invité"}
             </span>
-            <button
-              type="button"
-              onClick={switchView}
-              className="rounded-lg border border-slate-600/80 bg-slate-800/60 px-2.5 py-1.5 text-xs font-medium text-slate-300 transition-all hover:border-cyan-500/40 hover:bg-slate-700/80 hover:text-slate-100"
-              title={isDevMode ? "Passer en vue prod" : "Passer en vue dev"}
-            >
-              {isDevMode ? "Vue prod" : "Vue dev"}
-            </button>
+            {process.env.NODE_ENV !== "production" && (
+              <button
+                type="button"
+                onClick={switchView}
+                className="rounded-lg border border-slate-600/80 bg-slate-800/60 px-2.5 py-1.5 text-xs font-medium text-slate-300 transition-all hover:border-cyan-500/40 hover:bg-slate-700/80 hover:text-slate-100"
+                title={isDevMode ? "Passer en vue prod" : "Passer en vue dev"}
+              >
+                {isDevMode ? "Vue prod" : "Vue dev"}
+              </button>
+            )}
             {isAuthenticated && (
               <Button
                 type="button"
