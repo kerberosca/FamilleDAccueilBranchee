@@ -8,6 +8,7 @@ import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
 import { apiGet, apiPatch, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
+import { useMaintenance } from "../../lib/maintenance-context";
 
 type Tab = "families" | "resources" | "audit";
 
@@ -55,6 +56,7 @@ const SELECT_CLASS = "rounded-md border border-slate-700 bg-slate-900 px-3 py-2"
 
 export default function AdminPage() {
   const { accessToken } = useAuth();
+  const { updateMaintenance } = useMaintenance();
   const [tab, setTab] = useState<Tab>("families");
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loadingMe, setLoadingMe] = useState(false);
@@ -330,6 +332,7 @@ export default function AdminPage() {
     try {
       const data = await apiPost<MaintenanceStatus>("/maintenance", { token: accessToken, body: { enabled } });
       setMaintenanceStatus(data);
+      updateMaintenance(data.enabled);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur lors du changement de mode maintenance");
     } finally {

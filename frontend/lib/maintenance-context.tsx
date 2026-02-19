@@ -15,6 +15,8 @@ type MaintenanceStatus = {
 
 type MaintenanceContextValue = {
   maintenance: boolean | null;
+  /** Met à jour l’état maintenance immédiatement (ex. après toggle depuis la console admin). */
+  updateMaintenance: (enabled: boolean) => void;
 };
 
 const MaintenanceContext = createContext<MaintenanceContextValue | undefined>(undefined);
@@ -69,7 +71,10 @@ export function MaintenanceProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  const value: MaintenanceContextValue = { maintenance };
+  const value: MaintenanceContextValue = {
+    maintenance,
+    updateMaintenance: setMaintenance
+  };
 
   return (
     <MaintenanceContext.Provider value={value}>
