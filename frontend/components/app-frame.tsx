@@ -49,7 +49,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
   const { maintenance } = useMaintenance();
   const pathname = usePathname();
 
-  if (maintenance === true && pathname !== "/admin") {
+  if (maintenance === true && pathname !== "/admin" && pathname !== "/login") {
     return <MaintenancePage />;
   }
   const [loggingOut, setLoggingOut] = useState(false);
