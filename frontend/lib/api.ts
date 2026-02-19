@@ -57,6 +57,9 @@ async function requestJson<T>(
   }
 
   if (!response.ok) {
+    if (response.status === 503 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("fab-maintenance-503"));
+    }
     const message =
       (json as { message?: string | string[] } | null)?.message ??
       `HTTP ${response.status} on ${path}`;
