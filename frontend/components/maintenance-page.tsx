@@ -1,11 +1,35 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 
 export function MaintenancePage() {
+  const [logoSrc, setLogoSrc] = useState("/images/logo.png");
+  const [logoError, setLogoError] = useState(false);
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 px-4 text-center">
       <div className="max-w-md space-y-6">
+        {!logoError && (
+          <div className="flex justify-center">
+            <Image
+              src={logoSrc}
+              alt="FAB"
+              width={80}
+              height={80}
+              className="h-20 w-auto object-contain"
+              onError={() => {
+                if (logoSrc === "/images/logo.png") {
+                  setLogoSrc("/images/Logo.png");
+                } else {
+                  setLogoError(true);
+                }
+              }}
+              unoptimized
+            />
+          </div>
+        )}
         <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
           Maintenance en cours
         </h1>
