@@ -33,7 +33,7 @@ type ResourceItem = {
   verificationStatus: string;
   publishStatus: string;
   onboardingState: string;
-  user: { id: string; email: string; status: string };
+  user: { id: string; email: string; status: string; role?: string };
 };
 type ResourcesResponse = PageMeta & { items: ResourceItem[] };
 
@@ -337,6 +337,21 @@ export default function AdminPage() {
     }
   };
 
+  type RoleValue = "ADMIN" | "FAMILY" | "RESOURCE";
+  const updateUserRole = async (userId: string, role: RoleValue) => {
+    if (!accessToken) return;
+    setBusyId(`role-${userId}`);
+    setError(null);
+    try {
+      await apiPatch(`/users/${userId}/role`, { token: accessToken, body: { role } });
+      await refreshCurrentTab();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors du changement de role");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <main className="mx-auto max-w-6xl space-y-4 p-6">
       <h1 className="text-2xl font-semibold">Console Admin</h1>
@@ -446,6 +461,19 @@ export default function AdminPage() {
                           </p>
                         </div>
                       </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-slate-500">Role:</span>
+                        <select
+                          className={SELECT_CLASS}
+                          value={family.role}
+                          disabled={busyId === `role-${family.id}`}
+                          onChange={(e) => void updateUserRole(family.id, e.target.value as RoleValue)}
+                        >
+                          <option value="FAMILY">FAMILY</option>
+                          <option value="RESOURCE">RESOURCE</option>
+                          <option value="ADMIN">ADMIN</option>
+                        </select>
+                      </div>
                       <div className="flex gap-2">
                         <Button variant="secondary" disabled={busyId === family.id || family.status === "ACTIVE"} onClick={() => void updateFamilyStatus(family.id, "ACTIVE")}>
                           Activer
@@ -552,6 +580,19 @@ export default function AdminPage() {
                           </p>
                         </div>
                       </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-slate-500">Role:</span>
+                        <select
+                          className={SELECT_CLASS}
+                          value={resource.user.role ?? "RESOURCE"}
+                          disabled={busyId === `role-${resource.user.id}`}
+                          onChange={(e) => void updateUserRole(resource.user.id, e.target.value as RoleValue)}
+                        >
+                          <option value="FAMILY">FAMILY</option>
+                          <option value="RESOURCE">RESOURCE</option>
+                          <option value="ADMIN">ADMIN</option>
+                        </select>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="secondary"

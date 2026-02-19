@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma, UserStatus } from "@prisma/client";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma, Role, UserStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
@@ -18,6 +18,27 @@ export class UsersService {
     const user = await this.prisma.user.update({ where: { id: userId }, data: { status } });
     if (actorUserId) {
       await this.logAdminAction(actorUserId, "USER_STATUS_UPDATED", "USER", userId, { status });
+    }
+    return sanitizeUser(user);
+  }
+
+  async updateRole(userId: string, role: Role, actorUserId?: string) {
+    const target = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!target) {
+      throw new NotFoundException("User not found");
+    }
+    if (target.role === Role.ADMIN && role !== Role.ADMIN) {
+      const adminCount = await this.prisma.user.count({ where: { role: Role.ADMIN } });
+      if (adminCount <= 1) {
+        throw new BadRequestException("Impossible de retirer le dernier administrateur.");
+      }
+    }
+    const user = await this.prisma.user.update({ where: { id: userId }, data: { role } });
+    if (actorUserId) {
+      await this.logAdminAction(actorUserId, "USER_ROLE_UPDATED", "USER", userId, {
+        previousRole: target.role,
+        newRole: role
+      });
     }
     return sanitizeUser(user);
   }

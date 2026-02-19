@@ -151,6 +151,7 @@ export class ProfilesService {
               id: true,
               email: true,
               status: true,
+              role: true,
               createdAt: true,
               updatedAt: true
             }

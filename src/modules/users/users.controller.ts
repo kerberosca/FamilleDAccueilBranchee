@@ -7,6 +7,7 @@ import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
 import { BulkUpdateUserStatusDto } from "./dto/bulk-update-user-status.dto";
+import { UpdateUserRoleDto } from "./dto/update-user-role.dto";
 import { UpdateUserStatusDto } from "./dto/update-user-status.dto";
 import { UsersService } from "./users.service";
 
@@ -61,5 +62,11 @@ export class UsersController {
   @Patch(":userId/status")
   async updateStatus(@CurrentUser() user: JwtPayload, @Param("userId") userId: string, @Body() body: UpdateUserStatusDto) {
     return this.usersService.updateStatus(userId, body.status, user.sub);
+  }
+
+  @Roles(Role.ADMIN)
+  @Patch(":userId/role")
+  async updateRole(@CurrentUser() user: JwtPayload, @Param("userId") userId: string, @Body() body: UpdateUserRoleDto) {
+    return this.usersService.updateRole(userId, body.role, user.sub);
   }
 }
