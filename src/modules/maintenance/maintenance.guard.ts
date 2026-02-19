@@ -10,7 +10,14 @@ import { Role } from "@prisma/client";
 import { Request } from "express";
 import { MaintenanceService } from "./maintenance.service";
 
-const ALLOWED_PATH_PREFIXES = ["/v1/health", "/api/v1/health", "/v1/maintenance", "/api/v1/maintenance"];
+const ALLOWED_PATH_PREFIXES = [
+  "/v1/health",
+  "/api/v1/health",
+  "/v1/maintenance",
+  "/api/v1/maintenance",
+  "/v1/auth",
+  "/api/v1/auth"
+];
 
 @Injectable()
 export class MaintenanceGuard implements CanActivate {

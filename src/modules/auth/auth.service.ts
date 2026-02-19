@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  ServiceUnavailableException,
   UnauthorizedException
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -16,6 +17,7 @@ import {
   UserStatus
 } from "@prisma/client";
 import * as argon2 from "argon2";
+import { MaintenanceService } from "../maintenance/maintenance.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RegisterDto } from "./dto/register.dto";
 
@@ -31,7 +33,8 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly maintenanceService: MaintenanceService
   ) {}
 
   async register(input: RegisterDto) {
@@ -103,6 +106,10 @@ export class AuthService {
     if (!ok) {
       throw new UnauthorizedException("Invalid credentials");
     }
+    const maintenanceActive = await this.maintenanceService.isActive();
+    if (maintenanceActive && user.role !== Role.ADMIN) {
+      throw new ServiceUnavailableException("Connexion impossible pendant la maintenance.");
+    }
     const tokens = await this.generateAndPersistTokens(user);
     return { user: sanitizeUser(user), ...tokens };
   }
@@ -115,6 +122,10 @@ export class AuthService {
     const tokenValid = await argon2.verify(user.refreshTokenHash, refreshToken);
     if (!tokenValid) {
       throw new UnauthorizedException("Invalid refresh token");
+    }
+    const maintenanceActive = await this.maintenanceService.isActive();
+    if (maintenanceActive && user.role !== Role.ADMIN) {
+      throw new ServiceUnavailableException("Connexion impossible pendant la maintenance.");
     }
     const tokens = await this.generateAndPersistTokens(user);
     return { user: sanitizeUser(user), ...tokens };
