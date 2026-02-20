@@ -97,14 +97,14 @@ export class AuthService {
   async login(email: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException("Email ou mot de passe incorrect");
     }
     if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException("Account disabled");
+      throw new UnauthorizedException("Compte désactivé. Contactez l'administrateur.");
     }
     const ok = await argon2.verify(user.passwordHash, password);
     if (!ok) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException("Email ou mot de passe incorrect");
     }
     const maintenanceActive = await this.maintenanceService.isActive();
     if (maintenanceActive && user.role !== Role.ADMIN) {

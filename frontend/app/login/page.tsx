@@ -7,7 +7,7 @@ import { Alert } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
-import { apiPost } from "../../lib/api";
+import { ApiError, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 
 type LoginResponse = {
@@ -39,7 +39,13 @@ function LoginForm() {
       setTokens(res.accessToken, res.refreshToken);
       router.push(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Connexion impossible.");
+      const message =
+        err instanceof ApiError
+          ? err.message || "Connexion impossible."
+          : err instanceof Error
+            ? err.message
+            : "Connexion impossible.";
+      setError(message);
     } finally {
       setLoading(false);
     }
