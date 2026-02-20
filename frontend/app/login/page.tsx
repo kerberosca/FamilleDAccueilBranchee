@@ -12,7 +12,7 @@ import { useAuth } from "../../lib/auth-context";
 
 type LoginResponse = {
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
   user: { id: string; email: string; role: string };
 };
 

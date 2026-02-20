@@ -12,7 +12,7 @@ type DevRole = "ADMIN" | "FAMILLE" | "RESSOURCE";
 
 type DevLoginResponse = {
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
   user: { id: string; role: string; email: string };
 };
 

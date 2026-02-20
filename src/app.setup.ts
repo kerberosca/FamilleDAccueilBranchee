@@ -3,10 +3,13 @@ import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import { INestApplication } from "@nestjs/common";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
+import cookieParser from "cookie-parser";
 import helmet from "helmet";
 
 export function setupApp(app: INestApplication) {
   const configService = app.get(ConfigService);
+
+  app.use(cookieParser());
 
   app.use(
     helmet({

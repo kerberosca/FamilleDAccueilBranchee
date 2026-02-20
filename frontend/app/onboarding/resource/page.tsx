@@ -10,7 +10,7 @@ import { useAuth } from "../../../lib/auth-context";
 
 type RegisterResponse = {
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
   user: { id: string; role: string; email: string };
   nextStepForResource?: string | null;
 };

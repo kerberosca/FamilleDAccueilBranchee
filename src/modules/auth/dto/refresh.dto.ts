@@ -1,8 +1,9 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsString } from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { IsOptional, IsString } from "class-validator";
 
 export class RefreshDto {
-  @ApiProperty()
+  @ApiPropertyOptional({ description: "Optionnel si le refresh token est envoyé en cookie httpOnly" })
+  @IsOptional()
   @IsString()
-  refreshToken!: string;
+  refreshToken?: string;
 }

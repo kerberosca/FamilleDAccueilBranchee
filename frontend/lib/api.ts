@@ -1,6 +1,6 @@
 "use client";
 
-import { AUTH_TOKENS_EVENT, REFRESH_STORAGE_KEY } from "./auth-constants";
+import { AUTH_TOKENS_EVENT } from "./auth-constants";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
 
@@ -34,20 +34,18 @@ export async function apiPatch<T>(path: string, options: RequestOptions = {}): P
 
 async function tryRefresh(): Promise<string | null> {
   if (typeof window === "undefined") return null;
-  const refreshToken = window.sessionStorage.getItem(REFRESH_STORAGE_KEY);
-  if (!refreshToken) return null;
   const url = `${API_BASE}/auth/refresh`;
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken })
+      credentials: "include",
+      body: JSON.stringify({})
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { accessToken: string; refreshToken: string };
-    window.sessionStorage.setItem(REFRESH_STORAGE_KEY, data.refreshToken);
+    const data = (await res.json()) as { accessToken: string };
     window.dispatchEvent(
-      new CustomEvent(AUTH_TOKENS_EVENT, { detail: { accessToken: data.accessToken, refreshToken: data.refreshToken } })
+      new CustomEvent(AUTH_TOKENS_EVENT, { detail: { accessToken: data.accessToken } })
     );
     return data.accessToken;
   } catch {
@@ -78,6 +76,7 @@ async function requestJson<T>(
   const response = await fetch(url, {
     method: options.method,
     headers,
+    credentials: "include",
     body: typeof options.body === "undefined" ? undefined : JSON.stringify(options.body)
   });
 
