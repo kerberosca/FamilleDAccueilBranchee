@@ -61,8 +61,22 @@ model User {
   resourceProfile ResourceProfile?
   subscriptions   Subscription[]
   adminAuditLogs  AdminAuditLog[] @relation("AdminActor")
+  passwordResetTokens PasswordResetToken[]
 
   sentMessages Message[] @relation("MessageSender")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([expiresAt])
 }
 
 model FamilyProfile {

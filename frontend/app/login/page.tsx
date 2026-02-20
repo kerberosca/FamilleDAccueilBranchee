@@ -71,9 +71,17 @@ function LoginForm() {
             required
             minLength={8}
           />
-          <Button type="submit" disabled={loading}>
-            {loading ? "Connexion..." : "Se connecter"}
-          </Button>
+          <div className="flex items-center justify-between gap-2">
+            <Button type="submit" disabled={loading}>
+              {loading ? "Connexion..." : "Se connecter"}
+            </Button>
+            <Link
+              href="/forgot-password"
+              className="text-sm text-slate-400 hover:text-slate-200 hover:underline"
+            >
+              Mot de passe oublié ?
+            </Link>
+          </div>
         </form>
       </Card>
       {error ? <Alert tone="error">{error}</Alert> : null}

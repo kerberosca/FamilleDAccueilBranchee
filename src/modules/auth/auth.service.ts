@@ -17,9 +17,12 @@ import {
   UserStatus
 } from "@prisma/client";
 import * as argon2 from "argon2";
+import { randomBytes } from "crypto";
 import { MaintenanceService } from "../maintenance/maintenance.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RegisterDto } from "./dto/register.dto";
+
+const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 h
 
 type TokenPair = {
   accessToken: string;
@@ -158,8 +161,39 @@ export class AuthService {
   }
 
   async requestPasswordReset(email: string) {
-    this.logger.log(`Password reset requested for: ${email}`);
-    return { success: true };
+    const normalizedEmail = email.toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      return { message: "Si cet email est connu, un lien a été envoyé." };
+    }
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
+    await this.prisma.passwordResetToken.create({
+      data: { userId: user.id, token, expiresAt }
+    });
+    const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
+    const resetUrl = `${frontendUrl.replace(/\/$/, "")}/reset-password?token=${token}`;
+    this.logger.log(`Password reset link for ${normalizedEmail}: ${resetUrl}`);
+    return { message: "Si cet email est connu, un lien a été envoyé." };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { token },
+      include: { user: true }
+    });
+    if (!record || record.expiresAt < new Date()) {
+      throw new BadRequestException("Lien invalide ou expiré.");
+    }
+    const passwordHash = await argon2.hash(newPassword);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { passwordHash }
+      }),
+      this.prisma.passwordResetToken.deleteMany({ where: { userId: record.userId } })
+    ]);
+    return { success: true, message: "Mot de passe mis à jour." };
   }
 
   async verifyEmail(token: string) {
