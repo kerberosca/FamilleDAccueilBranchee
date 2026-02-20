@@ -21,7 +21,7 @@ type CheckoutResponse = {
 };
 
 export default function ResourceOnboardingPage() {
-  const { accessToken, setAccessToken } = useAuth();
+  const { accessToken, setTokens } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -55,7 +55,7 @@ export default function ResourceOnboardingPage() {
           tags: toTags(tags)
         }
       });
-      setAccessToken(response.accessToken);
+      setTokens(response.accessToken, response.refreshToken);
       setSuccess("Compte RESOURCE créé. Prochaine étape : paiement des frais d'inscription (Stripe).");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");

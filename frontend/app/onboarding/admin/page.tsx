@@ -16,7 +16,7 @@ type DevLoginResponse = {
 const ENABLED = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true";
 
 export default function AdminOnboardingPage() {
-  const { setAccessToken } = useAuth();
+  const { setTokens } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export default function AdminOnboardingPage() {
       const response = await apiPost<DevLoginResponse>("/dev/login-as", {
         body: { role: "ADMIN" }
       });
-      setAccessToken(response.accessToken);
+      setTokens(response.accessToken, response.refreshToken);
       setSuccess("Session ADMIN ouverte. Va sur /me ou commence la moderation.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");

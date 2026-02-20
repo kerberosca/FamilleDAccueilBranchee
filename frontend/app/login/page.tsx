@@ -22,7 +22,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/me";
-  const { setAccessToken } = useAuth();
+  const { setTokens } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,7 +36,7 @@ function LoginForm() {
       const res = await apiPost<LoginResponse>("/auth/login", {
         body: { email: email.trim(), password }
       });
-      setAccessToken(res.accessToken);
+      setTokens(res.accessToken, res.refreshToken);
       router.push(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connexion impossible.");

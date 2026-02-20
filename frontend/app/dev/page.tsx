@@ -20,7 +20,7 @@ const ENABLED = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true";
 
 export default function DevPage() {
   const router = useRouter();
-  const { setAccessToken } = useAuth();
+  const { setTokens } = useAuth();
   const [loadingRole, setLoadingRole] = useState<DevRole | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +29,7 @@ export default function DevPage() {
     setLoadingRole(role);
     try {
       const response = await apiPost<DevLoginResponse>("/dev/login-as", { body: { role } });
-      setAccessToken(response.accessToken);
+      setTokens(response.accessToken, response.refreshToken);
       const nextPath = new URLSearchParams(window.location.search).get("next") || "/me";
       router.push(nextPath);
     } catch (e) {

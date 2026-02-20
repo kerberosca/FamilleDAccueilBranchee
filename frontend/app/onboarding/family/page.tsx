@@ -20,7 +20,7 @@ type CheckoutResponse = {
 };
 
 export default function FamilyOnboardingPage() {
-  const { accessToken, setAccessToken } = useAuth();
+  const { accessToken, setTokens } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -54,7 +54,7 @@ export default function FamilyOnboardingPage() {
           tags: toTags(tags)
         }
       });
-      setAccessToken(response.accessToken);
+      setTokens(response.accessToken, response.refreshToken);
       setSuccess("Compte FAMILY cree. Tu peux maintenant lancer le checkout abonnement.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
