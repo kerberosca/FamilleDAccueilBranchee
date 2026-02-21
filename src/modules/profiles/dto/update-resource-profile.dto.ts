@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsArray, IsNumber, IsOptional, IsString } from "class-validator";
+import { IsArray, IsNumber, IsObject, IsOptional, IsString } from "class-validator";
 
 export class UpdateResourceProfileDto {
   @ApiPropertyOptional()
@@ -53,4 +53,10 @@ export class UpdateResourceProfileDto {
   @IsOptional()
   @IsString()
   contactPhone?: string;
+
+  /** Réponses au questionnaire allié (clés = id question, valeurs = réponse string). Modifiable par la suite. */
+  @ApiPropertyOptional({ description: "Réponses questionnaire (ex: { q1: \"...\", q2: \"...\" })" })
+  @IsOptional()
+  @IsObject()
+  questionnaireAnswers?: Record<string, string>;
 }

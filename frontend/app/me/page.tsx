@@ -8,6 +8,7 @@ import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
 import { apiGet, apiPatch } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
+import { ALLY_QUESTIONNAIRE } from "../../lib/questionnaire-ally";
 
 type MeResponse = {
   id: string;
@@ -46,6 +47,7 @@ type ResourceProfileResponse = {
   onboardingState: string;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  questionnaireAnswers?: Record<string, string> | null;
 };
 
 type FormSnapshot = {
@@ -59,6 +61,7 @@ type FormSnapshot = {
   contactEmail: string;
   contactPhone: string;
   availabilityJson: string;
+  questionnaireAnswers?: Record<string, string>;
 };
 
 type FieldErrors = Partial<
@@ -96,7 +99,13 @@ export default function MePage() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [availabilityJson, setAvailabilityJson] = useState("");
+  const [questionnaireValues, setQuestionnaireValues] = useState<Record<string, string>>({});
 
+  const questionnaireDirty =
+    initialSnapshot?.questionnaireAnswers !== undefined &&
+    ALLY_QUESTIONNAIRE.some(
+      (q) => (questionnaireValues[q.id] ?? "") !== (initialSnapshot.questionnaireAnswers?.[q.id] ?? "")
+    );
   const isDirty = Boolean(
     initialSnapshot &&
       (displayName !== initialSnapshot.displayName ||
@@ -108,7 +117,8 @@ export default function MePage() {
         hourlyRate !== initialSnapshot.hourlyRate ||
         contactEmail !== initialSnapshot.contactEmail ||
         contactPhone !== initialSnapshot.contactPhone ||
-        availabilityJson !== initialSnapshot.availabilityJson)
+        availabilityJson !== initialSnapshot.availabilityJson ||
+        questionnaireDirty)
   );
 
   useEffect(() => {
@@ -246,12 +256,13 @@ export default function MePage() {
         if (meData.role === "FAMILY") {
           const family = profileData as FamilyProfileResponse;
           nextSnapshot.tagsCsv = family.needsTags?.join(", ") ?? "";
-        } else if (meData.role === "RESOURCE") {
+        } else         if (meData.role === "RESOURCE") {
           const resource = profileData as ResourceProfileResponse;
           nextSnapshot.tagsCsv = resource.skillsTags?.join(", ") ?? "";
           nextSnapshot.hourlyRate = resource.hourlyRate ? String(resource.hourlyRate) : "";
           nextSnapshot.contactEmail = resource.contactEmail ?? "";
           nextSnapshot.contactPhone = resource.contactPhone ?? "";
+          nextSnapshot.questionnaireAnswers = resource.questionnaireAnswers ?? {};
         }
         applySnapshot(nextSnapshot);
         setInitialSnapshot(nextSnapshot);
@@ -365,7 +376,8 @@ export default function MePage() {
           hourlyRate: hourlyRate ? Number(hourlyRate) : undefined,
           contactEmail: contactEmail || undefined,
           contactPhone: contactPhone || undefined,
-          availability: parseAvailabilityOrThrow(availabilityJson)
+          availability: parseAvailabilityOrThrow(availabilityJson),
+          questionnaireAnswers: questionnaireValues
         }
       });
       setSuccess("Profil allié mis à jour.");
@@ -381,7 +393,8 @@ export default function MePage() {
         hourlyRate,
         contactEmail,
         contactPhone,
-        availabilityJson
+        availabilityJson,
+        questionnaireAnswers: questionnaireValues
       };
       setInitialSnapshot(updatedSnapshot);
     } catch (e) {
@@ -555,9 +568,44 @@ export default function MePage() {
                 {(profile as ResourceProfileResponse).publishStatus}
               </Alert>
             ) : null}
+            <h3 className="text-base font-medium pt-2 border-t border-slate-700 mt-2">Questionnaire allié</h3>
+            <p className="text-sm text-slate-400">Répondez aux questions ci-dessous. Vous pourrez les modifier plus tard.</p>
+            {ALLY_QUESTIONNAIRE.map((q) =>
+              q.type === "choice" ? (
+                <div key={q.id} className="space-y-1">
+                  <label className="text-sm text-slate-300">{q.label}</label>
+                  <select
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                    value={questionnaireValues[q.id] ?? ""}
+                    onChange={(e) =>
+                      setQuestionnaireValues((prev) => ({ ...prev, [q.id]: e.target.value }))
+                    }
+                  >
+                    <option value="">— Choisir —</option>
+                    {q.options?.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div key={q.id} className="space-y-1">
+                  <label className="text-sm text-slate-300">{q.label}</label>
+                  <textarea
+                    className="min-h-20 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                    placeholder="Votre réponse..."
+                    value={questionnaireValues[q.id] ?? ""}
+                    onChange={(e) =>
+                      setQuestionnaireValues((prev) => ({ ...prev, [q.id]: e.target.value }))
+                    }
+                  />
+                </div>
+              )
+            )}
             <div className="flex gap-2">
               <Button onClick={saveResourceProfile} disabled={saving}>
-                {saving ? "Enregistrement..." : "Enregistrer le profil RESOURCE"}
+                {saving ? "Enregistrement..." : "Enregistrer le profil allié"}
               </Button>
               <Button variant="secondary" onClick={handleRestore} disabled={saving || !isDirty}>
                 Restaurer
@@ -580,6 +628,7 @@ export default function MePage() {
     setContactEmail(snapshot.contactEmail);
     setContactPhone(snapshot.contactPhone);
     setAvailabilityJson(snapshot.availabilityJson);
+    setQuestionnaireValues(snapshot.questionnaireAnswers ?? {});
   }
 }
 

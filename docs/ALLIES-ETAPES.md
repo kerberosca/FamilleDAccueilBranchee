@@ -47,15 +47,15 @@ Document de planification du parcours d’inscription et de gestion des **allié
 
 ---
 
-### Étape 3 — Questionnaire allié (priorité moyenne)
+### Étape 3 — Questionnaire allié (priorité moyenne) ✅ — Terminée
 
-**Objectif** : Un questionnaire à remplir par l’allié (après inscription ou sur la même page). Contenu à préciser.
+**Objectif** : Un questionnaire à remplir par l’allié (après inscription ou sur la même page). Contenu modifiable par la suite.
 
 **Livrables** :
-- [ ] Définir le contenu du questionnaire (questions, champs).
-- [ ] Backend : modèle ou champs pour stocker les réponses (ex. table dédiée ou JSON sur le profil allié). Migration si besoin.
-- [ ] Backend : endpoint(s) pour enregistrer / récupérer les réponses du questionnaire.
-- [ ] Frontend : section ou page « Questionnaire » dans le parcours allié (même page d’inscription ou page suivante après création de compte).
+- [x] Contenu : 6 questions génériques (3 à choix de réponse, 3 à développement), définies dans `frontend/lib/questionnaire-ally.ts` (modifiable sans toucher au reste).
+- [x] Backend : champ **questionnaireAnswers** (JSON) sur `ResourceProfile`. Migration `add_resource_questionnaire_answers`.
+- [x] Backend : enregistrement et récupération via **PATCH** et **GET** `/profiles/me` (réponses dans le profil allié).
+- [x] Frontend : section **« Questionnaire allié »** sur la page Mon compte (`/me`) pour les alliés (choix + textes), sauvegarde avec « Enregistrer le profil allié ».
 
 ---
 

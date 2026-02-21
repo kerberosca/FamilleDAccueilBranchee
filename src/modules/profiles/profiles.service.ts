@@ -53,13 +53,23 @@ export class ProfilesService {
     if (user.role !== Role.RESOURCE) {
       throw new ForbiddenException("Only RESOURCE can update this profile");
     }
+    const { questionnaireAnswers: qAnswers, ...rest } = dto;
+    const questionnaireJson =
+      qAnswers !== undefined
+        ? (Object.fromEntries(
+            Object.entries(qAnswers).filter(
+              (entry): entry is [string, string] => typeof entry[1] === "string"
+            )
+          ) as Prisma.InputJsonValue)
+        : undefined;
     const updated = await this.prisma.resourceProfile.update({
       where: { userId: user.sub },
       data: {
-        ...dto,
-        postalCode: dto.postalCode ? normalizePostalCode(dto.postalCode) : undefined,
-        hourlyRate: dto.hourlyRate ?? undefined,
-        availability: toJson(dto.availability)
+        ...rest,
+        questionnaireAnswers: questionnaireJson,
+        postalCode: rest.postalCode ? normalizePostalCode(rest.postalCode) : undefined,
+        hourlyRate: rest.hourlyRate ?? undefined,
+        availability: toJson(rest.availability)
       }
     });
     return this.toResourcePrivateView(updated);
@@ -268,7 +278,8 @@ export class ProfilesService {
       publishStatus: resource.publishStatus,
       onboardingState: resource.onboardingState,
       contactEmail: resource.contactEmail,
-      contactPhone: resource.contactPhone
+      contactPhone: resource.contactPhone,
+      questionnaireAnswers: resource.questionnaireAnswers ?? undefined
     };
   }
 }

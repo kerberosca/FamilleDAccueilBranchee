@@ -121,6 +121,7 @@ model ResourceProfile {
   contactEmail       String?
   contactPhone       String?
   averageRating      Decimal? @db.Decimal(3, 2)
+  questionnaireAnswers Json?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
