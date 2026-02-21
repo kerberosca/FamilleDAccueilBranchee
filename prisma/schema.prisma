@@ -47,6 +47,12 @@ enum SubscriptionStatus {
   CANCELED
 }
 
+enum AllyType {
+  MENAGE
+  GARDIENS
+  AUTRES
+}
+
 model User {
   id               String   @id @default(cuid())
   email            String   @unique
@@ -100,6 +106,7 @@ model FamilyProfile {
 model ResourceProfile {
   id                 String   @id @default(cuid())
   userId             String   @unique
+  allyType           AllyType?
   displayName        String
   postalCode         String
   city               String

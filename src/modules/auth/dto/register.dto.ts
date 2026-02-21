@@ -1,4 +1,4 @@
-import { Role } from "@prisma/client";
+import { AllyType, Role } from "@prisma/client";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsArray, IsEmail, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
 
@@ -46,4 +46,10 @@ export class RegisterDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  /** Type d'allié (obligatoire quand role = RESOURCE). */
+  @ApiPropertyOptional({ enum: ["MENAGE", "GARDIENS", "AUTRES"] })
+  @IsOptional()
+  @IsEnum(AllyType)
+  allyType?: AllyType;
 }

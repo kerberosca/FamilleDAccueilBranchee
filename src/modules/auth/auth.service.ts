@@ -46,6 +46,9 @@ export class AuthService {
     if (input.role === Role.ADMIN) {
       throw new BadRequestException("ADMIN registration is disabled");
     }
+    if (input.role === Role.RESOURCE && input.allyType == null) {
+      throw new BadRequestException("Le type d'allié (Ménage, Gardiens ou Autres) est obligatoire.");
+    }
     const existing = await this.prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
     if (existing) {
       throw new ConflictException("Email already in use");
@@ -75,6 +78,7 @@ export class AuthService {
           input.role === Role.RESOURCE
             ? {
                 create: {
+                  allyType: input.allyType!,
                   displayName: input.displayName,
                   postalCode: normalizePostalCode(input.postalCode),
                   city: input.city,
