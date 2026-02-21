@@ -34,6 +34,7 @@ type ResourceItem = {
   verificationStatus: string;
   publishStatus: string;
   onboardingState: string;
+  backgroundCheckStatus?: string;
   user: { id: string; email: string; status: string; role?: string };
 };
 type ResourcesResponse = PageMeta & { items: ResourceItem[] };
@@ -276,7 +277,7 @@ export default function AdminPage() {
 
   const moderateResource = async (
     resourceId: string,
-    payload: { verificationStatus: string; publishStatus: string; onboardingState: string }
+    payload: { verificationStatus: string; publishStatus: string; onboardingState: string; backgroundCheckStatus?: string }
   ) => {
     if (!accessToken) {
       return;
@@ -595,6 +596,7 @@ export default function AdminPage() {
                           </p>
                           <p>
                             Etats: {resource.verificationStatus} / {resource.publishStatus} / {resource.onboardingState}
+                            {resource.backgroundCheckStatus ? ` · Antécédents: ${resource.backgroundCheckStatus}` : null}
                           </p>
                           <p>
                             Localisation: {resource.city}, {resource.region} ({resource.postalCode})
@@ -612,6 +614,27 @@ export default function AdminPage() {
                           <option value="FAMILY">FAMILY</option>
                           <option value="RESOURCE">RESOURCE</option>
                           <option value="ADMIN">ADMIN</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-slate-500">Antécédents:</span>
+                        <select
+                          className={SELECT_CLASS}
+                          value={resource.backgroundCheckStatus ?? "NOT_REQUESTED"}
+                          disabled={busyId === resource.id}
+                          onChange={(e) =>
+                            void moderateResource(resource.id, {
+                              verificationStatus: resource.verificationStatus,
+                              publishStatus: resource.publishStatus,
+                              onboardingState: resource.onboardingState,
+                              backgroundCheckStatus: e.target.value
+                            })
+                          }
+                        >
+                          <option value="NOT_REQUESTED">Non demandée</option>
+                          <option value="REQUESTED">Demandée (engagement)</option>
+                          <option value="PENDING">En attente</option>
+                          <option value="RECEIVED">Reçue</option>
                         </select>
                       </div>
                       <div className="flex flex-wrap gap-2">

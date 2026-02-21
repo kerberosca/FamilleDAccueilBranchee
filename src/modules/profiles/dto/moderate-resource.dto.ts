@@ -1,5 +1,10 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { ResourceOnboardingState, ResourcePublishStatus, ResourceVerificationStatus } from "@prisma/client";
+import {
+  BackgroundCheckStatus,
+  ResourceOnboardingState,
+  ResourcePublishStatus,
+  ResourceVerificationStatus
+} from "@prisma/client";
 import { IsEnum, IsOptional } from "class-validator";
 
 export class ModerateResourceDto {
@@ -17,4 +22,9 @@ export class ModerateResourceDto {
   @IsOptional()
   @IsEnum(ResourceOnboardingState)
   onboardingState?: ResourceOnboardingState;
+
+  @ApiPropertyOptional({ enum: BackgroundCheckStatus, description: "Antécédents judiciaires (ex: PENDING, RECEIVED)" })
+  @IsOptional()
+  @IsEnum(BackgroundCheckStatus)
+  backgroundCheckStatus?: BackgroundCheckStatus;
 }

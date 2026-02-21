@@ -1,5 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma, ResourceOnboardingState, ResourcePublishStatus, ResourceVerificationStatus, Role } from "@prisma/client";
+import {
+  BackgroundCheckStatus,
+  Prisma,
+  ResourceOnboardingState,
+  ResourcePublishStatus,
+  ResourceVerificationStatus,
+  Role
+} from "@prisma/client";
 import { SubscriptionAccessService } from "../billing/subscription-access.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
@@ -53,7 +60,16 @@ export class ProfilesService {
     if (user.role !== Role.RESOURCE) {
       throw new ForbiddenException("Only RESOURCE can update this profile");
     }
-    const { questionnaireAnswers: qAnswers, ...rest } = dto;
+    const { questionnaireAnswers: qAnswers, backgroundCheckStatus: bgStatus, ...rest } = dto;
+    if (
+      bgStatus !== undefined &&
+      bgStatus !== BackgroundCheckStatus.NOT_REQUESTED &&
+      bgStatus !== BackgroundCheckStatus.REQUESTED
+    ) {
+      throw new BadRequestException(
+        "Seul l'engagement (REQUESTED) ou l'absence de demande (NOT_REQUESTED) peut être modifié par l'allié."
+      );
+    }
     const questionnaireJson =
       qAnswers !== undefined
         ? (Object.fromEntries(
@@ -67,6 +83,7 @@ export class ProfilesService {
       data: {
         ...rest,
         questionnaireAnswers: questionnaireJson,
+        backgroundCheckStatus: bgStatus,
         postalCode: rest.postalCode ? normalizePostalCode(rest.postalCode) : undefined,
         hourlyRate: rest.hourlyRate ?? undefined,
         availability: toJson(rest.availability)
@@ -103,7 +120,8 @@ export class ProfilesService {
       data: {
         verificationStatus: dto.verificationStatus,
         publishStatus: dto.publishStatus,
-        onboardingState: dto.onboardingState
+        onboardingState: dto.onboardingState,
+        ...(dto.backgroundCheckStatus !== undefined && { backgroundCheckStatus: dto.backgroundCheckStatus })
       }
     });
     if (actorUserId) {
@@ -120,14 +138,16 @@ export class ProfilesService {
       data: {
         verificationStatus: dto.verificationStatus,
         publishStatus: dto.publishStatus,
-        onboardingState: dto.onboardingState
+        onboardingState: dto.onboardingState,
+        ...(dto.backgroundCheckStatus !== undefined && { backgroundCheckStatus: dto.backgroundCheckStatus })
       }
     });
     await this.usersService.logAdminAction(actorUserId, "RESOURCE_BULK_MODERATED", "RESOURCE_PROFILE", "bulk", {
       resourceIds,
       verificationStatus: dto.verificationStatus,
       publishStatus: dto.publishStatus,
-      onboardingState: dto.onboardingState
+      onboardingState: dto.onboardingState,
+      backgroundCheckStatus: dto.backgroundCheckStatus
     });
     return { updatedCount: result.count };
   }
@@ -211,6 +231,7 @@ export class ProfilesService {
         verificationStatus: resource.verificationStatus,
         publishStatus: resource.publishStatus,
         onboardingState: resource.onboardingState,
+        backgroundCheckStatus: resource.backgroundCheckStatus,
         contactEmail: resource.contactEmail,
         contactPhone: resource.contactPhone,
         updatedAt: resource.updatedAt,
@@ -279,7 +300,8 @@ export class ProfilesService {
       onboardingState: resource.onboardingState,
       contactEmail: resource.contactEmail,
       contactPhone: resource.contactPhone,
-      questionnaireAnswers: resource.questionnaireAnswers ?? undefined
+      questionnaireAnswers: resource.questionnaireAnswers ?? undefined,
+      backgroundCheckStatus: resource.backgroundCheckStatus
     };
   }
 }

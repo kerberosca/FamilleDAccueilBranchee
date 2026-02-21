@@ -48,6 +48,7 @@ type ResourceProfileResponse = {
   contactEmail?: string | null;
   contactPhone?: string | null;
   questionnaireAnswers?: Record<string, string> | null;
+  backgroundCheckStatus?: string | null;
 };
 
 type FormSnapshot = {
@@ -62,6 +63,7 @@ type FormSnapshot = {
   contactPhone: string;
   availabilityJson: string;
   questionnaireAnswers?: Record<string, string>;
+  backgroundCheckStatus?: string;
 };
 
 type FieldErrors = Partial<
@@ -100,12 +102,16 @@ export default function MePage() {
   const [contactPhone, setContactPhone] = useState("");
   const [availabilityJson, setAvailabilityJson] = useState("");
   const [questionnaireValues, setQuestionnaireValues] = useState<Record<string, string>>({});
+  const [backgroundCheckStatus, setBackgroundCheckStatus] = useState<string>("NOT_REQUESTED");
 
   const questionnaireDirty =
     initialSnapshot?.questionnaireAnswers !== undefined &&
     ALLY_QUESTIONNAIRE.some(
       (q) => (questionnaireValues[q.id] ?? "") !== (initialSnapshot.questionnaireAnswers?.[q.id] ?? "")
     );
+  const backgroundCheckDirty =
+    initialSnapshot?.backgroundCheckStatus !== undefined &&
+    backgroundCheckStatus !== (initialSnapshot.backgroundCheckStatus ?? "NOT_REQUESTED");
   const isDirty = Boolean(
     initialSnapshot &&
       (displayName !== initialSnapshot.displayName ||
@@ -118,7 +124,8 @@ export default function MePage() {
         contactEmail !== initialSnapshot.contactEmail ||
         contactPhone !== initialSnapshot.contactPhone ||
         availabilityJson !== initialSnapshot.availabilityJson ||
-        questionnaireDirty)
+        questionnaireDirty ||
+        backgroundCheckDirty)
   );
 
   useEffect(() => {
@@ -263,6 +270,7 @@ export default function MePage() {
           nextSnapshot.contactEmail = resource.contactEmail ?? "";
           nextSnapshot.contactPhone = resource.contactPhone ?? "";
           nextSnapshot.questionnaireAnswers = resource.questionnaireAnswers ?? {};
+          nextSnapshot.backgroundCheckStatus = resource.backgroundCheckStatus ?? "NOT_REQUESTED";
         }
         applySnapshot(nextSnapshot);
         setInitialSnapshot(nextSnapshot);
@@ -377,7 +385,8 @@ export default function MePage() {
           contactEmail: contactEmail || undefined,
           contactPhone: contactPhone || undefined,
           availability: parseAvailabilityOrThrow(availabilityJson),
-          questionnaireAnswers: questionnaireValues
+          questionnaireAnswers: questionnaireValues,
+          backgroundCheckStatus
         }
       });
       setSuccess("Profil allié mis à jour.");
@@ -394,7 +403,8 @@ export default function MePage() {
         contactEmail,
         contactPhone,
         availabilityJson,
-        questionnaireAnswers: questionnaireValues
+        questionnaireAnswers: questionnaireValues,
+        backgroundCheckStatus
       };
       setInitialSnapshot(updatedSnapshot);
     } catch (e) {
@@ -568,6 +578,24 @@ export default function MePage() {
                 {(profile as ResourceProfileResponse).publishStatus}
               </Alert>
             ) : null}
+            <h3 className="text-base font-medium pt-2 border-t border-slate-700 mt-2">Vérification d&apos;antécédents judiciaires</h3>
+            <p className="text-sm text-slate-400">
+              Pour être validé comme allié, une vérification d&apos;antécédents judiciaires est requise. Vous devrez fournir
+              les documents demandés selon les modalités communiquées.
+            </p>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={backgroundCheckStatus === "REQUESTED"}
+                onChange={(e) =>
+                  setBackgroundCheckStatus(e.target.checked ? "REQUESTED" : "NOT_REQUESTED")
+                }
+                className="rounded border-slate-600 bg-slate-800 text-cyan-500"
+              />
+              <span className="text-sm text-slate-300">
+                Je m&apos;engage à fournir une vérification d&apos;antécédents judiciaires
+              </span>
+            </label>
             <h3 className="text-base font-medium pt-2 border-t border-slate-700 mt-2">Questionnaire allié</h3>
             <p className="text-sm text-slate-400">Répondez aux questions ci-dessous. Vous pourrez les modifier plus tard.</p>
             {ALLY_QUESTIONNAIRE.map((q) =>
@@ -629,6 +657,7 @@ export default function MePage() {
     setContactPhone(snapshot.contactPhone);
     setAvailabilityJson(snapshot.availabilityJson);
     setQuestionnaireValues(snapshot.questionnaireAnswers ?? {});
+    setBackgroundCheckStatus(snapshot.backgroundCheckStatus ?? "NOT_REQUESTED");
   }
 }
 

@@ -59,14 +59,15 @@ Document de planification du parcours d’inscription et de gestion des **allié
 
 ---
 
-### Étape 4 — Vérification d’antécédents judiciaires (priorité moyenne)
+### Étape 4 — Vérification d’antécédents judiciaires (priorité moyenne) ✅ — Terminée
 
 **Objectif** : Informer l’allié qu’une vérification d’antécédents judiciaires est requise ; enregistrer la demande ou l’engagement.
 
 **Livrables** :
-- [ ] Backend : champ(s) pour le **statut** de la vérification (ex. `non_demandee` | `demandee` | `en_attente` | `recue`) sur le profil allié (ou table liée). Migration si besoin.
-- [ ] Frontend : texte explicatif + **case à cocher** « Je m’engage à fournir une vérification d’antécédents judiciaires » (obligatoire pour valider l’inscription ou pour passer en « vérifié » selon les règles métier).
-- [ ] (Optionnel) Plus tard : étape dédiée « Demande de vérification » (lien partenaire, formulaire, upload) et suivi du statut côté admin.
+- [x] Backend : champ **backgroundCheckStatus** sur `ResourceProfile` (enum `NOT_REQUESTED` | `REQUESTED` | `PENDING` | `RECEIVED`). Migration `add_background_check_status`. L’allié peut passer uniquement à `REQUESTED` ou `NOT_REQUESTED` ; l’admin peut définir `PENDING` / `RECEIVED` via modération (individuelle ou bulk).
+- [x] Frontend : sur Mon compte (`/me`) pour les alliés — texte explicatif + **case à cocher** « Je m’engage à fournir une vérification d’antécédents judiciaires » ; sauvegarde avec le profil.
+- [x] Admin : affichage du statut antécédents + liste déroulante pour passer en « En attente » ou « Reçue ».
+- [ ] (Optionnel) Plus tard : étape dédiée « Demande de vérification » (lien partenaire, formulaire, upload).
 
 ---
 

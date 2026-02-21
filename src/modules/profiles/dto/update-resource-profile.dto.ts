@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
+import { BackgroundCheckStatus } from "@prisma/client";
 import { Type } from "class-transformer";
-import { IsArray, IsNumber, IsObject, IsOptional, IsString } from "class-validator";
+import { IsArray, IsEnum, IsNumber, IsObject, IsOptional, IsString } from "class-validator";
 
 export class UpdateResourceProfileDto {
   @ApiPropertyOptional()
@@ -59,4 +60,10 @@ export class UpdateResourceProfileDto {
   @IsOptional()
   @IsObject()
   questionnaireAnswers?: Record<string, string>;
+
+  /** Statut vérification antécédents judiciaires. L'allié peut passer NOT_REQUESTED → REQUESTED (engagement). */
+  @ApiPropertyOptional({ enum: BackgroundCheckStatus })
+  @IsOptional()
+  @IsEnum(BackgroundCheckStatus)
+  backgroundCheckStatus?: BackgroundCheckStatus;
 }

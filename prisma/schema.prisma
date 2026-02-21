@@ -53,6 +53,13 @@ enum AllyType {
   AUTRES
 }
 
+enum BackgroundCheckStatus {
+  NOT_REQUESTED
+  REQUESTED
+  PENDING
+  RECEIVED
+}
+
 model User {
   id               String   @id @default(cuid())
   email            String   @unique
@@ -122,6 +129,7 @@ model ResourceProfile {
   contactPhone       String?
   averageRating      Decimal? @db.Decimal(3, 2)
   questionnaireAnswers Json?
+  backgroundCheckStatus BackgroundCheckStatus @default(NOT_REQUESTED)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

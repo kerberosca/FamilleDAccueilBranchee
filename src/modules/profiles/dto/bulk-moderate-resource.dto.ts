@@ -1,5 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { ResourceOnboardingState, ResourcePublishStatus, ResourceVerificationStatus } from "@prisma/client";
+import {
+  BackgroundCheckStatus,
+  ResourceOnboardingState,
+  ResourcePublishStatus,
+  ResourceVerificationStatus
+} from "@prisma/client";
 import { ArrayMinSize, IsArray, IsEnum, IsOptional, IsString } from "class-validator";
 
 export class BulkModerateResourceDto {
@@ -23,4 +28,9 @@ export class BulkModerateResourceDto {
   @IsOptional()
   @IsEnum(ResourceOnboardingState)
   onboardingState?: ResourceOnboardingState;
+
+  @ApiPropertyOptional({ enum: BackgroundCheckStatus })
+  @IsOptional()
+  @IsEnum(BackgroundCheckStatus)
+  backgroundCheckStatus?: BackgroundCheckStatus;
 }
