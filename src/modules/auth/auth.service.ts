@@ -184,6 +184,7 @@ export class AuthService {
       <p>Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</p>
     `.trim();
 
+    this.logger.log(`Envoi email reset vers ${normalizedEmail}...`);
     const result = await this.emailService.send({
       to: normalizedEmail,
       subject: "Réinitialisation de votre mot de passe",
@@ -191,6 +192,8 @@ export class AuthService {
     });
     if (!result.ok) {
       this.logger.warn(`Envoi email reset échoué pour ${normalizedEmail}: ${result.error}`);
+    } else {
+      this.logger.log(`Email reset traité pour ${normalizedEmail} (ok=${result.ok}).`);
     }
     return { message: "Si cet email est connu, un lien a été envoyé." };
   }

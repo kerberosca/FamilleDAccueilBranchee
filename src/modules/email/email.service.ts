@@ -17,12 +17,13 @@ export class EmailService {
   private readonly from: string;
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>("RESEND_API_KEY", "");
+    const apiKey = (this.configService.get<string>("RESEND_API_KEY", "") ?? "").trim();
     this.from =
-      this.configService.get<string>("EMAIL_FROM", "") ||
+      (this.configService.get<string>("EMAIL_FROM", "") ?? "").trim() ||
       "FAB <onboarding@resend.dev>";
     if (apiKey) {
       this.resend = new Resend(apiKey);
+      this.logger.log("Resend configuré : envoi d'emails activé.");
     } else {
       this.logger.warn(
         "RESEND_API_KEY non configuré : les emails ne seront pas envoyés (log uniquement)."

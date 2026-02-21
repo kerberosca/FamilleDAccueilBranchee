@@ -27,6 +27,8 @@ export class AuthController {
   ) {}
 
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } })
   @Post("register")
   async register(@Body() body: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(body);

@@ -5,6 +5,7 @@ import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
+import { PasswordStrength } from "../../../components/ui/password-strength";
 import { apiPost } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
 
@@ -90,12 +91,14 @@ export default function FamilyOnboardingPage() {
         <form className="grid gap-2" onSubmit={onRegister}>
           <Input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
           <Input
-            placeholder="Mot de passe (8+)"
+            placeholder="Mot de passe (8 caractères min, majuscule, chiffre, spécial)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             type="password"
             required
+            minLength={8}
           />
+          <PasswordStrength password={password} />
           <Input placeholder="Nom affiche" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
           <Input placeholder="Code postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} required />
           <Input placeholder="Ville" value={city} onChange={(e) => setCity(e.target.value)} required />

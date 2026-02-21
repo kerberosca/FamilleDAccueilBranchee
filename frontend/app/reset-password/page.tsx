@@ -7,6 +7,7 @@ import { Alert } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
+import { PasswordStrength } from "../../components/ui/password-strength";
 import { ApiError, apiPost } from "../../lib/api";
 
 type ResetPasswordResponse = { success?: boolean; message?: string };
@@ -86,13 +87,14 @@ function ResetPasswordForm() {
         <form onSubmit={onSubmit} className="grid gap-3">
           <Input
             type="password"
-            placeholder="Nouveau mot de passe"
+            placeholder="Nouveau mot de passe (8 car. min, majuscule, chiffre, spécial)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
             autoComplete="new-password"
           />
+          <PasswordStrength password={password} />
           <Input
             type="password"
             placeholder="Confirmer le mot de passe"
