@@ -32,6 +32,10 @@ export async function apiPatch<T>(path: string, options: RequestOptions = {}): P
   return requestJson<T>(path, { ...options, method: "PATCH" });
 }
 
+export async function apiDelete<T = void>(path: string, options: RequestOptions = {}): Promise<T> {
+  return requestJson<T>(path, { ...options, method: "DELETE" });
+}
+
 async function tryRefresh(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   const url = `${API_BASE}/auth/refresh`;
@@ -61,7 +65,7 @@ function redirectToLogin() {
 
 async function requestJson<T>(
   path: string,
-  options: RequestOptions & { method: "GET" | "POST" | "PATCH" },
+  options: RequestOptions & { method: "GET" | "POST" | "PATCH" | "DELETE" },
   isRetryAfterRefresh = false
 ): Promise<T> {
   const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
@@ -77,12 +81,15 @@ async function requestJson<T>(
     method: options.method,
     headers,
     credentials: "include",
-    body: typeof options.body === "undefined" ? undefined : JSON.stringify(options.body)
+    body: options.method === "GET" || options.method === "DELETE" ? undefined : (typeof options.body === "undefined" ? undefined : JSON.stringify(options.body))
   });
 
   let json: unknown = null;
   try {
-    json = await response.json();
+    const text = await response.text();
+    if (text.length > 0) {
+      json = JSON.parse(text);
+    }
   } catch {
     // Ignore non-json responses.
   }

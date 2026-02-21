@@ -368,7 +368,7 @@ export default function MePage() {
           availability: parseAvailabilityOrThrow(availabilityJson)
         }
       });
-      setSuccess("Profil RESOURCE mis a jour.");
+      setSuccess("Profil allié mis à jour.");
       const refreshed = await apiGet<ResourceProfileResponse>("/profiles/me", { token: accessToken });
       setProfile(refreshed);
       const updatedSnapshot: FormSnapshot = {
@@ -477,7 +477,7 @@ export default function MePage() {
 
         {me?.role === "RESOURCE" ? (
           <Card className="space-y-3">
-            <h2 className="text-lg font-medium">Editer mon profil RESOURCE</h2>
+            <h2 className="text-lg font-medium">Editer mon profil allié</h2>
             <Input
               placeholder="Nom affiche"
               value={displayName}

@@ -85,8 +85,8 @@ export class AuthService {
                   region: input.region,
                   bio: input.bio,
                   skillsTags: input.tags ?? [],
-                  onboardingState: ResourceOnboardingState.PENDING_PAYMENT,
-                  verificationStatus: ResourceVerificationStatus.DRAFT,
+                  onboardingState: ResourceOnboardingState.PENDING_VERIFICATION,
+                  verificationStatus: ResourceVerificationStatus.PENDING_VERIFICATION,
                   publishStatus: ResourcePublishStatus.HIDDEN
                 }
               }

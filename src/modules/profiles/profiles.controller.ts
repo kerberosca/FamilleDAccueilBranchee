@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Role } from "@prisma/client";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -73,6 +73,14 @@ export class ProfilesController {
   @Patch("resources/moderation/bulk")
   async bulkModerateResources(@CurrentUser() user: JwtPayload, @Body() dto: BulkModerateResourceDto) {
     return this.profilesService.bulkModerateResources(dto.resourceIds, dto, user.sub);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Delete("resource/:resourceId")
+  async deleteResource(@CurrentUser() user: JwtPayload, @Param("resourceId") resourceId: string) {
+    return this.profilesService.deleteResourceByAdmin(resourceId, user.sub);
   }
 
   @ApiBearerAuth()

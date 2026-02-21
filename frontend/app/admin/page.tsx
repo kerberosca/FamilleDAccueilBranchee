@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
-import { apiGet, apiPatch, apiPost } from "../../lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 import { useMaintenance } from "../../lib/maintenance-context";
 
@@ -323,6 +323,24 @@ export default function AdminPage() {
     setSelectedResourceIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
+  const deleteResource = async (resourceId: string, displayName: string) => {
+    if (!accessToken) return;
+    const confirmed = window.confirm(
+      `Supprimer définitivement l'allié « ${displayName} » ? Cette action est irréversible (compte et profil effacés de la base).`
+    );
+    if (!confirmed) return;
+    setBusyId(resourceId);
+    setError(null);
+    try {
+      await apiDelete(`/profiles/resource/${resourceId}`, { token: accessToken });
+      await refreshCurrentTab();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors de la suppression.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const setMaintenance = async (enabled: boolean) => {
     if (!accessToken) {
       return;
@@ -400,7 +418,7 @@ export default function AdminPage() {
                 Familles
               </Button>
               <Button variant={tab === "resources" ? "primary" : "secondary"} onClick={() => setTab("resources")}>
-                Ressources
+                Alliés
               </Button>
               <Button variant={tab === "audit" ? "primary" : "secondary"} onClick={() => setTab("audit")}>
                 Audit
@@ -565,7 +583,7 @@ export default function AdminPage() {
                   </Button>
                 </div>
 
-                {loadingData ? <Alert tone="info">Chargement des ressources...</Alert> : null}
+                {loadingData ? <Alert tone="info">Chargement des alliés...</Alert> : null}
                 <div className="space-y-2">
                   {resources.map((resource) => (
                     <Card key={resource.id} className="space-y-2">
@@ -622,10 +640,18 @@ export default function AdminPage() {
                         >
                           Rejeter / suspendre
                         </Button>
+                        <Button
+                          variant="secondary"
+                          disabled={busyId === resource.id}
+                          onClick={() => void deleteResource(resource.id, resource.displayName)}
+                          className="text-rose-400 hover:text-rose-300 hover:bg-rose-900/30"
+                        >
+                          Supprimer (effacer de la base)
+                        </Button>
                       </div>
                     </Card>
                   ))}
-                  {!loadingData && resources.length === 0 ? <Alert tone="info">Aucune ressource trouvee.</Alert> : null}
+                  {!loadingData && resources.length === 0 ? <Alert tone="info">Aucun allié trouvé.</Alert> : null}
                 </div>
 
                 <PaginationControls

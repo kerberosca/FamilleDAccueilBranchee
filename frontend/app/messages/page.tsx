@@ -103,7 +103,7 @@ function MessagesContent() {
                 </div>
               </form>
             ) : (
-              <Alert tone="info">Seules les familles (avec abonnement actif) peuvent contacter les ressources.</Alert>
+              <Alert tone="info">Seules les familles (avec abonnement actif) peuvent contacter les alliés.</Alert>
             )}
           </Card>
         ) : null}

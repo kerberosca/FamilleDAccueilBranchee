@@ -24,13 +24,8 @@ type RegisterResponse = {
   nextStepForResource?: string | null;
 };
 
-type CheckoutResponse = {
-  checkoutUrl: string;
-  sessionId: string;
-};
-
 export default function ResourceOnboardingPage() {
-  const { accessToken, setTokens } = useAuth();
+  const { setTokens } = useAuth();
   const [allyType, setAllyType] = useState<AllyType | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,7 +36,6 @@ export default function ResourceOnboardingPage() {
   const [bio, setBio] = useState("");
   const [tags, setTags] = useState("");
   const [loadingRegister, setLoadingRegister] = useState(false);
-  const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -71,30 +65,11 @@ export default function ResourceOnboardingPage() {
         }
       });
       setTokens(response.accessToken, response.refreshToken);
-      setSuccess("Compte allié créé. Prochaine étape : paiement des frais d'inscription (Stripe).");
+      setSuccess("Compte allié créé. Vous pouvez compléter votre profil et attendre la validation.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
       setLoadingRegister(false);
-    }
-  };
-
-  const onCheckout = async () => {
-    if (!accessToken) {
-      setError("Token manquant. Inscris-toi d'abord.");
-      return;
-    }
-    setError(null);
-    setLoadingCheckout(true);
-    try {
-      const session = await apiPost<CheckoutResponse>("/billing/resource/checkout-session", {
-        token: accessToken
-      });
-      window.location.href = session.checkoutUrl;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur inconnue");
-    } finally {
-      setLoadingCheckout(false);
     }
   };
 
@@ -141,15 +116,6 @@ export default function ResourceOnboardingPage() {
             {loadingRegister ? "Création…" : "Créer mon compte allié"}
           </Button>
         </form>
-      </Card>
-
-      <Card className="space-y-2">
-        <p className="text-sm text-slate-300">
-          Étape suivante : payer les frais d&apos;inscription ressource puis attendre la validation admin.
-        </p>
-        <Button type="button" onClick={onCheckout} disabled={loadingCheckout || !accessToken}>
-          {loadingCheckout ? "Redirection…" : "Payer les frais d'inscription"}
-        </Button>
       </Card>
 
       {success ? <Alert tone="info">{success}</Alert> : null}

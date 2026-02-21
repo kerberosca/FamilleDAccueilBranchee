@@ -169,7 +169,7 @@ export default function SearchPage() {
 
   return (
     <main className="mx-auto max-w-4xl space-y-5 p-6">
-      <h1 className="text-2xl font-semibold">Recherche de ressources</h1>
+      <h1 className="text-2xl font-semibold">Recherche d'alliés</h1>
 
       <form onSubmit={onSubmit} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
         <Input
@@ -207,7 +207,7 @@ export default function SearchPage() {
 
       {isPreview ? (
         <Alert tone="info">
-          Mode preview actif: seules quelques ressources sont visibles. Passe en abonnement actif pour pagination +
+          Mode preview actif: seuls quelques alliés sont visibles. Passe en abonnement actif pour pagination +
           contacts.
         </Alert>
       ) : null}

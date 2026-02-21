@@ -19,8 +19,8 @@ export default function OnboardingPage() {
         </Card>
 
         <Card>
-          <h2 className="text-lg font-semibold">Ressource</h2>
-          <p className="mt-2 text-sm text-slate-300">Créer un compte RESOURCE puis payer les frais d&apos;inscription (Stripe).</p>
+          <h2 className="text-lg font-semibold">Allié</h2>
+          <p className="mt-2 text-sm text-slate-300">Créer un compte allié, inscription gratuite.</p>
           <Link className="mt-3 inline-block" href="/onboarding/resource">
             Commencer
           </Link>

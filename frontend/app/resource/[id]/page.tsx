@@ -36,7 +36,7 @@ export default function ResourceDetailPage() {
   useEffect(() => {
     if (!resourceId) {
       setLoading(false);
-      setError("Identifiant ressource manquant.");
+      setError("Identifiant allié manquant.");
       return;
     }
     const run = async () => {
@@ -46,7 +46,7 @@ export default function ResourceDetailPage() {
         const data = await apiGet<ResourceDetail>(`/profiles/resource/${resourceId}`, { token: accessToken ?? undefined });
         setResource(data);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Ressource introuvable.");
+        setError(e instanceof Error ? e.message : "Allié introuvable.");
       } finally {
         setLoading(false);
       }
@@ -73,7 +73,7 @@ export default function ResourceDetailPage() {
   if (error || !resource) {
     return (
       <main className="mx-auto max-w-2xl space-y-4 p-6">
-        <Alert tone="error">{error ?? "Ressource introuvable."}</Alert>
+        <Alert tone="error">{error ?? "Allié introuvable."}</Alert>
         <Button variant="secondary" onClick={() => router.push("/search")}>
           Retour à la recherche
         </Button>
@@ -117,7 +117,7 @@ export default function ResourceDetailPage() {
 
         <div className="pt-2">
           <Button onClick={handleContact}>
-            {isAuthenticated ? "Contacter cette ressource" : "Se connecter pour contacter"}
+            {isAuthenticated ? "Contacter cet allié" : "Se connecter pour contacter"}
           </Button>
         </div>
       </Card>

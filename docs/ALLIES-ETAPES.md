@@ -35,15 +35,15 @@ Document de planification du parcours d’inscription et de gestion des **allié
 
 ---
 
-### Étape 2 — Inscription gratuite et remplacement « ressource » par « allié » (priorité haute)
+### Étape 2 — Inscription gratuite et remplacement « ressource » par « allié » (priorité haute) ✅ — Terminée
 
 **Objectif** : Plus de paiement pour les alliés ; après inscription, passage direct en attente de validation. Renommer tout ce qui est « ressource » en « allié » côté utilisateur.
 
 **Livrables** :
-- [ ] Backend : à l’inscription (rôle RESOURCE), mettre `onboardingState: PENDING_VERIFICATION` (et statuts de vérification/publication adaptés) au lieu de `PENDING_PAYMENT`. Inscription 100 % gratuite.
-- [ ] Frontend — page « Premiers pas » (`/onboarding`) : carte « Ressource » → **« Allié »** ; texte du type « Créer un compte allié, inscription gratuite ».
-- [ ] Frontend — page inscription (`/onboarding/resource`) : titre **« Inscription allié »** ; bouton **« Créer mon compte allié »** ; **supprimer** le bloc « Payer les frais d’inscription » et le bouton Stripe. Message de succès : « Compte allié créé. Vous pouvez compléter votre profil et attendre la validation. »
-- [ ] Frontend : remplacer « ressource » par « allié » partout où c’est visible (recherche, fiche détail `/resource/[id]`, espace « Me », etc.). Voir section Terminologie ci-dessus.
+- [x] Backend : à l’inscription (rôle RESOURCE), `onboardingState: PENDING_VERIFICATION` et `verificationStatus: PENDING_VERIFICATION`. Inscription 100 % gratuite.
+- [x] Frontend — page « Premiers pas » : carte **« Allié »**, texte « Créer un compte allié, inscription gratuite ».
+- [x] Frontend — page inscription allié : bloc paiement Stripe supprimé ; message « Compte allié créé. Vous pouvez compléter votre profil et attendre la validation. »
+- [x] Frontend : « ressource » → « allié » (recherche, fiche, accueil, messages, admin, Me).
 
 ---
 
@@ -70,12 +70,23 @@ Document de planification du parcours d’inscription et de gestion des **allié
 
 ---
 
+### Étape 5 — Suppression d’un allié par l’administrateur (priorité moyenne) ✅ — Terminée
+
+**Objectif** : Permettre à l’administrateur d’effacer définitivement un allié (utilisateur + profil) de la base de données.
+
+**Livrables** :
+- [x] Backend : `DELETE /profiles/resource/:resourceId` (admin uniquement) — supprime l’utilisateur associé au profil allié (cascade : profil, conversations, messages, etc.). Action enregistrée dans l’audit admin (`RESOURCE_DELETED`).
+- [x] Frontend (admin) : bouton **« Supprimer (effacer de la base) »** par allié, avec **confirmation** (`window.confirm`). Après suppression, rafraîchissement de la liste.
+
+---
+
 ## Ordre de réalisation suggéré
 
 1. **Étape 1** — Choix du type (Ménage, Gardiens, Autres) en base + dans le formulaire.
 2. **Étape 2** — Inscription gratuite + remplacement « ressource » → « allié » partout dans l’UI.
-3. **Étape 3** — Questionnaire (contenu puis stockage + UI).
-4. **Étape 4** — Vérification antécédents judiciaires (engagement + statut).
+3. **Étape 5** — Suppression d’un allié par l’admin (effacer de la base).
+4. **Étape 3** — Questionnaire (contenu puis stockage + UI).
+5. **Étape 4** — Vérification antécédents judiciaires (engagement + statut).
 
 ---
 

@@ -74,7 +74,7 @@ export default function HomePage() {
           </span>
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-slate-400">
-          Entrez votre code postal ci-dessous pour trouver des ressources près de chez vous. La recherche se fait par code postal (3 lettres-chiffres, ex. G8P, ou code complet en 6 caractères).
+          Entrez votre code postal ci-dessous pour trouver des alliés près de chez vous. La recherche se fait par code postal (3 lettres-chiffres, ex. G8P, ou code complet en 6 caractères).
         </p>
 
         <form onSubmit={handleSearch} className="mx-auto mt-8 max-w-md space-y-3 text-left">

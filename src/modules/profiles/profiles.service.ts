@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, ResourceOnboardingState, ResourcePublishStatus, ResourceVerificationStatus, Role } from "@prisma/client";
 import { SubscriptionAccessService } from "../billing/subscription-access.service";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -63,6 +63,28 @@ export class ProfilesService {
       }
     });
     return this.toResourcePrivateView(updated);
+  }
+
+  async deleteResourceByAdmin(resourceId: string, actorUserId: string) {
+    const profile = await this.prisma.resourceProfile.findUnique({
+      where: { id: resourceId },
+      include: { user: true }
+    });
+    if (!profile) {
+      throw new NotFoundException("Profil allié introuvable.");
+    }
+    if (profile.user.role !== Role.RESOURCE) {
+      throw new BadRequestException("Seul un compte allié (RESOURCE) peut être supprimé via cet endpoint.");
+    }
+    const userId = profile.userId;
+    const displayName = profile.displayName;
+    await this.usersService.logAdminAction(actorUserId, "RESOURCE_DELETED", "USER", userId, {
+      resourceId,
+      displayName,
+      email: profile.user.email
+    });
+    await this.prisma.user.delete({ where: { id: userId } });
+    return { success: true };
   }
 
   async moderateResource(resourceId: string, dto: ModerateResourceDto, actorUserId?: string) {
