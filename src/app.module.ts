@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
 import * as Joi from "joi";
 import { AuthModule } from "./modules/auth/auth.module";
+import { EmailModule } from "./modules/email/email.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { DevModule } from "./modules/dev/dev.module";
 import { HealthModule } from "./modules/health/health.module";
@@ -35,13 +36,16 @@ const isProduction = process.env.NODE_ENV === "production";
         STRIPE_SECRET_KEY: Joi.string().allow("").optional(),
         STRIPE_RESOURCE_ONBOARDING_PRICE_ID: Joi.string().allow("").optional(),
         STRIPE_FAMILY_SUBSCRIPTION_PRICE_ID: Joi.string().allow("").optional(),
-        STRIPE_WEBHOOK_SECRET: Joi.string().allow("").optional()
+        STRIPE_WEBHOOK_SECRET: Joi.string().allow("").optional(),
+        RESEND_API_KEY: Joi.string().allow("").optional(),
+        EMAIL_FROM: Joi.string().allow("").optional()
       })
     }),
     ThrottlerModule.forRoot([
       { ttl: 60_000, limit: 60 }
     ]),
     PrismaModule,
+    EmailModule,
     MaintenanceModule,
     AuthModule,
     ProfilesModule,

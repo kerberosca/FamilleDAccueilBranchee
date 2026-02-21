@@ -18,6 +18,7 @@ import {
 } from "@prisma/client";
 import * as argon2 from "argon2";
 import { randomBytes } from "crypto";
+import { EmailService } from "../email/email.service";
 import { MaintenanceService } from "../maintenance/maintenance.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RegisterDto } from "./dto/register.dto";
@@ -37,6 +38,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
     private readonly maintenanceService: MaintenanceService
   ) {}
 
@@ -173,7 +175,23 @@ export class AuthService {
     });
     const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
     const resetUrl = `${frontendUrl.replace(/\/$/, "")}/reset-password?token=${token}`;
-    this.logger.log(`Password reset link for ${normalizedEmail}: ${resetUrl}`);
+
+    const html = `
+      <p>Bonjour,</p>
+      <p>Une réinitialisation de mot de passe a été demandée pour ce compte. Cliquez sur le lien ci-dessous pour définir un nouveau mot de passe :</p>
+      <p><a href="${resetUrl}">Réinitialiser mon mot de passe</a></p>
+      <p>Ce lien est valable 1 heure.</p>
+      <p>Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</p>
+    `.trim();
+
+    const result = await this.emailService.send({
+      to: normalizedEmail,
+      subject: "Réinitialisation de votre mot de passe",
+      html
+    });
+    if (!result.ok) {
+      this.logger.warn(`Envoi email reset échoué pour ${normalizedEmail}: ${result.error}`);
+    }
     return { message: "Si cet email est connu, un lien a été envoyé." };
   }
 
