@@ -33,7 +33,7 @@ export default function CGUPage() {
           <li>l&apos;utilisation des listes d&apos;alliés ou de familles à des fins de <strong>prospection commerciale</strong>, de revente de données ou de sollicitation non sollicitée ;</li>
           <li>la <strong>revente</strong>, le partage ou la cession des données du répertoire à des tiers ;</li>
           <li>le <strong>scraping</strong>, la copie massive ou la réutilisation automatisée des profils ou des données ;</li>
-          <li>toute utilisation du répertoire ou des données en dehors de la plateforme FAB à d&apos;autres fins que la mise en relation prévue.
+          <li>toute utilisation du répertoire ou des données en dehors de la plateforme FAB à d&apos;autres fins que la mise en relation prévue.</li>
         </ul>
         <p className="text-slate-300">
           En cas de manquement, Forméduc se réserve le droit de <strong>suspension</strong> ou de <strong>résiliation</strong> du compte, sans préjudice d&apos;éventuelles poursuites.
