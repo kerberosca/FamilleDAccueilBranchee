@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import { useAuth } from "../lib/auth-context";
 import { useDevMode } from "../lib/dev-mode";
 import { useMaintenance } from "../lib/maintenance-context";
+import { CookieBanner } from "./cookie-banner";
 import { MaintenancePage } from "./maintenance-page";
 
 function NavLink({
@@ -164,6 +165,9 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
               <Link href="/confidentialite" className="text-slate-400 no-underline hover:text-cyan-400">
                 Confidentialité
               </Link>
+              <Link href="/confidentialite#cookies" className="text-slate-400 no-underline hover:text-cyan-400">
+                Cookies
+              </Link>
               <Link href="/mentions-legales" className="text-slate-400 no-underline hover:text-cyan-400">
                 Mentions légales
               </Link>
@@ -171,6 +175,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
           </div>
         </footer>
       </div>
+      <CookieBanner />
     </div>
   );
 }

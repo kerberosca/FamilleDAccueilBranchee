@@ -36,8 +36,11 @@ export default function ConfidentialitePage() {
         <p className="text-slate-300">
           <strong>Messages :</strong> contenu des échanges entre familles et alliés via la plateforme.
         </p>
+        <h3 id="cookies" className="text-base font-medium text-cyan-300 pt-2">
+          Cookies et traceurs
+        </h3>
         <p className="text-slate-300">
-          <strong>Cookies :</strong> nous utilisons des cookies strictement nécessaires au fonctionnement du site (session de connexion). Nous n&apos;utilisons pas de cookies publicitaires ni de traceurs à des fins de ciblage tiers.
+          Nous utilisons uniquement des <strong>cookies strictement nécessaires</strong> au fonctionnement du site : cookie de session (ex. <em>refresh_token</em>) pour maintenir votre connexion. Aucun consentement n&apos;est requis pour ces cookies. Nous n&apos;utilisons pas de cookies publicitaires, analytiques ou de traceurs à des fins de ciblage tiers. Vous pouvez à tout moment consulter cette section ou le bandeau d&apos;information en pied de page pour en savoir plus.
         </p>
       </section>
 
