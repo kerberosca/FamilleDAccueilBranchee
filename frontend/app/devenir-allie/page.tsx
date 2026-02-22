@@ -34,7 +34,7 @@ export default function DevenirAlliePage() {
       {/* Hero */}
       <section className="animate-slide-up text-center">
         <p className="text-sm font-medium uppercase tracking-wider text-cyan-400/90">
-          Exemple : Allié cherché
+          Allié cherché
         </p>
         <h1 className="mt-3 text-4xl font-bold tracking-tight text-white sm:text-5xl">
           Qu&apos;est-ce qu&apos;un{" "}

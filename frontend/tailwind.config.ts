@@ -20,6 +20,7 @@ const config: Config = {
       animation: {
         "fade-in": "fadeIn 0.4s ease-out",
         "slide-up": "slideUp 0.5s ease-out",
+        "soft-glow": "softGlow 2.5s ease-in-out 0.5s 2 forwards",
       },
       keyframes: {
         fadeIn: {
@@ -29,6 +30,10 @@ const config: Config = {
         slideUp: {
           "0%": { opacity: "0", transform: "translateY(12px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        softGlow: {
+          "0%, 100%": { boxShadow: "0 0 0 1px rgba(34, 211, 238, 0.15)" },
+          "50%": { boxShadow: "0 0 0 1px rgba(34, 211, 238, 0.35), 0 0 24px -4px rgba(34, 211, 238, 0.12)" },
         },
       },
       backgroundImage: {

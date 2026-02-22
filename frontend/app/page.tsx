@@ -74,49 +74,57 @@ export default function HomePage() {
             FAB
           </span>
         </h1>
-        <p className="mx-auto mt-4 max-w-xl text-lg text-slate-400">
-          Entrez votre code postal ci-dessous pour trouver des alliés près de chez vous. La recherche se fait par code postal (3 lettres-chiffres, ex. G8P, ou code complet en 6 caractères).
-        </p>
 
-        <form onSubmit={handleSearch} className="mx-auto mt-8 max-w-md space-y-3 text-left">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="mx-auto mt-6 max-w-md">
+          <p className="mb-3 text-center text-sm font-medium text-cyan-400/90">
+            Des alliés à deux pas de chez vous
+          </p>
+          <form
+            onSubmit={handleSearch}
+            className="animate-soft-glow rounded-xl border border-cyan-500/20 bg-slate-800/40 p-4 text-left backdrop-blur-sm"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                type="text"
+                value={postalCode}
+                onChange={(e) => setPostalCode(normalizePostalCode(e.target.value))}
+                placeholder="Code postal (ex: H2X ou H2X1Y4)"
+                className="flex-1"
+                maxLength={7}
+                aria-label="Code postal"
+              />
+              <Button type="submit" disabled={!isPostalValid} className="w-full sm:w-auto">
+                Rechercher
+              </Button>
+            </div>
             <Input
               type="text"
-              value={postalCode}
-              onChange={(e) => setPostalCode(normalizePostalCode(e.target.value))}
-              placeholder="Code postal (ex: H2X ou H2X1Y4)"
-              className="flex-1"
-              maxLength={7}
-              aria-label="Code postal"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="Tags optionnels (ex: transport, répit)"
+              className="mt-3 w-full"
+              aria-label="Tags de recherche"
             />
-            <Button type="submit" disabled={!isPostalValid} className="w-full sm:w-auto">
-              Rechercher
-            </Button>
-          </div>
-          <Input
-            type="text"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="Tags optionnels (ex: transport, répit)"
-            className="w-full"
-            aria-label="Tags de recherche"
-          />
-          {error && (
-            <p className="text-sm text-rose-400" role="alert">
-              {error}
-            </p>
-          )}
-        </form>
+            {error && (
+              <p className="mt-2 text-sm text-rose-400" role="alert">
+                {error}
+              </p>
+            )}
+          </form>
+          <p className="mt-2 text-center text-xs text-slate-500">
+            3 ou 6 caractères (ex. G8P ou G8P 1A1)
+          </p>
+        </div>
 
         <div className="mx-auto mt-10 max-w-md animate-slide-up">
           <Link
             href="/devenir-allie"
             className="block rounded-xl border border-cyan-500/30 bg-slate-800/60 p-4 text-center transition hover:border-cyan-500/50 hover:bg-slate-800/80 hover:shadow-[0_0_24px_-8px_rgba(34,211,238,0.2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
           >
-            <span className="text-sm font-medium uppercase tracking-wider text-cyan-400">
-              Exemple : Allié cherché
+            <span className="block text-base font-medium leading-snug text-white">
+              Rejoignez FAB comme allié — inscrivez-vous pour aider les familles.
             </span>
-            <span className="mt-1 block text-base font-medium text-white">
+            <span className="mt-2 block text-sm text-cyan-400/90">
               Qu&apos;est-ce qu&apos;un allié ? Devenir allié
             </span>
           </Link>
