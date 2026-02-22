@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "../components/ui/button";
@@ -106,6 +107,20 @@ export default function HomePage() {
             </p>
           )}
         </form>
+
+        <div className="mx-auto mt-10 max-w-md animate-slide-up">
+          <Link
+            href="/devenir-allie"
+            className="block rounded-xl border border-cyan-500/30 bg-slate-800/60 p-4 text-center transition hover:border-cyan-500/50 hover:bg-slate-800/80 hover:shadow-[0_0_24px_-8px_rgba(34,211,238,0.2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
+          >
+            <span className="text-sm font-medium uppercase tracking-wider text-cyan-400">
+              Exemple : Allié cherché
+            </span>
+            <span className="mt-1 block text-base font-medium text-white">
+              Qu&apos;est-ce qu&apos;un allié ? Devenir allié
+            </span>
+          </Link>
+        </div>
       </div>
     </main>
   );
