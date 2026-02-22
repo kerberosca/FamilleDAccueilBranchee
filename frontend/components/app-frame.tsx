@@ -168,9 +168,18 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
               <Link href="/confidentialite#cookies" className="text-slate-400 no-underline hover:text-cyan-400">
                 Cookies
               </Link>
+              <Link href="/cgu" className="text-slate-400 no-underline hover:text-cyan-400">
+                CGU
+              </Link>
               <Link href="/mentions-legales" className="text-slate-400 no-underline hover:text-cyan-400">
                 Mentions légales
               </Link>
+              <Link href="/accessibilite" className="text-slate-400 no-underline hover:text-cyan-400">
+                Accessibilité
+              </Link>
+              <a href="mailto:info@formeduc.ca" className="text-slate-400 no-underline hover:text-cyan-400">
+                Contact
+              </a>
             </nav>
           </div>
         </footer>

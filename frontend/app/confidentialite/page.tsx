@@ -14,7 +14,7 @@ export default function ConfidentialitePage() {
         <h2 className="text-lg font-semibold text-white">1. Qui sommes-nous ?</h2>
         <p className="text-slate-300">
           Le responsable du traitement des données est <strong>Forméduc</strong>. Adresse : 5121 boul. Chauveau Ouest, Québec, QC G2E 5A6 local 101. Contact : 418 842-7523, info@formeduc.ca.
-          Pour toute question sur vos données ou pour exercer vos droits, vous pouvez contacter Forméduc à info@formeduc.ca.
+          La personne responsable de la protection des renseignements personnels au sein de Forméduc est la direction, joignable à info@formeduc.ca ou au 418 842-7523. Pour toute question sur vos données ou pour exercer vos droits, vous pouvez la contacter.
         </p>
       </section>
 
@@ -100,7 +100,7 @@ export default function ConfidentialitePage() {
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-white">10. Nous contacter</h2>
         <p className="text-slate-300">
-          Forméduc — 5121 boul. Chauveau Ouest, Québec, QC G2E 5A6 local 101. Téléphone : 418 842-7523. Courriel : info@formeduc.ca. Pour toute question relative à la protection des renseignements personnels : info@formeduc.ca.
+          Forméduc — 5121 boul. Chauveau Ouest, Québec, QC G2E 5A6 local 101. Téléphone : 418 842-7523. Courriel : info@formeduc.ca. La direction, personne responsable de la protection des renseignements personnels, est joignable à info@formeduc.ca ou au 418 842-7523.
         </p>
       </section>
 
