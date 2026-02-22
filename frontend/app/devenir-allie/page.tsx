@@ -15,12 +15,14 @@ const TYPES = [
   {
     title: "Gardiens",
     description: "Garde d'enfants, répit. Permettre aux familles de souffler en toute confiance.",
-    icon: "👶"
+    icon: "👶",
+    image: "/images/gardien-illustration.png"
   },
   {
     title: "Autres",
     description: "Transport, accompagnement, soutien ponctuel. Chaque aide compte.",
-    icon: "🤝"
+    icon: "🤝",
+    image: "/images/autres-illustration.png"
   }
 ];
 
