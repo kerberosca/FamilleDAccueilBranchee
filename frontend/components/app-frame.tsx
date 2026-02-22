@@ -165,6 +165,9 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
               <Link href="/confidentialite" className="text-slate-400 no-underline hover:text-cyan-400">
                 Confidentialité
               </Link>
+              <Link href="/droits" className="text-slate-400 no-underline hover:text-cyan-400">
+                Vos droits
+              </Link>
               <Link href="/confidentialite#cookies" className="text-slate-400 no-underline hover:text-cyan-400">
                 Cookies
               </Link>

@@ -72,7 +72,7 @@ export default function ConfidentialitePage() {
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-white">6. Transfert des données hors du Québec</h2>
         <p className="text-slate-300">
-          Les données sont hébergées au Canada. Lorsque nous faisons appel à des prestataires hors du Québec, nous nous assurons que des garanties appropriées sont en place. Nous ne vendons pas vos données.
+          Les données sont hébergées au Canada (Toronto, Ontario), chez l&apos;hébergeur Vultr. Lorsque nous faisons appel à des prestataires hors du Québec, nous nous assurons que des garanties appropriées sont en place. Nous ne vendons pas vos données.
         </p>
       </section>
 
@@ -86,7 +86,7 @@ export default function ConfidentialitePage() {
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-white">8. Vos droits</h2>
         <p className="text-slate-300">
-          Vous pouvez : <strong>accéder</strong> à vos données (obtenir une copie) ; les <strong>rectifier</strong> (via Mon compte ou en nous contactant) ; <strong>retirer votre consentement</strong> (ex. ne plus figurer au répertoire) ; <strong>demander la suppression de votre compte</strong> (bouton dans Mon compte ou courriel à info@formeduc.ca). Nous nous engageons à répondre dans un délai raisonnable. Vous avez le droit de porter plainte devant la CAI.
+          Vous pouvez : <strong>accéder</strong> à vos données (obtenir une copie) ; les <strong>rectifier</strong> (via Mon compte ou en nous contactant) ; <strong>retirer votre consentement</strong> (ex. ne plus figurer au répertoire) ; <strong>demander la suppression de votre compte</strong> (bouton dans Mon compte ou courriel à info@formeduc.ca). Nous nous engageons à répondre dans un délai raisonnable. Vous avez le droit de porter plainte devant la CAI. Pour savoir comment exercer ces droits, consultez la page <Link href="/droits" className="text-cyan-400 underline hover:text-cyan-300">Exercer vos droits</Link>.
         </p>
       </section>
 

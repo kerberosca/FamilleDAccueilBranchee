@@ -31,7 +31,7 @@ export default function MentionsLegalesPage() {
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-white">Hébergement</h2>
         <p className="text-slate-300">
-          À préciser par Forméduc (hébergeur et lieu d&apos;hébergement).
+          Vultr, datacenter à Toronto (Ontario, Canada).
         </p>
       </section>
 
