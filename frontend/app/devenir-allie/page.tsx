@@ -1,13 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 import { Card } from "../../components/ui/card";
 
 const TYPES = [
   {
     title: "Ménage",
     description: "Aide au quotidien : entretien, repas, linge. Un soutien concret pour alléger le foyer.",
-    icon: "🏠"
+    icon: "🏠",
+    image: "/images/menage-illustration.png"
   },
   {
     title: "Gardiens",
@@ -27,6 +30,29 @@ const STEPS = [
   "Après validation (vérification d'antécédents), vous êtes visible par les familles.",
   "Les familles vous contactent selon leurs besoins."
 ];
+
+function TypeIcon({
+  item
+}: {
+  item: { title: string; icon: string; image?: string };
+}) {
+  const [imageError, setImageError] = useState(false);
+  if (item.image && !imageError) {
+    return (
+      <div className="relative h-20 w-full">
+        <Image
+          src={item.image}
+          alt=""
+          fill
+          className="object-contain object-left"
+          onError={() => setImageError(true)}
+          unoptimized
+        />
+      </div>
+    );
+  }
+  return <div className="text-3xl">{item.icon}</div>;
+}
 
 export default function DevenirAlliePage() {
   return (
@@ -65,7 +91,7 @@ export default function DevenirAlliePage() {
               variant="glass"
               className="animate-slide-up border-cyan-500/10 bg-slate-800/50 transition hover:border-cyan-500/25 hover:shadow-[0_0_20px_-8px_rgba(34,211,238,0.3)]"
             >
-              <div className="text-3xl">{item.icon}</div>
+              <TypeIcon item={item} />
               <h3 className="mt-3 text-lg font-semibold text-white">{item.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-400">{item.description}</p>
             </Card>

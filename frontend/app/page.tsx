@@ -76,8 +76,8 @@ export default function HomePage() {
         </h1>
 
         <div className="mx-auto mt-6 max-w-md">
-          <p className="mb-3 text-center text-sm font-medium text-cyan-400/90">
-            Des alliés à deux pas de chez vous
+          <p className="mb-3 text-center text-sm text-slate-400">
+            Entrez votre code postal ci-dessous pour trouver des alliés près de chez vous. La recherche se fait par code postal (3 lettres-chiffres, ex. G8P, ou code complet en 6 caractères).
           </p>
           <form
             onSubmit={handleSearch}
