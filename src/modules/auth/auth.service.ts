@@ -166,6 +166,12 @@ export class AuthService {
     return { success: true };
   }
 
+  /** Supprime définitivement le compte de l'utilisateur connecté (cascade: profil, messages, abonnements, etc.). */
+  async deleteMyAccount(userId: string) {
+    await this.prisma.user.delete({ where: { id: userId } });
+    return { success: true };
+  }
+
   async requestPasswordReset(email: string) {
     const normalizedEmail = email.toLowerCase();
     const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });

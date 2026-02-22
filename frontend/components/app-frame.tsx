@@ -155,7 +155,22 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <div className="relative">{children}</div>
+      <div className="relative flex min-h-[calc(100vh-4rem)] flex-col">
+        <div className="flex-1">{children}</div>
+        <footer className="mt-auto border-t border-slate-800/80 bg-slate-950/80 px-4 py-4 backdrop-blur-sm">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center text-sm text-slate-400 sm:justify-between">
+            <span>© FAB — Famille d&apos;accueil branchée</span>
+            <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1" aria-label="Liens légaux">
+              <Link href="/confidentialite" className="text-slate-400 no-underline hover:text-cyan-400">
+                Confidentialité
+              </Link>
+              <Link href="/mentions-legales" className="text-slate-400 no-underline hover:text-cyan-400">
+                Mentions légales
+              </Link>
+            </nav>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }

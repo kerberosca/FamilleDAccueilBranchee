@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
@@ -30,6 +31,7 @@ export default function FamilyOnboardingPage() {
   const [region, setRegion] = useState("QC");
   const [bio, setBio] = useState("");
   const [tags, setTags] = useState("");
+  const [acceptPolicy, setAcceptPolicy] = useState(false);
   const [loadingRegister, setLoadingRegister] = useState(false);
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +39,10 @@ export default function FamilyOnboardingPage() {
 
   const onRegister = async (event: FormEvent) => {
     event.preventDefault();
+    if (!acceptPolicy) {
+      setError("Vous devez accepter la Politique de confidentialité et le traitement de vos données pour vous inscrire.");
+      return;
+    }
     setError(null);
     setSuccess(null);
     setLoadingRegister(true);
@@ -87,8 +93,27 @@ export default function FamilyOnboardingPage() {
     <main className="mx-auto max-w-2xl space-y-4 p-6">
       <h1 className="text-2xl font-semibold">Inscription famille</h1>
 
+      <p className="text-sm text-slate-300">
+        Vos données seront enregistrées dans notre base et utilisées pour la mise en relation avec les alliés. Vous pourrez supprimer votre compte à tout moment depuis « Mon profil ». Consultez notre{" "}
+        <Link href="/confidentialite" className="text-cyan-400 underline hover:text-cyan-300">
+          Politique de confidentialité
+        </Link>
+        .
+      </p>
+
       <Card>
         <form className="grid gap-2" onSubmit={onRegister}>
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={acceptPolicy}
+              onChange={(e) => setAcceptPolicy(e.target.checked)}
+              className="mt-0.5 rounded border-slate-600 bg-slate-800 text-cyan-500"
+            />
+            <span>
+              J&apos;ai lu la Politique de confidentialité et j&apos;accepte que mes données soient traitées et que mon profil soit utilisé pour la mise en relation.
+            </span>
+          </label>
           <Input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
           <Input
             placeholder="Mot de passe (8 caractères min, majuscule, chiffre, spécial)"
@@ -105,7 +130,7 @@ export default function FamilyOnboardingPage() {
           <Input placeholder="Region" value={region} onChange={(e) => setRegion(e.target.value)} required />
           <Input placeholder="Bio (optionnel)" value={bio} onChange={(e) => setBio(e.target.value)} />
           <Input placeholder="Tags CSV (optionnel)" value={tags} onChange={(e) => setTags(e.target.value)} />
-          <Button type="submit" disabled={loadingRegister}>
+          <Button type="submit" disabled={loadingRegister || !acceptPolicy}>
             {loadingRegister ? "Creation..." : "Creer mon compte FAMILY"}
           </Button>
         </form>

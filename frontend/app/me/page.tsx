@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Alert } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
-import { apiGet, apiPatch } from "../../lib/api";
+import { apiDelete, apiGet, apiPatch } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 import { ALLY_QUESTIONNAIRE } from "../../lib/questionnaire-ally";
 
@@ -80,8 +81,10 @@ type FieldErrors = Partial<
 >;
 
 export default function MePage() {
+  const router = useRouter();
   const { accessToken, logout } = useAuth();
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [profile, setProfile] = useState<FamilyProfileResponse | ResourceProfileResponse | null>(null);
   const [initialSnapshot, setInitialSnapshot] = useState<FormSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -218,6 +221,28 @@ export default function MePage() {
     setLoggingOut(true);
     await logout();
     setLoggingOut(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (
+      !accessToken ||
+      !window.confirm(
+        "Êtes-vous sûr de vouloir supprimer définitivement votre compte ? Cette action est irréversible (profil, messages, abonnement). Vous serez déconnecté."
+      )
+    ) {
+      return;
+    }
+    setDeletingAccount(true);
+    setError(null);
+    try {
+      await apiDelete("/auth/me", { token: accessToken });
+      await logout();
+      router.push("/");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors de la suppression du compte.");
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   useEffect(() => {
@@ -641,6 +666,22 @@ export default function MePage() {
             </div>
           </Card>
         ) : null}
+
+        <Card className="mt-6 border-t border-slate-700 pt-4">
+          <h2 className="text-lg font-medium text-slate-200">Supprimer mon compte</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            La suppression est définitive : profil, messages et abonnement seront supprimés. Cette action est irréversible.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-3 border-rose-500/50 text-rose-300 hover:bg-rose-950/50 hover:text-rose-200"
+            onClick={handleDeleteAccount}
+            disabled={deletingAccount}
+          >
+            {deletingAccount ? "Suppression…" : "Supprimer mon compte"}
+          </Button>
+        </Card>
       </RequireAuth>
     </main>
   );

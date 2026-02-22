@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
@@ -35,12 +36,17 @@ export default function ResourceOnboardingPage() {
   const [region, setRegion] = useState("QC");
   const [bio, setBio] = useState("");
   const [tags, setTags] = useState("");
+  const [acceptPolicy, setAcceptPolicy] = useState(false);
   const [loadingRegister, setLoadingRegister] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const onRegister = async (event: FormEvent) => {
     event.preventDefault();
+    if (!acceptPolicy) {
+      setError("Vous devez accepter la Politique de confidentialité et le traitement de vos données pour vous inscrire.");
+      return;
+    }
     if (!allyType) {
       setError("Veuillez choisir un type (Ménage, Gardiens ou Autres).");
       return;
@@ -77,8 +83,27 @@ export default function ResourceOnboardingPage() {
     <main className="mx-auto max-w-2xl space-y-4 p-6">
       <h1 className="text-2xl font-semibold">Inscription allié</h1>
 
+      <p className="text-sm text-slate-300">
+        Vos données seront enregistrées dans notre base et votre profil pourra être publié dans le répertoire pour permettre la mise en relation avec les familles. Vous pourrez supprimer votre compte à tout moment depuis « Mon profil ». Consultez notre{" "}
+        <Link href="/confidentialite" className="text-cyan-400 underline hover:text-cyan-300">
+          Politique de confidentialité
+        </Link>
+        .
+      </p>
+
       <Card>
         <form className="grid gap-2" onSubmit={onRegister}>
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={acceptPolicy}
+              onChange={(e) => setAcceptPolicy(e.target.checked)}
+              className="mt-0.5 rounded border-slate-600 bg-slate-800 text-cyan-500"
+            />
+            <span>
+              J&apos;ai lu la Politique de confidentialité et j&apos;accepte que mes données soient traitées et que mon profil soit publié dans le répertoire.
+            </span>
+          </label>
           <p className="text-sm text-slate-300">Choisissez votre type :</p>
           <div className="flex flex-wrap gap-2">
             {ALLY_TYPE_OPTIONS.map(({ value, label }) => (
@@ -112,7 +137,7 @@ export default function ResourceOnboardingPage() {
           <Input placeholder="Region" value={region} onChange={(e) => setRegion(e.target.value)} required />
           <Input placeholder="Bio (optionnel)" value={bio} onChange={(e) => setBio(e.target.value)} />
           <Input placeholder="Tags CSV (optionnel)" value={tags} onChange={(e) => setTags(e.target.value)} />
-          <Button type="submit" disabled={loadingRegister || !allyType}>
+          <Button type="submit" disabled={loadingRegister || !allyType || !acceptPolicy}>
             {loadingRegister ? "Création…" : "Créer mon compte allié"}
           </Button>
         </form>

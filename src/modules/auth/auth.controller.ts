@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, HttpCode, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
@@ -76,6 +76,13 @@ export class AuthController {
     await this.authService.logout(user.sub);
     this.clearRefreshCookie(res);
     return { success: true };
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Delete("me")
+  async deleteMyAccount(@CurrentUser() user: JwtPayload) {
+    return this.authService.deleteMyAccount(user.sub);
   }
 
   private setRefreshCookie(res: Response, refreshToken: string) {
