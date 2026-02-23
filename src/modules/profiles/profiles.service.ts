@@ -248,6 +248,13 @@ export class ProfilesService {
     if (!resource) {
       throw new NotFoundException("Resource not found");
     }
+    const isPublishedAndVerified =
+      resource.publishStatus === ResourcePublishStatus.PUBLISHED &&
+      resource.verificationStatus === ResourceVerificationStatus.VERIFIED;
+    const isAdmin = currentUser?.role === Role.ADMIN;
+    if (!isPublishedAndVerified && !isAdmin) {
+      throw new NotFoundException("Resource not found");
+    }
     const premium = await this.canSeeSensitiveResourceInfo(currentUser);
     return premium ? this.toResourcePremiumView(resource) : this.toResourcePublicView(resource);
   }

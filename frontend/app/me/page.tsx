@@ -454,8 +454,13 @@ export default function MePage() {
         {error ? <Alert tone="error">{error}</Alert> : null}
         {success ? <Alert tone="info">{success}</Alert> : null}
         {me ? (
-          <Card>
-            <pre className="overflow-auto text-sm">{JSON.stringify(me, null, 2)}</pre>
+          <Card className="space-y-1">
+            <p className="text-sm text-slate-300">
+              Connecté avec <strong className="text-white">{me.email}</strong>
+            </p>
+            <p className="text-sm text-slate-400">
+              Rôle : {me.role === "ADMIN" ? "Administrateur" : me.role === "FAMILY" ? "Famille" : me.role === "RESOURCE" ? "Allié" : me.role}
+            </p>
           </Card>
         ) : null}
 

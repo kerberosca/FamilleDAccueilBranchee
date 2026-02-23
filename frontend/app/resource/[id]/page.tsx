@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Alert } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
-import { apiGet } from "../../../lib/api";
+import { ApiError, apiGet } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
 
 type ResourceDetail = {
@@ -46,7 +46,11 @@ export default function ResourceDetailPage() {
         const data = await apiGet<ResourceDetail>(`/profiles/resource/${resourceId}`, { token: accessToken ?? undefined });
         setResource(data);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Allié introuvable.");
+        if (e instanceof ApiError && e.statusCode === 404) {
+          setError("Profil non disponible.");
+        } else {
+          setError(e instanceof Error ? e.message : "Allié introuvable.");
+        }
       } finally {
         setLoading(false);
       }
@@ -73,7 +77,7 @@ export default function ResourceDetailPage() {
   if (error || !resource) {
     return (
       <main className="mx-auto max-w-2xl space-y-4 p-6">
-        <Alert tone="error">{error ?? "Allié introuvable."}</Alert>
+        <Alert tone="error">{error ?? "Profil non disponible."}</Alert>
         <Button variant="secondary" onClick={() => router.push("/search")}>
           Retour à la recherche
         </Button>
