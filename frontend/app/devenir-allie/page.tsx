@@ -104,7 +104,7 @@ export default function DevenirAlliePage() {
       {/* Comment ça marche */}
       <section className="mt-14 sm:mt-18">
         <h2 className="text-center text-2xl font-semibold text-white sm:text-3xl">
-          Comment ça marche ?
+          Du profil à la mise en relation : quatre étapes.
         </h2>
         <ul className="mx-auto mt-8 max-w-lg space-y-4">
           {STEPS.map((step, i) => (
@@ -122,7 +122,7 @@ export default function DevenirAlliePage() {
       <section className="mt-14 sm:mt-18">
         <Card variant="elevated" className="border-cyan-500/25 bg-slate-800/70 text-center">
           <h2 className="text-xl font-semibold text-white sm:text-2xl">
-            Prêt à devenir allié ?
+            Rejoignez le répertoire : créer mon compte allié.
           </h2>
           <p className="mx-auto mt-2 max-w-md text-slate-400">
             Inscription gratuite. Complétez votre profil, répondez au questionnaire et à la

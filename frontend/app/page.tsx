@@ -69,15 +69,17 @@ export default function HomePage() {
           </div>
         )}
         <h1 className="-mt-5 text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
-          Bienvenue sur{" "}
+          Là où les familles d&apos;accueil trouvent leur soutien.
+        </h1>
+        <p className="mt-2 text-xl text-cyan-400/90 sm:text-2xl">
           <span className="bg-gradient-to-r from-cyan-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
             FAB
           </span>
-        </h1>
+        </p>
 
         <div className="mx-auto mt-6 max-w-md">
           <p className="mb-3 text-center text-sm text-slate-400">
-            Entrez votre code postal ci-dessous pour trouver des alliés près de chez vous. La recherche se fait par code postal (3 lettres-chiffres, ex. G8P, ou code complet en 6 caractères).
+            Un code postal, des alliés. C&apos;est parti.
           </p>
           <form
             onSubmit={handleSearch}
@@ -122,10 +124,10 @@ export default function HomePage() {
             className="block rounded-xl border border-cyan-500/30 bg-slate-800/60 p-4 text-center transition hover:border-cyan-500/50 hover:bg-slate-800/80 hover:shadow-[0_0_24px_-8px_rgba(34,211,238,0.2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
           >
             <span className="block text-base font-medium leading-snug text-white">
-              Rejoignez FAB comme allié — inscrivez-vous pour aider les familles.
+              Votre temps, leurs besoins. Rejoignez FAB comme allié.
             </span>
             <span className="mt-2 block text-sm text-cyan-400/90">
-              Qu&apos;est-ce qu&apos;un allié ? Devenir allié
+              Rejoindre le répertoire FAB
             </span>
           </Link>
         </div>
