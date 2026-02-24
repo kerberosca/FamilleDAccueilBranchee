@@ -51,11 +51,11 @@ function CategoryCard({
   return (
     <Link
       href={searchHref}
-      className="block h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 rounded-xl"
+      className="block h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 rounded-xl transition-shadow duration-200"
     >
       <Card
         variant="glass"
-        className="h-full border-cyan-500/10 bg-slate-800/50 text-center transition hover:border-cyan-500/25 hover:shadow-[0_0_20px_-8px_rgba(34,211,238,0.3)]"
+        className="h-full border-cyan-500/10 bg-slate-800/50 text-center transition-all duration-200 hover:border-cyan-500/25 hover:shadow-[0_0_20px_-8px_rgba(34,211,238,0.3)]"
       >
         <div className="relative mx-auto h-16 w-full max-w-[120px]">
           {item.image && !imageError ? (
@@ -146,6 +146,7 @@ export default function HomePage() {
           <form
             onSubmit={handleSearch}
             className="animate-soft-glow rounded-xl border border-cyan-500/20 bg-slate-800/40 p-4 text-left backdrop-blur-sm"
+            aria-label="Recherche d'alliés par code postal"
           >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input
@@ -200,7 +201,8 @@ export default function HomePage() {
             href="https://www.formeduc.ca"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-cyan-400 underline hover:text-cyan-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 rounded"
+            className="text-cyan-400 underline hover:text-cyan-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 rounded transition-colors duration-200"
+            aria-label="Forméduc, formation en secourisme (nouvelle fenêtre)"
           >
             Forméduc
           </a>
@@ -210,7 +212,8 @@ export default function HomePage() {
         <div className="mx-auto mt-10 max-w-md animate-slide-up">
           <Link
             href="/devenir-allie"
-            className="block rounded-xl border border-cyan-500/30 bg-slate-800/60 p-4 text-center transition hover:border-cyan-500/50 hover:bg-slate-800/80 hover:shadow-[0_0_24px_-8px_rgba(34,211,238,0.2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
+            className="block rounded-xl border border-cyan-500/30 bg-slate-800/60 p-4 text-center transition-all duration-200 hover:border-cyan-500/50 hover:bg-slate-800/80 hover:shadow-[0_0_24px_-8px_rgba(34,211,238,0.2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            aria-label="Rejoindre le répertoire FAB, page Devenir allié"
           >
             <span className="block text-base font-medium leading-snug text-white">
               Votre temps, leurs besoins. Rejoignez FAB comme allié.

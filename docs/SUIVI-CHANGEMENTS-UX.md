@@ -75,10 +75,10 @@ Document de suivi pour la refonte des messages et de la structure des pages (acc
 - [x] 4.2 Court message « Alliés vérifiés (vérification d'antécédents). » sous le formulaire de recherche
 - [x] Mention Forméduc : « FAB est une initiative de Forméduc, reconnu pour la formation en secourisme au Québec. » avec lien vers formeduc.ca (sous les cartes, avant le bandeau)
 
-### Phase 5 — Polish
-- [ ] 5.1 Cohérence des phrases sur tout le site
-- [ ] 5.2 Accessibilité (contrastes, libellés, titres)
-- [ ] 5.3 Micro-interactions (survol, focus)
+### Phase 5 — Polish ✅
+- [x] 5.1 Cohérence : meta description (layout) alignée sur le hero — « Là où les familles d'accueil trouvent leur soutien. Trouvez des alliés… Une initiative Forméduc. »
+- [x] 5.2 Accessibilité : aria-label sur le formulaire de recherche, aria-label lien Forméduc (nouvelle fenêtre), focus-visible:ring-offset sur liens, aria-label bandeau « Rejoindre le répertoire »
+- [x] 5.3 Micro-interactions : transition duration-200 sur cartes, bandeau et liens (accueil + page Devenir allié)
 
 ---
 

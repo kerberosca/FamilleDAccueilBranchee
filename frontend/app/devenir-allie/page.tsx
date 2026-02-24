@@ -91,7 +91,7 @@ export default function DevenirAlliePage() {
             <Card
               key={item.title}
               variant="glass"
-              className="animate-slide-up border-cyan-500/10 bg-slate-800/50 transition hover:border-cyan-500/25 hover:shadow-[0_0_20px_-8px_rgba(34,211,238,0.3)]"
+              className="animate-slide-up border-cyan-500/10 bg-slate-800/50 transition-all duration-200 hover:border-cyan-500/25 hover:shadow-[0_0_20px_-8px_rgba(34,211,238,0.3)]"
             >
               <TypeIcon item={item} />
               <h3 className="mt-3 text-lg font-semibold text-white">{item.title}</h3>
@@ -131,13 +131,13 @@ export default function DevenirAlliePage() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/onboarding/resource"
-              className="inline-flex min-w-[200px] justify-center rounded-md bg-cyan-700 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
+              className="inline-flex min-w-[200px] justify-center rounded-md bg-cyan-700 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-cyan-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               Créer mon compte allié
             </Link>
             <Link
               href="/"
-              className="inline-flex rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50"
+              className="inline-flex rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-slate-100 transition-colors duration-200 hover:bg-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               Retour à l&apos;accueil
             </Link>

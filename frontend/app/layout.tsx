@@ -14,7 +14,8 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   title: "FAB — Famille d'accueil branchée",
-  description: "Famille d'accueil branchée — plateforme",
+  description:
+    "Là où les familles d'accueil trouvent leur soutien. Trouvez des alliés (ménage, garde, transport, répit) près de chez vous. Une initiative Forméduc.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
