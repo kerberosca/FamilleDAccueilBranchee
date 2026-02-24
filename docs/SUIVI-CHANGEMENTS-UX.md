@@ -64,15 +64,16 @@ Document de suivi pour la refonte des messages et de la structure des pages (acc
 - [x] 2.4 Mettre à jour le bandeau allié (phrase + CTA)
 - [x] 2.5 Ajouter les 3 cartes catégories (Ménage, Gardiens, Autres) sous la recherche — liens vers recherche avec tag (ménage, garde, transport)
 
-### Phase 3 — Page « Devenir allié »
-- [ ] 3.1 Hero : titre validé
-- [ ] 3.2 Conserver « Trois types d'alliés » et les 3 cartes
-- [ ] 3.3 Remplacer « Comment ça marche ? » par le titre validé (4 étapes)
-- [ ] 3.4 CTA final : titre + bouton validés
+### Phase 3 — Page « Devenir allié » ✅
+- [x] 3.1 Hero : titre validé (« Qu'est-ce qu'un allié ? »)
+- [x] 3.2 Conserver « Trois types d'alliés » et les 3 cartes
+- [x] 3.3 Remplacer « Comment ça marche ? » par « Du profil à la mise en relation : quatre étapes. »
+- [x] 3.4 CTA final : « Rejoignez le répertoire : créer mon compte allié. » + bouton « Créer mon compte allié »
 
-### Phase 4 — Preuve sociale (optionnel)
-- [ ] 4.1 Afficher un chiffre si disponible (ex. X alliés, Y régions)
-- [ ] 4.2 Court message « Alliés vérifiés » près de la recherche
+### Phase 4 — Preuve sociale ✅
+- [ ] 4.1 Afficher un chiffre si disponible (ex. X alliés, Y régions) — _optionnel, nécessiterait un endpoint stats côté backend_
+- [x] 4.2 Court message « Alliés vérifiés (vérification d'antécédents). » sous le formulaire de recherche
+- [x] Mention Forméduc : « FAB est une initiative de Forméduc, reconnu pour la formation en secourisme au Québec. » avec lien vers formeduc.ca (sous les cartes, avant le bandeau)
 
 ### Phase 5 — Polish
 - [ ] 5.1 Cohérence des phrases sur tout le site

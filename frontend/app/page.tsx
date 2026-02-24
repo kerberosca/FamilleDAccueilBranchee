@@ -178,6 +178,9 @@ export default function HomePage() {
           <p className="mt-2 text-center text-xs text-slate-500">
             3 ou 6 caractères (ex. G8P ou G8P 1A1)
           </p>
+          <p className="mt-1 text-center text-xs text-slate-500">
+            Alliés vérifiés (vérification d&apos;antécédents).
+          </p>
         </div>
 
         <section className="mx-auto mt-10 max-w-3xl animate-slide-up" aria-labelledby="categories-heading">
@@ -190,6 +193,19 @@ export default function HomePage() {
             ))}
           </div>
         </section>
+
+        <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-slate-500">
+          FAB est une initiative de{" "}
+          <a
+            href="https://www.formeduc.ca"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cyan-400 underline hover:text-cyan-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 rounded"
+          >
+            Forméduc
+          </a>
+          , reconnu pour la formation en secourisme au Québec.
+        </p>
 
         <div className="mx-auto mt-10 max-w-md animate-slide-up">
           <Link
