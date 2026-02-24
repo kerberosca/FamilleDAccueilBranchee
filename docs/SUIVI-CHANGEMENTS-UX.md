@@ -57,12 +57,12 @@ Document de suivi pour la refonte des messages et de la structure des pages (acc
 - [x] Valider CTA principal (Rejoindre le répertoire FAB)
 - [x] Valider titres et CTA page Devenir allié (Comment ça marche → Du profil à la mise en relation ; CTA Rejoignez le répertoire : créer mon compte allié.)
 
-### Phase 2 — Page d'accueil
-- [ ] 2.1 Remplacer le titre hero par la phrase validée
-- [ ] 2.2 Adapter le sous-titre (recherche)
-- [ ] 2.3 Conserver / ajuster le bloc recherche (code postal + tags)
-- [ ] 2.4 Mettre à jour le bandeau allié (phrase + CTA)
-- [ ] 2.5 Ajouter les 3 cartes catégories (Ménage, Gardiens, Autres) sous la recherche
+### Phase 2 — Page d'accueil ✅
+- [x] 2.1 Remplacer le titre hero par la phrase validée
+- [x] 2.2 Adapter le sous-titre (recherche)
+- [x] 2.3 Conserver / ajuster le bloc recherche (code postal + tags)
+- [x] 2.4 Mettre à jour le bandeau allié (phrase + CTA)
+- [x] 2.5 Ajouter les 3 cartes catégories (Ménage, Gardiens, Autres) sous la recherche — liens vers recherche avec tag (ménage, garde, transport)
 
 ### Phase 3 — Page « Devenir allié »
 - [ ] 3.1 Hero : titre validé

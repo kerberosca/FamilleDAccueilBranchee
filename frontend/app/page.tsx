@@ -5,7 +5,29 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "../components/ui/button";
+import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+
+const CATEGORIES = [
+  {
+    title: "Ménage",
+    description: "Entretien, repas, linge. Un soutien concret pour alléger le foyer.",
+    image: "/images/menage-illustration.png",
+    searchTag: "ménage",
+  },
+  {
+    title: "Gardiens",
+    description: "Garde d'enfants, répit. Permettre aux familles de souffler.",
+    image: "/images/gardien-illustration.png",
+    searchTag: "garde",
+  },
+  {
+    title: "Autres",
+    description: "Transport, accompagnement, soutien ponctuel.",
+    image: "/images/autres-illustration.png",
+    searchTag: "transport",
+  },
+];
 
 const FSA_REGEX = /^[A-Z][0-9][A-Z]$/;
 const FULL_POSTAL_REGEX = /^[A-Z][0-9][A-Z][0-9][A-Z][0-9]$/;
@@ -16,6 +38,46 @@ function normalizePostalCode(value: string): string {
 
 function isValidPostalCode(value: string): boolean {
   return FSA_REGEX.test(value) || FULL_POSTAL_REGEX.test(value);
+}
+
+function CategoryCard({
+  item,
+}: {
+  item: (typeof CATEGORIES)[number];
+}) {
+  const [imageError, setImageError] = useState(false);
+  const searchHref = `/search?tags=${encodeURIComponent(item.searchTag)}`;
+
+  return (
+    <Link
+      href={searchHref}
+      className="block h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 rounded-xl"
+    >
+      <Card
+        variant="glass"
+        className="h-full border-cyan-500/10 bg-slate-800/50 text-center transition hover:border-cyan-500/25 hover:shadow-[0_0_20px_-8px_rgba(34,211,238,0.3)]"
+      >
+        <div className="relative mx-auto h-16 w-full max-w-[120px]">
+          {item.image && !imageError ? (
+            <Image
+              src={item.image}
+              alt=""
+              fill
+              className="object-contain object-center"
+              onError={() => setImageError(true)}
+              unoptimized
+            />
+          ) : (
+            <span className="text-3xl" aria-hidden>
+              {item.title === "Ménage" ? "🏠" : item.title === "Gardiens" ? "👶" : "🤝"}
+            </span>
+          )}
+        </div>
+        <h3 className="mt-3 text-base font-semibold text-white">{item.title}</h3>
+        <p className="mt-1 text-sm leading-snug text-slate-400">{item.description}</p>
+      </Card>
+    </Link>
+  );
 }
 
 export default function HomePage() {
@@ -117,6 +179,17 @@ export default function HomePage() {
             3 ou 6 caractères (ex. G8P ou G8P 1A1)
           </p>
         </div>
+
+        <section className="mx-auto mt-10 max-w-3xl animate-slide-up" aria-labelledby="categories-heading">
+          <h2 id="categories-heading" className="mb-4 text-center text-lg font-semibold text-slate-300">
+            Types d&apos;alliés
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {CATEGORIES.map((item) => (
+              <CategoryCard key={item.title} item={item} />
+            ))}
+          </div>
+        </section>
 
         <div className="mx-auto mt-10 max-w-md animate-slide-up">
           <Link
