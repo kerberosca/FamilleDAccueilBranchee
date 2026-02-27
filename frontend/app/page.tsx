@@ -109,7 +109,29 @@ export default function HomePage() {
   };
 
   return (
-    <main className="relative mx-auto max-w-4xl px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
+    <main className="relative isolate mx-auto max-w-4xl overflow-hidden px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <video
+          className="hidden h-full w-full object-cover opacity-35 blur-[1px] brightness-[0.45] contrast-125 saturate-75 sm:block"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+        >
+          <source src="/videos/video-accueil.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-[#0a0e17]/75" aria-hidden />
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(ellipse 120% 80% at 50% -20%, rgba(34, 211, 238, 0.10), transparent), radial-gradient(ellipse 80% 50% at 100% 0%, rgba(59, 130, 246, 0.06), transparent), radial-gradient(ellipse 60% 40% at 0% 100%, rgba(34, 211, 238, 0.05), transparent)",
+          }}
+          aria-hidden
+        />
+      </div>
+
       <div className="animate-slide-up text-center">
         {!heroLogoError && (
           <div className="mb-0 flex justify-center">
