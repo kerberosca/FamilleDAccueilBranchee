@@ -112,12 +112,13 @@ export default function HomePage() {
     <main className="relative isolate mx-auto max-w-4xl overflow-hidden px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <video
-          className="h-full w-full object-cover opacity-60 brightness-[0.65] contrast-110 saturate-90"
+          className="block h-full w-full object-cover opacity-60 brightness-[0.65] contrast-110 saturate-90"
           autoPlay
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="auto"
+          aria-hidden
         >
           <source src="/videos/video-accueil.mp4" type="video/mp4" />
         </video>
