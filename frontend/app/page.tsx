@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -82,11 +82,42 @@ function CategoryCard({
 
 export default function HomePage() {
   const router = useRouter();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [heroLogoSrc, setHeroLogoSrc] = useState("/images/logo.png");
   const [heroLogoError, setHeroLogoError] = useState(false);
   const [postalCode, setPostalCode] = useState("");
   const [tags, setTags] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [videoReady, setVideoReady] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const tryPlay = () => {
+      video.muted = true;
+      const playPromise = video.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {
+          // iOS may block autoplay depending on device settings (e.g. low power mode).
+          // Keep the poster as fallback instead of throwing.
+        });
+      }
+    };
+
+    tryPlay();
+    video.addEventListener("loadeddata", tryPlay);
+    video.addEventListener("canplay", tryPlay);
+    document.addEventListener("visibilitychange", tryPlay);
+    window.addEventListener("orientationchange", tryPlay);
+
+    return () => {
+      video.removeEventListener("loadeddata", tryPlay);
+      video.removeEventListener("canplay", tryPlay);
+      document.removeEventListener("visibilitychange", tryPlay);
+      window.removeEventListener("orientationchange", tryPlay);
+    };
+  }, []);
 
   const normalizedPostal = normalizePostalCode(postalCode);
   const isPostalValid = isValidPostalCode(normalizedPostal);
@@ -112,16 +143,21 @@ export default function HomePage() {
     <main className="relative isolate mx-auto max-w-4xl overflow-hidden px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <video
+          ref={videoRef}
           className="block h-full w-full object-cover opacity-60 brightness-[0.65] contrast-110 saturate-90"
           autoPlay
           muted
           loop
           playsInline
+          webkit-playsinline="true"
           preload="auto"
+          poster="/images/logo.png"
+          onCanPlay={() => setVideoReady(true)}
           aria-hidden
         >
           <source src="/videos/video-accueil.mp4" type="video/mp4" />
         </video>
+        {!videoReady && <div className="absolute inset-0 bg-[#0a0e17]" aria-hidden />}
         <div className="absolute inset-0 bg-[#0a0e17]/50" aria-hidden />
         <div
           className="absolute inset-0"
