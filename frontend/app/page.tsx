@@ -112,7 +112,7 @@ export default function HomePage() {
     <main className="relative isolate mx-auto max-w-4xl overflow-hidden px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <video
-          className="hidden h-full w-full object-cover opacity-35 blur-[1px] brightness-[0.45] contrast-125 saturate-75 sm:block"
+          className="h-full w-full object-cover opacity-60 brightness-[0.65] contrast-110 saturate-90"
           autoPlay
           muted
           loop
@@ -121,7 +121,7 @@ export default function HomePage() {
         >
           <source src="/videos/video-accueil.mp4" type="video/mp4" />
         </video>
-        <div className="absolute inset-0 bg-[#0a0e17]/75" aria-hidden />
+        <div className="absolute inset-0 bg-[#0a0e17]/50" aria-hidden />
         <div
           className="absolute inset-0"
           style={{
