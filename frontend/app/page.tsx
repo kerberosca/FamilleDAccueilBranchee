@@ -99,23 +99,35 @@ export default function HomePage() {
       const playPromise = video.play();
       if (playPromise && typeof playPromise.catch === "function") {
         playPromise.catch(() => {
-          // iOS may block autoplay depending on device settings (e.g. low power mode).
-          // Keep the poster as fallback instead of throwing.
+          // iOS may block autoplay in portrait; orientationchange will retry.
         });
       }
     };
 
+    const onPlaying = () => setVideoReady(true);
+
     tryPlay();
     video.addEventListener("loadeddata", tryPlay);
     video.addEventListener("canplay", tryPlay);
+    video.addEventListener("playing", onPlaying);
     document.addEventListener("visibilitychange", tryPlay);
     window.addEventListener("orientationchange", tryPlay);
+    window.addEventListener("resize", tryPlay);
+
+    const t1 = setTimeout(tryPlay, 400);
+    const t2 = setTimeout(tryPlay, 1200);
+    const fallbackReady = setTimeout(() => setVideoReady(true), 2500);
 
     return () => {
       video.removeEventListener("loadeddata", tryPlay);
       video.removeEventListener("canplay", tryPlay);
+      video.removeEventListener("playing", onPlaying);
       document.removeEventListener("visibilitychange", tryPlay);
       window.removeEventListener("orientationchange", tryPlay);
+      window.removeEventListener("resize", tryPlay);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(fallbackReady);
     };
   }, []);
 
@@ -141,7 +153,7 @@ export default function HomePage() {
 
   return (
     <main className="relative isolate mx-auto max-w-4xl overflow-hidden px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 -z-10 min-h-[100dvh] overflow-hidden sm:min-h-0">
         <video
           ref={videoRef}
           className="block h-full w-full object-cover opacity-60 brightness-[0.65] contrast-110 saturate-90"
