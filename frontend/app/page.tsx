@@ -5,28 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
-import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 
-const CATEGORIES = [
-  {
-    title: "Ménage",
-    description: "Entretien, repas, linge. Un soutien concret pour alléger le foyer.",
-    image: "/images/menage-illustration.png",
-    searchTag: "ménage",
-  },
-  {
-    title: "Gardiens",
-    description: "Garde d'enfants, répit. Permettre aux familles de souffler.",
-    image: "/images/gardien-illustration.png",
-    searchTag: "garde",
-  },
-  {
-    title: "Autres",
-    description: "Transport, accompagnement, soutien ponctuel.",
-    image: "/images/autres-illustration.png",
-    searchTag: "transport",
-  },
+/** Zones cliquables sur l'image "types d'alliés" : Gardien compétent, Entretien Ménage, Tutorat */
+const TYPES_ALLIES_CLICK_ZONES = [
+  { label: "Gardien compétent", searchTag: "garde", position: { left: "8%", top: "18%", width: "28%", height: "22%" } },
+  { label: "Entretien Ménage", searchTag: "ménage", position: { left: "8%", top: "48%", width: "28%", height: "22%" } },
+  { label: "Tutorat", searchTag: "transport", position: { left: "64%", top: "32%", width: "28%", height: "26%" } },
 ];
 
 const FSA_REGEX = /^[A-Z][0-9][A-Z]$/;
@@ -38,46 +23,6 @@ function normalizePostalCode(value: string): string {
 
 function isValidPostalCode(value: string): boolean {
   return FSA_REGEX.test(value) || FULL_POSTAL_REGEX.test(value);
-}
-
-function CategoryCard({
-  item,
-}: {
-  item: (typeof CATEGORIES)[number];
-}) {
-  const [imageError, setImageError] = useState(false);
-  const searchHref = `/search?tags=${encodeURIComponent(item.searchTag)}`;
-
-  return (
-    <Link
-      href={searchHref}
-      className="block h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 rounded-xl transition-shadow duration-200"
-    >
-      <Card
-        variant="glass"
-        className="h-full border-cyan-500/10 bg-slate-800/50 text-center transition-all duration-200 hover:border-cyan-500/25 hover:shadow-[0_0_20px_-8px_rgba(34,211,238,0.3)]"
-      >
-        <div className="relative mx-auto h-16 w-full max-w-[120px]">
-          {item.image && !imageError ? (
-            <Image
-              src={item.image}
-              alt=""
-              fill
-              className="object-contain object-center"
-              onError={() => setImageError(true)}
-              unoptimized
-            />
-          ) : (
-            <span className="text-3xl" aria-hidden>
-              {item.title === "Ménage" ? "🏠" : item.title === "Gardiens" ? "👶" : "🤝"}
-            </span>
-          )}
-        </div>
-        <h3 className="mt-3 text-base font-semibold text-white">{item.title}</h3>
-        <p className="mt-1 text-sm leading-snug text-slate-400">{item.description}</p>
-      </Card>
-    </Link>
-  );
 }
 
 export default function HomePage() {
@@ -259,9 +204,31 @@ export default function HomePage() {
           <h2 id="categories-heading" className="mb-4 text-center text-lg font-semibold text-slate-300">
             Types d&apos;alliés
           </h2>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {CATEGORIES.map((item) => (
-              <CategoryCard key={item.title} item={item} />
+          <p className="mb-4 text-center text-sm text-slate-400">
+            Cliquez sur un type pour rechercher les alliés correspondants.
+          </p>
+          <div className="relative w-full overflow-hidden rounded-xl">
+            <Image
+              src="/images/AlliésTypes.jpg"
+              alt="Types d'alliés : Gardien compétent, Entretien Ménage, Tutorat. Cliquez sur une bulle pour rechercher."
+              width={800}
+              height={600}
+              className="w-full h-auto object-contain"
+              unoptimized
+            />
+            {TYPES_ALLIES_CLICK_ZONES.map((zone) => (
+              <Link
+                key={zone.label}
+                href={`/search?tags=${encodeURIComponent(zone.searchTag)}`}
+                className="absolute rounded-2xl transition-all duration-200 hover:bg-cyan-500/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                style={{
+                  left: zone.position.left,
+                  top: zone.position.top,
+                  width: zone.position.width,
+                  height: zone.position.height,
+                }}
+                aria-label={`Rechercher des alliés : ${zone.label}`}
+              />
             ))}
           </div>
         </section>
