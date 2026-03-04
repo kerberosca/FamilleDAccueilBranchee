@@ -9,9 +9,9 @@ import { Input } from "../components/ui/input";
 
 /** Zones cliquables sur l'image "types d'alliés" : Gardien compétent, Entretien Ménage, Tutorat */
 const TYPES_ALLIES_CLICK_ZONES = [
-  { label: "Gardien compétent", searchTag: "garde", position: { left: "8%", top: "18%", width: "28%", height: "22%" } },
-  { label: "Entretien Ménage", searchTag: "ménage", position: { left: "8%", top: "48%", width: "28%", height: "22%" } },
-  { label: "Tutorat", searchTag: "transport", position: { left: "64%", top: "32%", width: "28%", height: "26%" } },
+  { label: "Gardien compétent", searchTag: "garde", position: { left: "6%", top: "14%", width: "30%", height: "24%" } },
+  { label: "Entretien Ménage", searchTag: "ménage", position: { left: "6%", top: "46%", width: "30%", height: "24%" } },
+  { label: "Tutorat", searchTag: "transport", position: { left: "62%", top: "28%", width: "30%", height: "28%" } },
 ];
 
 const FSA_REGEX = /^[A-Z][0-9][A-Z]$/;
