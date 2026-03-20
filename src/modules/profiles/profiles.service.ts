@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import {
+  AllyType,
   BackgroundCheckStatus,
   Prisma,
   ResourceOnboardingState,
@@ -7,6 +8,11 @@ import {
   ResourceVerificationStatus,
   Role
 } from "@prisma/client";
+import {
+  buildAvailabilityFromRegistration,
+  buildSkillsTagsFromRegistration,
+  parseAndValidateAllyRegistration
+} from "../auth/ally-registration.validation";
 import { SubscriptionAccessService } from "../billing/subscription-access.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
@@ -60,7 +66,12 @@ export class ProfilesService {
     if (user.role !== Role.RESOURCE) {
       throw new ForbiddenException("Only RESOURCE can update this profile");
     }
-    const { questionnaireAnswers: qAnswers, backgroundCheckStatus: bgStatus, ...rest } = dto;
+    const {
+      questionnaireAnswers: qAnswers,
+      backgroundCheckStatus: bgStatus,
+      allyRegistration: allyRegRaw,
+      ...rest
+    } = dto;
     if (
       bgStatus !== undefined &&
       bgStatus !== BackgroundCheckStatus.NOT_REQUESTED &&
@@ -78,15 +89,55 @@ export class ProfilesService {
             )
           ) as Prisma.InputJsonValue)
         : undefined;
+
+    const existing = await this.prisma.resourceProfile.findUnique({ where: { userId: user.sub } });
+    if (!existing) {
+      throw new NotFoundException("Resource profile not found");
+    }
+
+    let allyRegJson: Prisma.InputJsonValue | undefined;
+    let derivedFromAlly: Partial<Prisma.ResourceProfileUpdateInput> = {};
+    if (allyRegRaw !== undefined) {
+      const reg = parseAndValidateAllyRegistration(allyRegRaw);
+      const allyLabel =
+        existing.allyType === AllyType.MENAGE
+          ? "ménage"
+          : existing.allyType === AllyType.GARDIENS
+            ? "gardiens"
+            : "autres";
+      const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel);
+      const skillsTags = [...new Set([...fromReg, ...(rest.skillsTags ?? existing.skillsTags)])];
+      const hourlyRaw = parseFloat(reg.section3.hourlyRateSuggested.replace(",", "."));
+      allyRegJson = JSON.parse(JSON.stringify(reg)) as Prisma.InputJsonValue;
+      derivedFromAlly = {
+        streetAddress: reg.section1.streetAddress,
+        contactEmail: reg.section1.contactEmail,
+        contactPhone: rest.contactPhone ?? existing.contactPhone ?? undefined,
+        skillsTags,
+        hourlyRate: hourlyRaw,
+        availability: buildAvailabilityFromRegistration(reg) as Prisma.InputJsonValue,
+        bio: reg.section2.approachChildren,
+        allyRegistration: allyRegJson,
+        allyDeclarationsAcceptedAt: new Date()
+      };
+    }
+
+    const { allyRegistration: _drop, skillsTags: tagsFromRest, ...restWithoutAlly } = rest as UpdateResourceProfileDto & {
+      allyRegistration?: unknown;
+    };
+
     const updated = await this.prisma.resourceProfile.update({
       where: { userId: user.sub },
       data: {
-        ...rest,
+        ...restWithoutAlly,
+        ...(tagsFromRest !== undefined ? { skillsTags: tagsFromRest } : {}),
         questionnaireAnswers: questionnaireJson,
         backgroundCheckStatus: bgStatus,
         postalCode: rest.postalCode ? normalizePostalCode(rest.postalCode) : undefined,
-        hourlyRate: rest.hourlyRate ?? undefined,
-        availability: toJson(rest.availability)
+        hourlyRate: allyRegRaw !== undefined ? undefined : (rest.hourlyRate ?? undefined),
+        availability:
+          allyRegRaw !== undefined ? undefined : toJson(rest.availability),
+        ...(allyRegRaw !== undefined ? derivedFromAlly : {})
       }
     });
     return this.toResourcePrivateView(updated);
@@ -227,6 +278,7 @@ export class ProfilesService {
         city: resource.city,
         region: resource.region,
         postalCode: resource.postalCode,
+        streetAddress: resource.streetAddress,
         skillsTags: resource.skillsTags,
         verificationStatus: resource.verificationStatus,
         publishStatus: resource.publishStatus,
@@ -234,6 +286,8 @@ export class ProfilesService {
         backgroundCheckStatus: resource.backgroundCheckStatus,
         contactEmail: resource.contactEmail,
         contactPhone: resource.contactPhone,
+        allyRegistration: resource.allyRegistration ?? undefined,
+        allyDeclarationsAcceptedAt: resource.allyDeclarationsAcceptedAt ?? undefined,
         updatedAt: resource.updatedAt,
         user: resource.user
       }))
@@ -294,10 +348,12 @@ export class ProfilesService {
     return {
       id: resource.id,
       userId: resource.userId,
+      allyType: resource.allyType ?? undefined,
       displayName: resource.displayName,
       postalCode: resource.postalCode,
       city: resource.city,
       region: resource.region,
+      streetAddress: resource.streetAddress ?? undefined,
       bio: resource.bio,
       skillsTags: resource.skillsTags,
       hourlyRate: resource.hourlyRate,
@@ -308,6 +364,8 @@ export class ProfilesService {
       contactEmail: resource.contactEmail,
       contactPhone: resource.contactPhone,
       questionnaireAnswers: resource.questionnaireAnswers ?? undefined,
+      allyRegistration: resource.allyRegistration ?? undefined,
+      allyDeclarationsAcceptedAt: resource.allyDeclarationsAcceptedAt ?? undefined,
       backgroundCheckStatus: resource.backgroundCheckStatus
     };
   }

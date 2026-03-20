@@ -20,8 +20,10 @@ export default function OnboardingPage() {
 
         <Card>
           <h2 className="text-lg font-semibold">Allié</h2>
-          <p className="mt-2 text-sm text-slate-300">Créer un compte allié, inscription gratuite.</p>
-          <Link className="mt-3 inline-block" href="/onboarding/resource">
+          <p className="mt-2 text-sm text-slate-300">
+            Parcours guidé (formulaire répit) : compétences, offre et déclarations légales.
+          </p>
+          <Link className="mt-3 inline-block text-cyan-400 underline" href="/onboarding/resource">
             Commencer
           </Link>
         </Card>

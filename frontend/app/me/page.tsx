@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "../../components/ui/alert";
@@ -9,7 +10,6 @@ import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
 import { apiDelete, apiGet, apiPatch } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
-import { ALLY_QUESTIONNAIRE } from "../../lib/questionnaire-ally";
 
 type MeResponse = {
   id: string;
@@ -35,10 +35,12 @@ type FamilyProfileResponse = {
 type ResourceProfileResponse = {
   id: string;
   userId: string;
+  allyType?: string | null;
   displayName: string;
   postalCode: string;
   city: string;
   region: string;
+  streetAddress?: string | null;
   bio?: string | null;
   skillsTags: string[];
   hourlyRate?: string | number | null;
@@ -49,6 +51,8 @@ type ResourceProfileResponse = {
   contactEmail?: string | null;
   contactPhone?: string | null;
   questionnaireAnswers?: Record<string, string> | null;
+  allyRegistration?: unknown;
+  allyDeclarationsAcceptedAt?: string | null;
   backgroundCheckStatus?: string | null;
 };
 
@@ -57,13 +61,13 @@ type FormSnapshot = {
   postalCode: string;
   city: string;
   region: string;
+  streetAddress: string;
   bio: string;
   tagsCsv: string;
   hourlyRate: string;
   contactEmail: string;
   contactPhone: string;
   availabilityJson: string;
-  questionnaireAnswers?: Record<string, string>;
   backgroundCheckStatus?: string;
 };
 
@@ -104,14 +108,9 @@ export default function MePage() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [availabilityJson, setAvailabilityJson] = useState("");
-  const [questionnaireValues, setQuestionnaireValues] = useState<Record<string, string>>({});
+  const [streetAddress, setStreetAddress] = useState("");
   const [backgroundCheckStatus, setBackgroundCheckStatus] = useState<string>("NOT_REQUESTED");
 
-  const questionnaireDirty =
-    initialSnapshot?.questionnaireAnswers !== undefined &&
-    ALLY_QUESTIONNAIRE.some(
-      (q) => (questionnaireValues[q.id] ?? "") !== (initialSnapshot.questionnaireAnswers?.[q.id] ?? "")
-    );
   const backgroundCheckDirty =
     initialSnapshot?.backgroundCheckStatus !== undefined &&
     backgroundCheckStatus !== (initialSnapshot.backgroundCheckStatus ?? "NOT_REQUESTED");
@@ -126,8 +125,8 @@ export default function MePage() {
         hourlyRate !== initialSnapshot.hourlyRate ||
         contactEmail !== initialSnapshot.contactEmail ||
         contactPhone !== initialSnapshot.contactPhone ||
+        streetAddress !== initialSnapshot.streetAddress ||
         availabilityJson !== initialSnapshot.availabilityJson ||
-        questionnaireDirty ||
         backgroundCheckDirty)
   );
 
@@ -277,6 +276,7 @@ export default function MePage() {
           postalCode: profileData.postalCode ?? "",
           city: profileData.city ?? "",
           region: profileData.region ?? "",
+          streetAddress: "",
           bio: (profileData.bio as string | null | undefined) ?? "",
           tagsCsv: "",
           hourlyRate: "",
@@ -288,13 +288,13 @@ export default function MePage() {
         if (meData.role === "FAMILY") {
           const family = profileData as FamilyProfileResponse;
           nextSnapshot.tagsCsv = family.needsTags?.join(", ") ?? "";
-        } else         if (meData.role === "RESOURCE") {
+        } else if (meData.role === "RESOURCE") {
           const resource = profileData as ResourceProfileResponse;
           nextSnapshot.tagsCsv = resource.skillsTags?.join(", ") ?? "";
           nextSnapshot.hourlyRate = resource.hourlyRate ? String(resource.hourlyRate) : "";
           nextSnapshot.contactEmail = resource.contactEmail ?? "";
           nextSnapshot.contactPhone = resource.contactPhone ?? "";
-          nextSnapshot.questionnaireAnswers = resource.questionnaireAnswers ?? {};
+          nextSnapshot.streetAddress = resource.streetAddress ?? "";
           nextSnapshot.backgroundCheckStatus = resource.backgroundCheckStatus ?? "NOT_REQUESTED";
         }
         applySnapshot(nextSnapshot);
@@ -355,16 +355,17 @@ export default function MePage() {
       const refreshed = await apiGet<FamilyProfileResponse>("/profiles/me", { token: accessToken });
       setProfile(refreshed);
       const updatedSnapshot: FormSnapshot = {
-        displayName,
-        postalCode,
-        city,
-        region,
-        bio,
-        tagsCsv,
-        hourlyRate: "",
-        contactEmail: "",
-        contactPhone: "",
-        availabilityJson
+          displayName,
+          postalCode,
+          city,
+          region,
+          streetAddress: "",
+          bio,
+          tagsCsv,
+          hourlyRate: "",
+          contactEmail: "",
+          contactPhone: "",
+          availabilityJson
       };
       setInitialSnapshot(updatedSnapshot);
     } catch (e) {
@@ -404,13 +405,13 @@ export default function MePage() {
           postalCode: normalizePostal(postalCode),
           city,
           region,
+          streetAddress: streetAddress.trim() || undefined,
           bio: bio || undefined,
           skillsTags: toTags(tagsCsv),
           hourlyRate: hourlyRate ? Number(hourlyRate) : undefined,
           contactEmail: contactEmail || undefined,
           contactPhone: contactPhone || undefined,
           availability: parseAvailabilityOrThrow(availabilityJson),
-          questionnaireAnswers: questionnaireValues,
           backgroundCheckStatus
         }
       });
@@ -422,13 +423,13 @@ export default function MePage() {
         postalCode,
         city,
         region,
+        streetAddress,
         bio,
         tagsCsv,
         hourlyRate,
         contactEmail,
         contactPhone,
         availabilityJson,
-        questionnaireAnswers: questionnaireValues,
         backgroundCheckStatus
       };
       setInitialSnapshot(updatedSnapshot);
@@ -567,6 +568,11 @@ export default function MePage() {
               }}
             />
             <FieldError error={fieldErrors.region} />
+            <Input
+              placeholder="Adresse postale"
+              value={streetAddress}
+              onChange={(e) => setStreetAddress(e.target.value)}
+            />
             <Input placeholder="Bio" value={bio} onChange={(e) => setBio(e.target.value)} />
             <Input placeholder="Competences (CSV)" value={tagsCsv} onChange={(e) => setTagsCsv(e.target.value)} />
             <Input
@@ -626,41 +632,18 @@ export default function MePage() {
                 Je m&apos;engage à fournir une vérification d&apos;antécédents judiciaires
               </span>
             </label>
-            <h3 className="text-base font-medium pt-2 border-t border-slate-700 mt-2">Questionnaire allié</h3>
-            <p className="text-sm text-slate-400">Répondez aux questions ci-dessous. Vous pourrez les modifier plus tard.</p>
-            {ALLY_QUESTIONNAIRE.map((q) =>
-              q.type === "choice" ? (
-                <div key={q.id} className="space-y-1">
-                  <label className="text-sm text-slate-300">{q.label}</label>
-                  <select
-                    className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                    value={questionnaireValues[q.id] ?? ""}
-                    onChange={(e) =>
-                      setQuestionnaireValues((prev) => ({ ...prev, [q.id]: e.target.value }))
-                    }
-                  >
-                    <option value="">— Choisir —</option>
-                    {q.options?.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div key={q.id} className="space-y-1">
-                  <label className="text-sm text-slate-300">{q.label}</label>
-                  <textarea
-                    className="min-h-20 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-                    placeholder="Votre réponse..."
-                    value={questionnaireValues[q.id] ?? ""}
-                    onChange={(e) =>
-                      setQuestionnaireValues((prev) => ({ ...prev, [q.id]: e.target.value }))
-                    }
-                  />
-                </div>
-              )
-            )}
+            <h3 className="text-base font-medium pt-2 border-t border-slate-700 mt-2">Candidature répit (formulaire officiel)</h3>
+            <p className="text-sm text-slate-400">
+              Les compétences, l&apos;offre de service et les déclarations légales sont enregistrées via le formulaire
+              aligné sur la documentation FAB. Pour les modifier, ouvrez l&apos;assistant complet (toutes les sections
+              devront être validées à nouveau).
+            </p>
+            <Link
+              href="/me/ally-candidature"
+              className="inline-flex rounded-md border border-cyan-500/40 bg-slate-800 px-4 py-2 text-sm font-medium text-cyan-300 hover:bg-slate-700"
+            >
+              Mettre à jour ma candidature répit
+            </Link>
             <div className="flex gap-2">
               <Button onClick={saveResourceProfile} disabled={saving}>
                 {saving ? "Enregistrement..." : "Enregistrer le profil allié"}
@@ -696,13 +679,13 @@ export default function MePage() {
     setPostalCode(snapshot.postalCode);
     setCity(snapshot.city);
     setRegion(snapshot.region);
+    setStreetAddress(snapshot.streetAddress);
     setBio(snapshot.bio);
     setTagsCsv(snapshot.tagsCsv);
     setHourlyRate(snapshot.hourlyRate);
     setContactEmail(snapshot.contactEmail);
     setContactPhone(snapshot.contactPhone);
     setAvailabilityJson(snapshot.availabilityJson);
-    setQuestionnaireValues(snapshot.questionnaireAnswers ?? {});
     setBackgroundCheckStatus(snapshot.backgroundCheckStatus ?? "NOT_REQUESTED");
   }
 }

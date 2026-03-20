@@ -1,6 +1,6 @@
 /**
- * Questionnaire allié — 6 questions (3 à choix, 3 à développement).
- * Structure générique : modifier ce tableau pour changer les questions sans toucher au reste.
+ * @deprecated Ancien questionnaire démo. L’inscription allié utilise désormais le formulaire répit
+ * (`allyRegistration` + `AllyOnboardingWizard`). Conservé pour rétrocompatibilité des données `questionnaireAnswers`.
  */
 export type AllyQuestionType = "choice" | "text";
 

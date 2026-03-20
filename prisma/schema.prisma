@@ -118,6 +118,8 @@ model ResourceProfile {
   postalCode         String
   city               String
   region             String
+  // Adresse postale (formulaire répit section 1)
+  streetAddress      String?
   bio                String?
   skillsTags         String[]
   hourlyRate         Decimal? @db.Decimal(10, 2)
@@ -129,6 +131,10 @@ model ResourceProfile {
   contactPhone       String?
   averageRating      Decimal? @db.Decimal(3, 2)
   questionnaireAnswers Json?
+  // Formulaire Devenir allié répit (sections 1-4), JSON
+  allyRegistration   Json?
+  // Acceptation des déclarations obligatoires (section 4)
+  allyDeclarationsAcceptedAt DateTime?
   backgroundCheckStatus BackgroundCheckStatus @default(NOT_REQUESTED)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

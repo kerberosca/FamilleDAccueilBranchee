@@ -31,10 +31,13 @@ type ResourceItem = {
   city: string;
   region: string;
   postalCode: string;
+  streetAddress?: string | null;
   verificationStatus: string;
   publishStatus: string;
   onboardingState: string;
   backgroundCheckStatus?: string;
+  allyRegistration?: unknown;
+  allyDeclarationsAcceptedAt?: string | null;
   user: { id: string; email: string; status: string; role?: string };
 };
 type ResourcesResponse = PageMeta & { items: ResourceItem[] };
@@ -601,6 +604,23 @@ export default function AdminPage() {
                           <p>
                             Localisation: {resource.city}, {resource.region} ({resource.postalCode})
                           </p>
+                          {resource.streetAddress ? (
+                            <p className="text-slate-400">Adresse : {resource.streetAddress}</p>
+                          ) : null}
+                          {resource.allyDeclarationsAcceptedAt ? (
+                            <p className="text-xs text-slate-500">
+                              Déclarations formulaire répit :{" "}
+                              {new Date(resource.allyDeclarationsAcceptedAt).toLocaleString("fr-CA")}
+                            </p>
+                          ) : null}
+                          {resource.allyRegistration ? (
+                            <details className="mt-1 text-xs">
+                              <summary className="cursor-pointer text-cyan-400">Dossier candidature répit (JSON)</summary>
+                              <pre className="mt-2 max-h-48 overflow-auto rounded bg-slate-950 p-2 text-[10px] text-slate-300">
+                                {JSON.stringify(resource.allyRegistration, null, 2)}
+                              </pre>
+                            </details>
+                          ) : null}
                         </div>
                       </label>
                       <div className="flex flex-wrap items-center gap-2">

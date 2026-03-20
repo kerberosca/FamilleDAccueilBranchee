@@ -9,6 +9,8 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import {
+  BackgroundCheckStatus,
+  Prisma,
   ResourceOnboardingState,
   ResourcePublishStatus,
   ResourceVerificationStatus,
@@ -21,6 +23,11 @@ import { randomBytes } from "crypto";
 import { EmailService } from "../email/email.service";
 import { MaintenanceService } from "../maintenance/maintenance.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import {
+  buildAvailabilityFromRegistration,
+  buildSkillsTagsFromRegistration,
+  parseAndValidateAllyRegistration
+} from "./ally-registration.validation";
 import { RegisterDto } from "./dto/register.dto";
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 h
@@ -49,12 +56,61 @@ export class AuthService {
     if (input.role === Role.RESOURCE && input.allyType == null) {
       throw new BadRequestException("Le type d'allié (Ménage, Gardiens ou Autres) est obligatoire.");
     }
+    if (input.role === Role.RESOURCE) {
+      if (!input.contactPhone?.trim()) {
+        throw new BadRequestException("Le téléphone est obligatoire pour créer un compte allié.");
+      }
+      if (input.allyRegistration == null) {
+        throw new BadRequestException("Le formulaire d'inscription allié (allyRegistration) est obligatoire.");
+      }
+    }
     const existing = await this.prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
     if (existing) {
       throw new ConflictException("Email already in use");
     }
 
     const passwordHash = await argon2.hash(input.password);
+
+    let resourceProfile:
+      | {
+          create: Prisma.ResourceProfileUncheckedCreateWithoutUserInput;
+        }
+      | undefined;
+
+    if (input.role === Role.RESOURCE) {
+      const reg = parseAndValidateAllyRegistration(input.allyRegistration);
+      const allyLabel =
+        input.allyType === "MENAGE" ? "ménage" : input.allyType === "GARDIENS" ? "gardiens" : "autres";
+      const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel);
+      const skillsTags = [...new Set([...fromReg, ...(input.tags ?? [])])];
+      const hourlyRaw = parseFloat(reg.section3.hourlyRateSuggested.replace(",", "."));
+      const bioText = input.bio?.trim() ? input.bio : reg.section2.approachChildren;
+      const availability = buildAvailabilityFromRegistration(reg) as Prisma.InputJsonValue;
+
+      resourceProfile = {
+        create: {
+          allyType: input.allyType!,
+          displayName: input.displayName,
+          postalCode: normalizePostalCode(input.postalCode),
+          city: input.city,
+          region: input.region,
+          streetAddress: reg.section1.streetAddress,
+          bio: bioText,
+          skillsTags,
+          hourlyRate: hourlyRaw,
+          availability,
+          contactEmail: reg.section1.contactEmail,
+          contactPhone: input.contactPhone!.trim(),
+          allyRegistration: JSON.parse(JSON.stringify(reg)) as Prisma.InputJsonValue,
+          allyDeclarationsAcceptedAt: new Date(),
+          onboardingState: ResourceOnboardingState.PENDING_VERIFICATION,
+          verificationStatus: ResourceVerificationStatus.PENDING_VERIFICATION,
+          publishStatus: ResourcePublishStatus.HIDDEN,
+          backgroundCheckStatus: BackgroundCheckStatus.REQUESTED
+        }
+      };
+    }
+
     const created = await this.prisma.user.create({
       data: {
         email: input.email.toLowerCase(),
@@ -74,23 +130,7 @@ export class AuthService {
                 }
               }
             : undefined,
-        resourceProfile:
-          input.role === Role.RESOURCE
-            ? {
-                create: {
-                  allyType: input.allyType!,
-                  displayName: input.displayName,
-                  postalCode: normalizePostalCode(input.postalCode),
-                  city: input.city,
-                  region: input.region,
-                  bio: input.bio,
-                  skillsTags: input.tags ?? [],
-                  onboardingState: ResourceOnboardingState.PENDING_VERIFICATION,
-                  verificationStatus: ResourceVerificationStatus.PENDING_VERIFICATION,
-                  publishStatus: ResourcePublishStatus.HIDDEN
-                }
-              }
-            : undefined
+        resourceProfile
       }
     });
 
@@ -98,8 +138,7 @@ export class AuthService {
     return {
       user: sanitizeUser(created),
       ...tokens,
-      nextStepForResource:
-        created.role === Role.RESOURCE ? "Create Stripe checkout via POST /api/v1/billing/resource/checkout-session" : null
+      nextStepForResource: null
     };
   }
 

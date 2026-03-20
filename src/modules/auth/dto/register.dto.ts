@@ -1,6 +1,6 @@
 import { AllyType, Role } from "@prisma/client";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsArray, IsEmail, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { IsArray, IsEmail, IsEnum, IsObject, IsOptional, IsString, Matches, MaxLength, MinLength, ValidateIf } from "class-validator";
 
 export class RegisterDto {
   @ApiProperty()
@@ -52,4 +52,20 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(AllyType)
   allyType?: AllyType;
+
+  /** Téléphone (obligatoire pour les alliés — formulaire répit). */
+  @ApiPropertyOptional()
+  @ValidateIf((o: RegisterDto) => o.role === Role.RESOURCE)
+  @IsString()
+  @MinLength(8, { message: "Un numéro de téléphone valide est requis." })
+  contactPhone?: string;
+
+  /**
+   * Formulaire complet « Devenir allié répit » (JSON).
+   * Obligatoire si role = RESOURCE ; validé côté serveur.
+   */
+  @ApiPropertyOptional()
+  @ValidateIf((o: RegisterDto) => o.role === Role.RESOURCE)
+  @IsObject()
+  allyRegistration?: unknown;
 }

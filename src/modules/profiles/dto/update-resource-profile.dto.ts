@@ -24,6 +24,11 @@ export class UpdateResourceProfileDto {
   @IsString()
   region?: string;
 
+  @ApiPropertyOptional({ description: "Adresse postale (formulaire répit)" })
+  @IsOptional()
+  @IsString()
+  streetAddress?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -66,4 +71,13 @@ export class UpdateResourceProfileDto {
   @IsOptional()
   @IsEnum(BackgroundCheckStatus)
   backgroundCheckStatus?: BackgroundCheckStatus;
+
+  /**
+   * Remplacement complet du formulaire répit (même schéma qu'à l'inscription).
+   * Si fourni, re-validé côté serveur ; met à jour tags / disponibilités / tarif dérivés du JSON.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  allyRegistration?: unknown;
 }

@@ -27,10 +27,10 @@ const TYPES = [
 ];
 
 const STEPS = [
-  "Inscrivez-vous gratuitement et choisissez votre type d'allié.",
-  "Complétez votre profil et le questionnaire.",
+  "Consultez le formulaire officiel répit et lancez l'inscription guidée (même contenu que la documentation).",
+  "Renseignez vos compétences, votre offre de service et les déclarations légales — tout est expliqué étape par étape.",
   "Après validation (vérification d'antécédents), vous êtes visible par les familles.",
-  "Les familles vous contactent selon leurs besoins."
+  "Les familles vous contactent selon leurs besoins ; l'entente financière se fait entre vous et elles."
 ];
 
 function TypeIcon({
@@ -125,15 +125,20 @@ export default function DevenirAlliePage() {
             Rejoignez le répertoire : créer mon compte allié.
           </h2>
           <p className="mx-auto mt-2 max-w-md text-slate-400">
-            Inscription gratuite. Complétez votre profil, répondez au questionnaire et à la
-            vérification d&apos;antécédents pour être visible auprès des familles.
+            Inscription gratuite. Parcours aligné sur le formulaire « Devenir allié répit » : informations générales,
+            compétences, offre et engagements légaux.
           </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm">
+            <Link href="/formulaire-allie-repit" className="text-cyan-400 underline hover:text-cyan-300">
+              Lire le formulaire (référence)
+            </Link>
+          </div>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/onboarding/resource"
               className="inline-flex min-w-[200px] justify-center rounded-md bg-cyan-700 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 hover:bg-cyan-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
-              Créer mon compte allié
+              Commencer l&apos;inscription guidée
             </Link>
             <Link
               href="/"
