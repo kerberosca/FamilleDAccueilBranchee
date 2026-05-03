@@ -441,12 +441,35 @@ export default function MePage() {
   };
 
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">Mon profil</h1>
-      <RequireAuth>
-        <Button variant="secondary" onClick={handleLogout} disabled={loggingOut}>
-          {loggingOut ? "Deconnexion..." : "Se deconnecter"}
-        </Button>
+    <main className="relative isolate overflow-hidden px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(980px 420px at -10% -8%, rgba(242,157,82,0.18), transparent), radial-gradient(760px 360px at 108% 4%, rgba(118,106,204,0.24), transparent), linear-gradient(180deg, #130e2d 0%, #100c26 60%, #0d0a1f 100%)",
+          }}
+          aria-hidden
+        />
+      </div>
+
+      <div className="mx-auto max-w-3xl space-y-4">
+        <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
+          <h1 className="text-2xl font-semibold sm:text-3xl">Mon profil</h1>
+          <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
+            Mettez a jour vos informations pour mieux connecter familles et allies.
+          </p>
+        </section>
+
+        <RequireAuth>
+          <Button
+            variant="secondary"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="!rounded-xl !border !border-[#5a527f] !bg-[#1b153d] !px-4 !py-2 !text-sm !text-[#ece8ff] hover:!bg-[#241c4d]"
+          >
+            {loggingOut ? "Deconnexion..." : "Se deconnecter"}
+          </Button>
 
         {loading ? <Alert tone="info">Chargement du profil...</Alert> : null}
         {isDirty ? (
@@ -455,7 +478,7 @@ export default function MePage() {
         {error ? <Alert tone="error">{error}</Alert> : null}
         {success ? <Alert tone="info">{success}</Alert> : null}
         {me ? (
-          <Card className="space-y-1">
+          <Card className="space-y-1 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
             <p className="text-sm text-slate-300">
               Connecté avec <strong className="text-white">{me.email}</strong>
             </p>
@@ -468,7 +491,7 @@ export default function MePage() {
         {me?.role === "ADMIN" ? <Alert tone="info">Le role ADMIN n&apos;a pas de profil editable dans cette version.</Alert> : null}
 
         {me?.role === "FAMILY" ? (
-          <Card className="space-y-3">
+          <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
             <h2 className="text-lg font-medium">Editer mon profil FAMILY</h2>
             <Input
               placeholder="Nom affiche"
@@ -509,7 +532,7 @@ export default function MePage() {
             <Input placeholder="Bio" value={bio} onChange={(e) => setBio(e.target.value)} />
             <Input placeholder="Besoins (CSV)" value={tagsCsv} onChange={(e) => setTagsCsv(e.target.value)} />
             <textarea
-              className="min-h-28 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+              className="min-h-28 w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100 placeholder:text-[#8b84ad] focus:border-[#6f8fe2] focus:outline-none focus:ring-1 focus:ring-[#6f8fe2]/35"
               placeholder='Disponibilite JSON (optionnel), ex: {"weekend":true}'
               value={availabilityJson}
               onChange={(e) => {
@@ -518,11 +541,16 @@ export default function MePage() {
               }}
             />
             <FieldError error={fieldErrors.availabilityJson} />
-            <div className="flex gap-2">
-              <Button onClick={saveFamilyProfile} disabled={saving}>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={saveFamilyProfile} disabled={saving} className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]">
                 {saving ? "Enregistrement..." : "Enregistrer le profil FAMILY"}
               </Button>
-              <Button variant="secondary" onClick={handleRestore} disabled={saving || !isDirty}>
+              <Button
+                variant="secondary"
+                onClick={handleRestore}
+                disabled={saving || !isDirty}
+                className="!rounded-xl !bg-[#262148] !text-[#ece8ff] hover:!bg-[#30295a]"
+              >
                 Restaurer
               </Button>
             </div>
@@ -530,7 +558,7 @@ export default function MePage() {
         ) : null}
 
         {me?.role === "RESOURCE" ? (
-          <Card className="space-y-3">
+          <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
             <h2 className="text-lg font-medium">Editer mon profil allié</h2>
             <Input
               placeholder="Nom affiche"
@@ -599,7 +627,7 @@ export default function MePage() {
             <FieldError error={fieldErrors.contactEmail} />
             <Input placeholder="Telephone de contact" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
             <textarea
-              className="min-h-28 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+              className="min-h-28 w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100 placeholder:text-[#8b84ad] focus:border-[#6f8fe2] focus:outline-none focus:ring-1 focus:ring-[#6f8fe2]/35"
               placeholder='Disponibilite JSON (optionnel), ex: {"soir":"lundi-mardi"}'
               value={availabilityJson}
               onChange={(e) => {
@@ -632,7 +660,7 @@ export default function MePage() {
                 Je m&apos;engage à fournir une vérification d&apos;antécédents judiciaires
               </span>
             </label>
-            <h3 className="text-base font-medium pt-2 border-t border-slate-700 mt-2">Candidature répit (formulaire officiel)</h3>
+            <h3 className="text-base font-medium pt-2 border-t border-slate-700 mt-2">Candidature allié (formulaire officiel)</h3>
             <p className="text-sm text-slate-400">
               Les compétences, l&apos;offre de service et les déclarations légales sont enregistrées via le formulaire
               aligné sur la documentation FAB. Pour les modifier, ouvrez l&apos;assistant complet (toutes les sections
@@ -640,22 +668,27 @@ export default function MePage() {
             </p>
             <Link
               href="/me/ally-candidature"
-              className="inline-flex rounded-md border border-cyan-500/40 bg-slate-800 px-4 py-2 text-sm font-medium text-cyan-300 hover:bg-slate-700"
+              className="inline-flex rounded-xl border border-[#6f8fe2]/45 bg-[#1d1840] px-4 py-2 text-sm font-medium text-[#b9ccff] no-underline hover:bg-[#292358] hover:text-[#d4dfff]"
             >
-              Mettre à jour ma candidature répit
+              Mettre à jour ma candidature allié
             </Link>
-            <div className="flex gap-2">
-              <Button onClick={saveResourceProfile} disabled={saving}>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={saveResourceProfile} disabled={saving} className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]">
                 {saving ? "Enregistrement..." : "Enregistrer le profil allié"}
               </Button>
-              <Button variant="secondary" onClick={handleRestore} disabled={saving || !isDirty}>
+              <Button
+                variant="secondary"
+                onClick={handleRestore}
+                disabled={saving || !isDirty}
+                className="!rounded-xl !bg-[#262148] !text-[#ece8ff] hover:!bg-[#30295a]"
+              >
                 Restaurer
               </Button>
             </div>
           </Card>
         ) : null}
 
-        <Card className="mt-6 border-t border-slate-700 pt-4">
+        <Card className="mt-6 border-[#6f4561] bg-[#24112e]/80 pt-4 backdrop-blur-sm">
           <h2 className="text-lg font-medium text-slate-200">Supprimer mon compte</h2>
           <p className="mt-1 text-sm text-slate-400">
             La suppression est définitive : profil, messages et abonnement seront supprimés. Cette action est irréversible.
@@ -671,6 +704,7 @@ export default function MePage() {
           </Button>
         </Card>
       </RequireAuth>
+      </div>
     </main>
   );
 

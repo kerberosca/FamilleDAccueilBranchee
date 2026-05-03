@@ -9,8 +9,9 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import {
-  BackgroundCheckStatus,
-  Prisma,
+	  BackgroundCheckStatus,
+	  AllyType,
+	  Prisma,
   ResourceOnboardingState,
   ResourcePublishStatus,
   ResourceVerificationStatus,
@@ -54,7 +55,7 @@ export class AuthService {
       throw new BadRequestException("ADMIN registration is disabled");
     }
     if (input.role === Role.RESOURCE && input.allyType == null) {
-      throw new BadRequestException("Le type d'allié (Ménage, Gardiens ou Autres) est obligatoire.");
+	      throw new BadRequestException("Le type d'allié (Gardien compétent, Entretien Ménage ou Tutorat) est obligatoire.");
     }
     if (input.role === Role.RESOURCE) {
       if (!input.contactPhone?.trim()) {
@@ -79,8 +80,7 @@ export class AuthService {
 
     if (input.role === Role.RESOURCE) {
       const reg = parseAndValidateAllyRegistration(input.allyRegistration);
-      const allyLabel =
-        input.allyType === "MENAGE" ? "ménage" : input.allyType === "GARDIENS" ? "gardiens" : "autres";
+	      const allyLabel = allyTypeToPublicLabel(input.allyType!);
       const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel);
       const skillsTags = [...new Set([...fromReg, ...(input.tags ?? [])])];
       const hourlyRaw = parseFloat(reg.section3.hourlyRateSuggested.replace(",", "."));
@@ -307,4 +307,10 @@ function sanitizeUser(user: User) {
 
 function normalizePostalCode(postalCode: string): string {
   return postalCode.replace(/\s+/g, "").toUpperCase();
+}
+
+function allyTypeToPublicLabel(allyType: AllyType): string {
+  if (allyType === AllyType.GARDIENS) return "Gardien compétent";
+  if (allyType === AllyType.MENAGE) return "Entretien Ménage";
+  return "Tutorat";
 }

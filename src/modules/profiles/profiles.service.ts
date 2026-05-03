@@ -99,13 +99,9 @@ export class ProfilesService {
     let derivedFromAlly: Partial<Prisma.ResourceProfileUpdateInput> = {};
     if (allyRegRaw !== undefined) {
       const reg = parseAndValidateAllyRegistration(allyRegRaw);
-      const allyLabel =
-        existing.allyType === AllyType.MENAGE
-          ? "ménage"
-          : existing.allyType === AllyType.GARDIENS
-            ? "gardiens"
-            : "autres";
-      const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel);
+	      const nextAllyType = rest.allyType ?? existing.allyType;
+	      const allyLabel = nextAllyType ? allyTypeToPublicLabel(nextAllyType) : undefined;
+	      const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel);
       const skillsTags = [...new Set([...fromReg, ...(rest.skillsTags ?? existing.skillsTags)])];
       const hourlyRaw = parseFloat(reg.section3.hourlyRateSuggested.replace(",", "."));
       allyRegJson = JSON.parse(JSON.stringify(reg)) as Prisma.InputJsonValue;
@@ -373,6 +369,12 @@ export class ProfilesService {
 
 function normalizePostalCode(postalCode: string): string {
   return postalCode.replace(/\s+/g, "").toUpperCase();
+}
+
+function allyTypeToPublicLabel(allyType: AllyType): string {
+  if (allyType === AllyType.GARDIENS) return "Gardien compétent";
+  if (allyType === AllyType.MENAGE) return "Entretien Ménage";
+  return "Tutorat";
 }
 
 function toJson(input: unknown): Prisma.InputJsonValue | undefined {

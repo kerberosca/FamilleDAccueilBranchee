@@ -24,7 +24,7 @@ export default function MentionsLegalesPage() {
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-white">Objet du site</h2>
         <p className="text-slate-300">
-          FAB (Famille d&apos;accueil branchée) est une plateforme de mise en relation entre familles d&apos;accueil et alliés (soutien : ménage, garde, transport, répit) au Québec.
+          FAB (Famille d&apos;accueil branchée) est une plateforme de mise en relation entre familles d&apos;accueil et alliés (gardien compétent, entretien ménage, tutorat) au Québec.
         </p>
       </section>
 

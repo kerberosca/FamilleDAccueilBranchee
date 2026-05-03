@@ -13,7 +13,7 @@ export default function CGUPage() {
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-white">1. Objet du site</h2>
         <p className="text-slate-300">
-          FAB (Famille d&apos;accueil branchée) est une plateforme de mise en relation entre familles d&apos;accueil et alliés (soutien : ménage, garde, transport, répit) au Québec. Elle est exploitée par <strong>Forméduc</strong>. En utilisant le site, vous acceptez les présentes conditions générales d&apos;utilisation (CGU).
+          FAB (Famille d&apos;accueil branchée) est une plateforme de mise en relation entre familles d&apos;accueil et alliés (gardien compétent, entretien ménage, tutorat) au Québec. Elle est exploitée par <strong>Forméduc</strong>. En utilisant le site, vous acceptez les présentes conditions générales d&apos;utilisation (CGU).
         </p>
       </section>
 

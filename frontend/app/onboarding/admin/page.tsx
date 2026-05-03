@@ -27,10 +27,10 @@ export default function AdminOnboardingPage() {
     setLoading(true);
     try {
       const response = await apiPost<DevLoginResponse>("/dev/login-as", {
-        body: { role: "ADMIN" }
+        body: { role: "ADMIN" },
       });
       setTokens(response.accessToken, response.refreshToken);
-      setSuccess("Session ADMIN ouverte. Va sur /me ou commence la moderation.");
+      setSuccess("Session ADMIN ouverte. Allez sur /me ou commencez la moderation.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
@@ -39,25 +39,43 @@ export default function AdminOnboardingPage() {
   };
 
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">Admin — Premiers pas</h1>
+    <main className="relative isolate overflow-hidden px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(980px 420px at -10% -8%, rgba(242,157,82,0.18), transparent), radial-gradient(760px 360px at 108% 4%, rgba(118,106,204,0.24), transparent), linear-gradient(180deg, #130e2d 0%, #100c26 60%, #0d0a1f 100%)",
+          }}
+          aria-hidden
+        />
+      </div>
 
-      <Card className="space-y-2">
-        <p className="text-sm text-slate-300">
-          L&apos;inscription publique ADMIN est desactivee cote backend. Le role admin doit etre provisionne en seed ou
-          via un process interne.
-        </p>
-        {ENABLED ? (
-          <Button onClick={loginAsAdmin} disabled={loading}>
-            {loading ? "Connexion..." : "Login ADMIN (bypass dev)"}
-          </Button>
-        ) : (
-          <Alert tone="info">Mode dev bypass desactive. Utilise un compte admin existant via /auth/login.</Alert>
-        )}
-      </Card>
+      <div className="mx-auto max-w-3xl space-y-4">
+        <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
+          <h1 className="text-2xl font-semibold sm:text-3xl">Admin - Premiers pas</h1>
+          <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
+            L'inscription publique ADMIN est desactivee. Utilisez un compte provisionne ou le bypass dev.
+          </p>
+        </section>
 
-      {success ? <Alert tone="info">{success}</Alert> : null}
-      {error ? <Alert tone="error">{error}</Alert> : null}
+        <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
+          {ENABLED ? (
+            <Button
+              onClick={loginAsAdmin}
+              disabled={loading}
+              className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
+            >
+              {loading ? "Connexion..." : "Login ADMIN (bypass dev)"}
+            </Button>
+          ) : (
+            <Alert tone="info">Mode dev bypass desactive. Utilisez un compte admin existant via /auth/login.</Alert>
+          )}
+        </Card>
+
+        {success ? <Alert tone="info">{success}</Alert> : null}
+        {error ? <Alert tone="error">{error}</Alert> : null}
+      </div>
     </main>
   );
 }

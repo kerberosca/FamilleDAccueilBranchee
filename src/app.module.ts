@@ -41,9 +41,9 @@ const isProduction = process.env.NODE_ENV === "production";
         EMAIL_FROM: Joi.string().allow("").optional()
       })
     }),
-    ThrottlerModule.forRoot([
-      { ttl: 60_000, limit: 60 }
-    ]),
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 60_000, limit: 60 }]
+    }),
     PrismaModule,
     EmailModule,
     MaintenanceModule,

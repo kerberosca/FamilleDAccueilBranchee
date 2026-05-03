@@ -609,13 +609,13 @@ export default function AdminPage() {
                           ) : null}
                           {resource.allyDeclarationsAcceptedAt ? (
                             <p className="text-xs text-slate-500">
-                              Déclarations formulaire répit :{" "}
+                              Déclarations formulaire allié :{" "}
                               {new Date(resource.allyDeclarationsAcceptedAt).toLocaleString("fr-CA")}
                             </p>
                           ) : null}
                           {resource.allyRegistration ? (
                             <details className="mt-1 text-xs">
-                              <summary className="cursor-pointer text-cyan-400">Dossier candidature répit (JSON)</summary>
+                              <summary className="cursor-pointer text-cyan-400">Dossier candidature allié (JSON)</summary>
                               <pre className="mt-2 max-h-48 overflow-auto rounded bg-slate-950 p-2 text-[10px] text-slate-300">
                                 {JSON.stringify(resource.allyRegistration, null, 2)}
                               </pre>

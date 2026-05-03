@@ -21,12 +21,12 @@ export function ResourceCard({
 }) {
   const contactPlaceholder = isPremiumUser ? "Non renseigne" : "Masque (premium requis)";
   return (
-    <Card>
+    <Card className="border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-lg font-semibold">{resource.displayName}</h3>
+        <h3 className="text-lg font-semibold text-white">{resource.displayName}</h3>
         <Link
           href={`/resource/${resource.id}`}
-          className="text-sm text-cyan-400 hover:underline"
+          className="text-sm font-medium text-[#9fb9ff] no-underline hover:text-[#c5d6ff]"
         >
           Voir le profil
         </Link>
@@ -37,11 +37,11 @@ export function ResourceCard({
       <p className="mt-2 text-sm text-slate-300">
         Tags: {resource.skillsTags?.length ? resource.skillsTags.join(", ") : "Aucun"}
       </p>
-      <p className="mt-2 text-sm">
-        Email: <span className="text-slate-200">{resource.contactEmail ?? contactPlaceholder}</span>
+      <p className="mt-2 text-sm text-slate-200">
+        Email: <span className="text-white">{resource.contactEmail ?? contactPlaceholder}</span>
       </p>
-      <p className="text-sm">
-        Tel: <span className="text-slate-200">{resource.contactPhone ?? contactPlaceholder}</span>
+      <p className="text-sm text-slate-200">
+        Tel: <span className="text-white">{resource.contactPhone ?? contactPlaceholder}</span>
       </p>
     </Card>
   );

@@ -40,7 +40,7 @@ export default function FamilyOnboardingPage() {
   const onRegister = async (event: FormEvent) => {
     event.preventDefault();
     if (!acceptPolicy) {
-      setError("Vous devez accepter la Politique de confidentialité et le traitement de vos données pour vous inscrire.");
+      setError("Vous devez accepter la Politique de confidentialite et le traitement de vos donnees pour vous inscrire.");
       return;
     }
     setError(null);
@@ -58,11 +58,11 @@ export default function FamilyOnboardingPage() {
           city,
           region,
           bio: bio || undefined,
-          tags: toTags(tags)
-        }
+          tags: toTags(tags),
+        },
       });
       setTokens(response.accessToken, response.refreshToken);
-      setSuccess("Compte FAMILY cree. Tu peux maintenant lancer le checkout abonnement.");
+      setSuccess("Compte FAMILY cree. Vous pouvez maintenant lancer le checkout abonnement.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
@@ -72,14 +72,14 @@ export default function FamilyOnboardingPage() {
 
   const onCheckout = async () => {
     if (!accessToken) {
-      setError("Token manquant. Inscris-toi d'abord.");
+      setError("Token manquant. Inscrivez-vous d'abord.");
       return;
     }
     setError(null);
     setLoadingCheckout(true);
     try {
       const session = await apiPost<CheckoutResponse>("/billing/family/checkout-session", {
-        token: accessToken
+        token: accessToken,
       });
       window.location.href = session.checkoutUrl;
     } catch (e) {
@@ -90,61 +90,132 @@ export default function FamilyOnboardingPage() {
   };
 
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">Inscription famille</h1>
+    <main className="relative isolate overflow-hidden px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(980px 420px at -10% -8%, rgba(242,157,82,0.18), transparent), radial-gradient(760px 360px at 108% 4%, rgba(118,106,204,0.24), transparent), linear-gradient(180deg, #130e2d 0%, #100c26 60%, #0d0a1f 100%)",
+          }}
+          aria-hidden
+        />
+      </div>
 
-      <p className="text-sm text-slate-300">
-        Vos données seront enregistrées dans notre base et utilisées pour la mise en relation avec les alliés. Vous pourrez supprimer votre compte à tout moment depuis « Mon profil ». Consultez notre{" "}
-        <Link href="/confidentialite" className="text-cyan-400 underline hover:text-cyan-300">
-          Politique de confidentialité
-        </Link>
-        .
-      </p>
+      <div className="mx-auto max-w-3xl space-y-4">
+        <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
+          <h1 className="text-2xl font-semibold sm:text-3xl">Inscription famille</h1>
+          <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
+            Creez votre espace puis activez l'abonnement pour contacter les allies.
+          </p>
+        </section>
 
-      <Card>
-        <form className="grid gap-2" onSubmit={onRegister}>
-          <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
-            <input
-              type="checkbox"
-              checked={acceptPolicy}
-              onChange={(e) => setAcceptPolicy(e.target.checked)}
-              className="mt-0.5 rounded border-slate-600 bg-slate-800 text-cyan-500"
+        <p className="text-sm text-slate-200">
+          Vos donnees seront enregistrees pour la mise en relation. Vous pourrez supprimer votre compte depuis "Mon profil".
+          Consultez notre{" "}
+          <Link href="/confidentialite" className="font-medium text-[#b9ccff] underline hover:text-[#d3dfff]">
+            Politique de confidentialite
+          </Link>
+          .
+        </p>
+
+        <Card className="border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
+          <form className="grid gap-3" onSubmit={onRegister}>
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={acceptPolicy}
+                onChange={(e) => setAcceptPolicy(e.target.checked)}
+                className="mt-0.5 rounded border-[#5e567f] bg-[#0f0b24] text-[#6f8fe2]"
+              />
+              <span>
+                J'ai lu la Politique de confidentialite et j'accepte le traitement de mes donnees pour la mise en relation.
+              </span>
+            </label>
+
+            <Input
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
+              className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
             />
-            <span>
-              J&apos;ai lu la Politique de confidentialité et j&apos;accepte que mes données soient traitées et que mon profil soit utilisé pour la mise en relation.
-            </span>
-          </label>
-          <Input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
-          <Input
-            placeholder="Mot de passe (8 caractères min, majuscule, chiffre, spécial)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            required
-            minLength={8}
-          />
-          <PasswordStrength password={password} />
-          <Input placeholder="Nom affiche" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
-          <Input placeholder="Code postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} required />
-          <Input placeholder="Ville" value={city} onChange={(e) => setCity(e.target.value)} required />
-          <Input placeholder="Region" value={region} onChange={(e) => setRegion(e.target.value)} required />
-          <Input placeholder="Bio (optionnel)" value={bio} onChange={(e) => setBio(e.target.value)} />
-          <Input placeholder="Tags CSV (optionnel)" value={tags} onChange={(e) => setTags(e.target.value)} />
-          <Button type="submit" disabled={loadingRegister || !acceptPolicy}>
-            {loadingRegister ? "Creation..." : "Creer mon compte FAMILY"}
+            <Input
+              placeholder="Mot de passe (8 caracteres min, majuscule, chiffre, special)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              required
+              minLength={8}
+              className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
+            />
+            <PasswordStrength password={password} />
+            <Input
+              placeholder="Nom affiche"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              required
+              className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
+            />
+            <Input
+              placeholder="Code postal"
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              required
+              className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
+            />
+            <Input
+              placeholder="Ville"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              required
+              className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
+            />
+            <Input
+              placeholder="Region"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              required
+              className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
+            />
+            <Input
+              placeholder="Bio (optionnel)"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
+            />
+            <Input
+              placeholder="Tags CSV (optionnel)"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
+            />
+            <Button
+              type="submit"
+              disabled={loadingRegister || !acceptPolicy}
+              className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
+            >
+              {loadingRegister ? "Creation..." : "Creer mon compte FAMILY"}
+            </Button>
+          </form>
+        </Card>
+
+        <Card className="space-y-2 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
+          <p className="text-sm text-slate-300">Etape suivante: activer l'abonnement FAMILY via Stripe.</p>
+          <Button
+            type="button"
+            onClick={onCheckout}
+            disabled={loadingCheckout || !accessToken}
+            className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
+          >
+            {loadingCheckout ? "Redirection..." : "Activer abonnement FAMILY"}
           </Button>
-        </form>
-      </Card>
+        </Card>
 
-      <Card className="space-y-2">
-        <p className="text-sm text-slate-300">Etape suivante: activer l&apos;abonnement FAMILY via Stripe.</p>
-        <Button type="button" onClick={onCheckout} disabled={loadingCheckout || !accessToken}>
-          {loadingCheckout ? "Redirection..." : "Activer abonnement FAMILY"}
-        </Button>
-      </Card>
-
-      {success ? <Alert tone="info">{success}</Alert> : null}
-      {error ? <Alert tone="error">{error}</Alert> : null}
+        {success ? <Alert tone="info">{success}</Alert> : null}
+        {error ? <Alert tone="error">{error}</Alert> : null}
+      </div>
     </main>
   );
 }

@@ -29,45 +29,59 @@ export default function ResourceOnboardingPage() {
         city: p.city,
         region: p.region,
         contactPhone: p.contactPhone,
-        allyRegistration: p.allyRegistration
-      }
+        allyRegistration: p.allyRegistration,
+      },
     });
     setTokens(response.accessToken, response.refreshToken);
     setSuccess(
-      "Candidature enregistrée. Votre profil est en attente de validation. Vous pouvez compléter ou modifier des détails depuis « Mon profil »."
+      "Candidature enregistrée. Votre profil est en attente de validation. Vous pouvez ensuite le modifier dans Mon profil."
     );
   };
 
   return (
-    <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">Devenir allié — inscription</h1>
-      <p className="text-sm text-slate-400">
-        Parcours guidé aligné sur le{" "}
-        <Link href="/formulaire-allie-repit" className="text-cyan-400 underline">
-          formulaire de candidature répit
-        </Link>
-        . Besoin d&apos;aide ? Consultez aussi la page{" "}
-        <Link href="/devenir-allie" className="text-cyan-400 underline">
-          Devenir allié
-        </Link>
-        .
-      </p>
-
-      {success ? (
-        <Alert tone="info">
-          {success}{" "}
-          <Link href="/me" className="font-medium text-cyan-300 underline">
-            Ouvrir mon profil
-          </Link>
-        </Alert>
-      ) : (
-        <AllyOnboardingWizard
-          mode="register"
-          onRegister={async (p) => {
-            await handleRegister(p);
+    <main className="relative isolate overflow-hidden px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(980px 420px at -10% -8%, rgba(242,157,82,0.18), transparent), radial-gradient(760px 360px at 108% 4%, rgba(118,106,204,0.24), transparent), linear-gradient(180deg, #130e2d 0%, #100c26 60%, #0d0a1f 100%)",
           }}
+          aria-hidden
         />
-      )}
+      </div>
+
+      <div className="mx-auto max-w-3xl space-y-4">
+        <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
+          <h1 className="text-2xl font-semibold sm:text-3xl">Devenir allié - inscription</h1>
+          <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
+            Choisissez votre type d'allié: gardien compétent, entretien ménage ou tutorat.
+          </p>
+          <p className="mt-2 text-sm text-[#ebe6ff]">
+            Voir la référence:{" "}
+            <Link href="/formulaire-allie" className="font-medium text-[#b9ccff] underline hover:text-[#d3dfff]">
+              formulaire de candidature FAB
+            </Link>
+            .
+          </p>
+        </section>
+
+        {success ? (
+          <Alert tone="info">
+            {success}{" "}
+            <Link href="/me" className="font-medium text-[#b9ccff] underline hover:text-[#d3dfff]">
+              Ouvrir mon profil
+            </Link>
+          </Alert>
+        ) : (
+          <AllyOnboardingWizard
+            mode="register"
+            onRegister={async (p) => {
+              await handleRegister(p);
+            }}
+          />
+        )}
+      </div>
     </main>
   );
 }

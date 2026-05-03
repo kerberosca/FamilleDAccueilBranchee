@@ -2,6 +2,7 @@ import {
   ResourceOnboardingState,
   ResourcePublishStatus,
   ResourceVerificationStatus,
+  AllyType,
   PrismaClient,
   Role,
   SubscriptionStatus,
@@ -56,7 +57,7 @@ async function main() {
           city: "Montreal",
           region: "QC",
           bio: "Nous cherchons de l'aide ponctuelle.",
-          needsTags: ["repit", "transport"],
+          needsTags: ["Gardien compétent", "Tutorat"],
           availability: { weekdays: "soir" }
         }
       }
@@ -91,7 +92,7 @@ async function main() {
           city: "Montreal",
           region: "QC",
           bio: "Compte seed pour bypass dev.",
-          needsTags: ["repit", "gardiennage"],
+          needsTags: ["Gardien compétent", "Entretien Ménage"],
           availability: { weekdays: "soir", weekend: true }
         }
       }
@@ -125,8 +126,9 @@ async function main() {
           postalCode: "H2X2A1",
           city: "Montreal",
           region: "QC",
-          bio: "Gardiennage et transport.",
-          skillsTags: ["gardiennage", "transport"],
+          allyType: AllyType.GARDIENS,
+          bio: "Gardien compétent disponible pour soutenir les familles.",
+          skillsTags: ["Gardien compétent", "soirée", "fin de semaine"],
           hourlyRate: 28,
           verificationStatus: ResourceVerificationStatus.VERIFIED,
           publishStatus: ResourcePublishStatus.PUBLISHED,
@@ -154,8 +156,9 @@ async function main() {
           postalCode: "H3B1B2",
           city: "Montreal",
           region: "QC",
-          bio: "Compte seed pour bypass dev.",
-          skillsTags: ["transport", "repit"],
+          allyType: AllyType.AUTRES,
+          bio: "Compte seed pour bypass dev - tutorat.",
+          skillsTags: ["Tutorat", "devoirs", "accompagnement scolaire"],
           hourlyRate: 30,
           verificationStatus: ResourceVerificationStatus.VERIFIED,
           publishStatus: ResourcePublishStatus.PUBLISHED,

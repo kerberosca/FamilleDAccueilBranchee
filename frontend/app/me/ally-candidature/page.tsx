@@ -62,10 +62,10 @@ export default function AllyCandidaturePage() {
             ← Mon profil
           </Link>
         </p>
-        <h1 className="text-2xl font-semibold text-white">Ma candidature allié répit</h1>
+        <h1 className="text-2xl font-semibold text-white">Ma candidature allié FAB</h1>
         <p className="text-sm text-slate-400">
-          Mettez à jour les informations du formulaire officiel. Les déclarations devront être à nouveau acceptées
-          intégralement.
+          Mettez à jour votre type d'allié, vos informations et votre offre de service. Les déclarations devront être à
+          nouveau acceptées intégralement.
         </p>
 
         {loading ? <p className="text-slate-400">Chargement…</p> : null}
@@ -107,10 +107,11 @@ export default function AllyCandidaturePage() {
                   displayName: payload.displayName,
                   postalCode: payload.postalCode,
                   city: payload.city,
-                  region: payload.region,
-                  contactPhone: payload.contactPhone,
-                  allyRegistration: payload.allyRegistration
-                }
+	                  region: payload.region,
+	                  contactPhone: payload.contactPhone,
+	                  allyType: payload.allyType,
+	                  allyRegistration: payload.allyRegistration
+	                }
               });
               setSuccess("Candidature mise à jour.");
               await load();

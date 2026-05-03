@@ -9,7 +9,7 @@ export default function FormulaireAllieRepitPage() {
           ← Devenir allié
         </Link>
       </p>
-      <h1 className="text-3xl font-bold text-white">Formulaire de candidature — Devenir allié(e) répit</h1>
+      <h1 className="text-3xl font-bold text-white">Formulaire de candidature - Devenir allié(e) FAB</h1>
       <p>
         Merci de votre intérêt à devenir un(e) allié(e) auprès des familles d&apos;accueil. Notre plateforme agit comme
         intermédiaire de mise en relation. Les ententes financières et contractuelles se font directement entre la famille
@@ -38,7 +38,8 @@ export default function FormulaireAllieRepitPage() {
       <section className="space-y-2 border-t border-slate-700 pt-6">
         <h2 className="text-xl font-semibold text-white">Section 3 — Votre offre de service</h2>
         <ul className="list-inside list-disc text-sm">
-          <li>Types de répit : soirée, nuit, week-end, urgence / dépannage</li>
+          <li>Type d'allié choisi : Gardien compétent, Entretien Ménage ou Tutorat</li>
+          <li>Modalités de service : soirée, nuit, week-end, urgence / dépannage</li>
           <li>Âges acceptés, nombre maximal d&apos;enfants, secteur (distance)</li>
           <li>Taux horaire suggéré, disponibilités générales</li>
         </ul>

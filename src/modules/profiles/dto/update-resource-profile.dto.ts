@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { BackgroundCheckStatus } from "@prisma/client";
+import { AllyType, BackgroundCheckStatus } from "@prisma/client";
 import { Type } from "class-transformer";
 import { IsArray, IsEnum, IsNumber, IsObject, IsOptional, IsString } from "class-validator";
 
@@ -19,12 +19,17 @@ export class UpdateResourceProfileDto {
   @IsString()
   city?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  region?: string;
+	  @ApiPropertyOptional()
+	  @IsOptional()
+	  @IsString()
+	  region?: string;
 
-  @ApiPropertyOptional({ description: "Adresse postale (formulaire répit)" })
+	  @ApiPropertyOptional({ enum: AllyType })
+	  @IsOptional()
+	  @IsEnum(AllyType)
+	  allyType?: AllyType;
+
+  @ApiPropertyOptional({ description: "Adresse postale (formulaire allié)" })
   @IsOptional()
   @IsString()
   streetAddress?: string;
@@ -73,7 +78,7 @@ export class UpdateResourceProfileDto {
   backgroundCheckStatus?: BackgroundCheckStatus;
 
   /**
-   * Remplacement complet du formulaire répit (même schéma qu'à l'inscription).
+   * Remplacement complet du formulaire allié (même schéma qu'à l'inscription).
    * Si fourni, re-validé côté serveur ; met à jour tags / disponibilités / tarif dérivés du JSON.
    */
   @ApiPropertyOptional()

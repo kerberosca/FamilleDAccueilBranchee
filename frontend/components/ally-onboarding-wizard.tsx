@@ -36,6 +36,7 @@ type Props = {
   /** Mise à jour profil existant */
   onUpdate?: (payload: {
     allyRegistration: AllyRegistrationPayload;
+    allyType: AllyType;
     contactPhone: string;
     displayName: string;
     postalCode: string;
@@ -51,10 +52,16 @@ type Props = {
   initialAllyType?: AllyType | null;
 };
 
+const ALLY_TYPE_LABELS: Record<AllyType, string> = {
+  GARDIENS: "Gardien compétent",
+  MENAGE: "Entretien Ménage",
+  AUTRES: "Tutorat"
+};
+
 const ALLY_OPTIONS: { value: AllyType; label: string }[] = [
-  { value: "MENAGE", label: "Ménage" },
-  { value: "GARDIENS", label: "Gardiens" },
-  { value: "AUTRES", label: "Autres" }
+  { value: "GARDIENS", label: ALLY_TYPE_LABELS.GARDIENS },
+  { value: "MENAGE", label: ALLY_TYPE_LABELS.MENAGE },
+  { value: "AUTRES", label: ALLY_TYPE_LABELS.AUTRES }
 ];
 
 const STEP_LABELS_REGISTER = [
@@ -174,7 +181,7 @@ export function AllyOnboardingWizard({
         reg.section3.repitNuit ||
         reg.section3.repitWeekend ||
         reg.section3.repitUrgence;
-      if (!repitAny) return "Cochez au moins un type de répit.";
+      if (!repitAny) return "Cochez au moins une modalité de service.";
       const ageAny = reg.section3.age0_5 || reg.section3.age6_12 || reg.section3.age12p;
       if (!ageAny) return "Cochez au moins une tranche d'âge.";
       if (!reg.section3.maxChildren.trim()) return "Nombre maximal d'enfants requis.";
@@ -242,6 +249,7 @@ export function AllyOnboardingWizard({
       } else if (onUpdate) {
         await onUpdate({
           allyRegistration: payloadReg,
+          allyType: allyType!,
           contactPhone: contactPhone.trim(),
           displayName: displayName.trim(),
           postalCode: postalCode.trim(),
@@ -265,7 +273,7 @@ export function AllyOnboardingWizard({
       type="checkbox"
       checked={checked}
       onChange={(e) => onChange(e.target.checked)}
-      className="mt-1 rounded border-slate-600 bg-slate-800 text-cyan-500"
+      className="mt-1 rounded border-[#5e567f] bg-[#0f0b24] text-[#6f8fe2]"
     />
   );
 
@@ -273,11 +281,11 @@ export function AllyOnboardingWizard({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-400">
         <span>
-          Étape {step + 1} / {maxStep + 1} — {progressLabel}
+          Étape {step + 1} / {maxStep + 1} - {progressLabel}
         </span>
-        <div className="h-1 flex-1 min-w-[120px] max-w-xs overflow-hidden rounded-full bg-slate-800">
+        <div className="h-1 flex-1 min-w-[120px] max-w-xs overflow-hidden rounded-full bg-[#262148]">
           <div
-            className="h-full bg-cyan-600 transition-all"
+            className="h-full bg-[#3567b7] transition-all"
             style={{ width: `${((step + 1) / (maxStep + 1)) * 100}%` }}
           />
         </div>
@@ -288,11 +296,11 @@ export function AllyOnboardingWizard({
       {/* Step 0 register only: intro */}
       {isRegister && step === 0 ? (
         <Card className="space-y-3 p-4">
-          <h2 className="text-lg font-semibold text-white">Devenir allié(e) répit</h2>
+          <h2 className="text-lg font-semibold text-white">Devenir allié(e) FAB</h2>
           <p className="text-sm text-slate-300">
             FAB met en relation les familles d&apos;accueil et les alliés. Les ententes financières se font directement
             entre vous et la famille. Ce parcours reprend le{" "}
-            <Link href="/formulaire-allie-repit" className="text-cyan-400 underline">
+            <Link href="/formulaire-allie" className="text-[#b9ccff] underline">
               formulaire officiel de candidature
             </Link>
             .
@@ -314,7 +322,7 @@ export function AllyOnboardingWizard({
             {chk(acceptPolicy, setAcceptPolicy)}
             <span>
               J&apos;ai lu la{" "}
-              <Link href="/confidentialite" className="text-cyan-400 underline">
+              <Link href="/confidentialite" className="text-[#b9ccff] underline">
                 Politique de confidentialité
               </Link>{" "}
               et j&apos;accepte le traitement de mes données.
@@ -376,7 +384,7 @@ export function AllyOnboardingWizard({
       {/* Section 1 suite: register step 3 / update step 1 */}
       {((isRegister && step === 3) || (!isRegister && step === 1)) ? (
         <Card className="space-y-3 p-4">
-          <h2 className="text-lg font-semibold text-white">Section 1 — Informations générales</h2>
+          <h2 className="text-lg font-semibold text-white">Section 1 - Informations générales</h2>
           <Input
             placeholder="Ville / secteur desservi"
             value={reg.section1.sectorServiced}
@@ -418,11 +426,11 @@ export function AllyOnboardingWizard({
       {/* Section 2 */}
       {((isRegister && step === 4) || (!isRegister && step === 2)) ? (
         <Card className="space-y-3 p-4">
-          <h2 className="text-lg font-semibold text-white">Section 2 — Vos compétences</h2>
+          <h2 className="text-lg font-semibold text-white">Section 2 - Vos compétences</h2>
           <div className="space-y-2">
             <p className="text-sm text-slate-300">Certification RCR / premiers secours valide</p>
             <select
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
               value={reg.section2.rcrValid}
               onChange={(e) =>
                 setReg((r) => ({
@@ -444,7 +452,7 @@ export function AllyOnboardingWizard({
           <div className="space-y-2">
             <p className="text-sm text-slate-300">Formation RCR Niveau C</p>
             <select
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
               value={reg.section2.rcrLevelC}
               onChange={(e) =>
                 setReg((r) => ({
@@ -460,7 +468,7 @@ export function AllyOnboardingWizard({
           <div className="space-y-2">
             <p className="text-sm text-slate-300">Expérience avec des enfants</p>
             <select
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
               value={reg.section2.experienceChildren}
               onChange={(e) =>
                 setReg((r) => ({
@@ -507,10 +515,10 @@ export function AllyOnboardingWizard({
           <div>
             <p className="mb-1 text-sm text-slate-300">Votre approche avec les enfants</p>
             <textarea
-              className="min-h-24 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+              className="min-h-24 w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
               value={reg.section2.approachChildren}
               onChange={(e) => setReg((r) => ({ ...r, section2: { ...r.section2, approachChildren: e.target.value } }))}
-              placeholder="Décrivez brièvement votre approche…"
+              placeholder="Décrivez brièvement votre approche..."
             />
           </div>
           <div className="flex gap-2">
@@ -527,8 +535,8 @@ export function AllyOnboardingWizard({
       {/* Section 3 */}
       {((isRegister && step === 5) || (!isRegister && step === 3)) ? (
         <Card className="space-y-3 p-4">
-          <h2 className="text-lg font-semibold text-white">Section 3 — Votre offre de service</h2>
-          <p className="text-sm text-slate-400">Types de répit offerts</p>
+          <h2 className="text-lg font-semibold text-white">Section 3 - Votre offre de service</h2>
+          <p className="text-sm text-slate-400">Modalités de service offertes</p>
           <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
             {[
               ["repitSoiree", "Soirée"],
@@ -567,7 +575,7 @@ export function AllyOnboardingWizard({
           <div className="space-y-2">
             <p className="text-sm text-slate-300">Secteur desservi (distance)</p>
             <select
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
               value={reg.section3.serviceRadius}
               onChange={(e) =>
                 setReg((r) => ({
@@ -617,7 +625,7 @@ export function AllyOnboardingWizard({
       {/* Section 4 */}
       {((isRegister && step === 6) || (!isRegister && step === 4)) ? (
         <Card className="space-y-3 p-4">
-          <h2 className="text-lg font-semibold text-white">Section 4 — Vérifications et engagement</h2>
+          <h2 className="text-lg font-semibold text-white">Section 4 - Vérifications et engagement</h2>
           <p className="text-sm text-slate-400">Je suis en mesure de fournir (sur demande) :</p>
           <label className="flex items-start gap-2 text-sm text-slate-300">
             {chk(reg.section4.canProvideBackgroundCheck, (v) =>
@@ -675,9 +683,9 @@ export function AllyOnboardingWizard({
           <ul className="space-y-1 text-sm text-slate-300">
             {isRegister ? <li>Courriel : {email}</li> : null}
             <li>Nom : {displayName}</li>
-            <li>Type : {allyType}</li>
+            <li>Type : {allyType ? ALLY_TYPE_LABELS[allyType] : "-"}</li>
             <li>
-              {city}, {region} — {postalCode}
+              {city}, {region} - {postalCode}
             </li>
             <li>Téléphone : {contactPhone}</li>
             <li>Contact : {reg.section1.contactEmail}</li>
@@ -688,7 +696,7 @@ export function AllyOnboardingWizard({
               Retour
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Envoi…" : isRegister ? "Créer mon compte allié" : "Enregistrer les modifications"}
+              {loading ? "Envoi..." : isRegister ? "Créer mon compte allié" : "Enregistrer les modifications"}
             </Button>
           </form>
         </Card>
@@ -697,3 +705,4 @@ export function AllyOnboardingWizard({
     </div>
   );
 }
+

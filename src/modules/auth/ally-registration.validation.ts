@@ -113,7 +113,7 @@ export function parseAndValidateAllyRegistration(raw: unknown): AllyRegistration
     asBool(s3.repitWeekend) ||
     asBool(s3.repitUrgence);
   if (!repitAny) {
-    throw new BadRequestException("Section 3 : cochez au moins un type de répit offert.");
+    throw new BadRequestException("Section 3 : cochez au moins une modalité de service offerte.");
   }
   const ageAny = asBool(s3.age0_5) || asBool(s3.age6_12) || asBool(s3.age12p);
   if (!ageAny) {
@@ -218,10 +218,10 @@ export function parseAndValidateAllyRegistration(raw: unknown): AllyRegistration
 export function buildSkillsTagsFromRegistration(reg: AllyRegistrationPayload, allyTypeLabel?: string): string[] {
   const tags = new Set<string>();
   if (allyTypeLabel) tags.add(allyTypeLabel);
-  if (reg.section3.repitSoiree) tags.add("répit soirée");
-  if (reg.section3.repitNuit) tags.add("répit nuit");
-  if (reg.section3.repitWeekend) tags.add("répit fin de semaine");
-  if (reg.section3.repitUrgence) tags.add("répit urgence");
+  if (reg.section3.repitSoiree) tags.add("soirée");
+  if (reg.section3.repitNuit) tags.add("nuit");
+  if (reg.section3.repitWeekend) tags.add("fin de semaine");
+  if (reg.section3.repitUrgence) tags.add("urgence");
   if (reg.section3.age0_5) tags.add("0-5 ans");
   if (reg.section3.age6_12) tags.add("6-12 ans");
   if (reg.section3.age12p) tags.add("12 ans et +");

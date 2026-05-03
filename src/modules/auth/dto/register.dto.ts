@@ -53,7 +53,7 @@ export class RegisterDto {
   @IsEnum(AllyType)
   allyType?: AllyType;
 
-  /** Téléphone (obligatoire pour les alliés — formulaire répit). */
+  /** Téléphone (obligatoire pour les alliés — formulaire FAB). */
   @ApiPropertyOptional()
   @ValidateIf((o: RegisterDto) => o.role === Role.RESOURCE)
   @IsString()
@@ -61,7 +61,7 @@ export class RegisterDto {
   contactPhone?: string;
 
   /**
-   * Formulaire complet « Devenir allié répit » (JSON).
+   * Formulaire complet « Devenir allié FAB » (JSON).
    * Obligatoire si role = RESOURCE ; validé côté serveur.
    */
   @ApiPropertyOptional()

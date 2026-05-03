@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { ResourceCard } from "../../components/resource-card";
 import { Alert } from "../../components/ui/alert";
@@ -37,7 +38,7 @@ type SearchQuery = {
 const DEFAULT_QUERY: SearchQuery = {
   postalCode: "H2X1Y4",
   tags: "",
-  page: 1
+  page: 1,
 };
 const FSA_REGEX = /^[A-Z][0-9][A-Z]$/;
 const FULL_POSTAL_REGEX = /^[A-Z][0-9][A-Z][0-9][A-Z][0-9]$/;
@@ -64,7 +65,7 @@ export default function SearchPage() {
       try {
         const params = new URLSearchParams({
           postalCode: nextQuery.postalCode,
-          page: String(nextQuery.page)
+          page: String(nextQuery.page),
         });
         if (nextQuery.tags.trim()) {
           params.set("tags", nextQuery.tags.trim());
@@ -92,8 +93,6 @@ export default function SearchPage() {
     [accessToken]
   );
 
-  // Lancer la recherche à l'arrivée : lire l'URL réelle (window.location) + revérifier après un court délai
-  // (après router.push() Next.js peut mettre à jour l'URL juste après le premier rendu)
   useEffect(() => {
     const runFromUrl = () => {
       const q = parseQuery(window.location.search);
@@ -136,25 +135,14 @@ export default function SearchPage() {
       setError("Code postal invalide. Utilise 3 caracteres (FSA, ex: H2X) ou 6 caracteres (ex: H2X1Y4).");
       return;
     }
-    await runSearch({
-      postalCode: nextPostalCode,
-      tags: formTags,
-      page: 1
-    }, { pushHistory: true, syncForm: false });
-  };
-
-  const onNextPage = async () => {
-    await runSearch({
-      ...query,
-      page: currentPage + 1
-    }, { pushHistory: true, syncForm: false });
-  };
-
-  const onPreviousPage = async () => {
-    await runSearch({
-      ...query,
-      page: currentPage - 1
-    }, { pushHistory: true, syncForm: false });
+    await runSearch(
+      {
+        postalCode: nextPostalCode,
+        tags: formTags,
+        page: 1,
+      },
+      { pushHistory: true, syncForm: false }
+    );
   };
 
   const total = data?.totalFound ?? data?.meta?.total ?? 0;
@@ -167,80 +155,156 @@ export default function SearchPage() {
   const showEmptyState = !loading && Boolean(data) && (data?.results?.length ?? 0) === 0;
   const skeletonCount = Math.max(1, Math.min(3, pageSize));
 
+  const onNextPage = async () => {
+    await runSearch(
+      {
+        ...query,
+        page: currentPage + 1,
+      },
+      { pushHistory: true, syncForm: false }
+    );
+  };
+
+  const onPreviousPage = async () => {
+    await runSearch(
+      {
+        ...query,
+        page: currentPage - 1,
+      },
+      { pushHistory: true, syncForm: false }
+    );
+  };
+
   return (
-    <main className="mx-auto max-w-4xl space-y-5 p-6">
-      <h1 className="text-2xl font-semibold">Recherche d'alliés</h1>
-
-      <form onSubmit={onSubmit} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
-        <Input
-          value={formPostalCode}
-          onChange={(e) => setFormPostalCode(normalizePostalCode(e.target.value))}
-          placeholder="Code postal (FSA A1A ou complet A1A1A1)"
+    <main className="relative isolate overflow-hidden px-4 pb-16 pt-8 sm:px-6 sm:pt-10 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(1000px 420px at -8% -10%, rgba(242,157,82,0.2), transparent), radial-gradient(900px 420px at 108% 8%, rgba(118,106,204,0.22), transparent), linear-gradient(180deg, #130e2d 0%, #100c26 55%, #0d0a1f 100%)",
+          }}
+          aria-hidden
         />
-        <Input value={formTags} onChange={(e) => setFormTags(e.target.value)} placeholder="Tags (ex: transport,repit)" />
-        <Button type="submit" disabled={loading || !isPostalCodeValid}>
-          {loading ? "Recherche..." : "Rechercher"}
-        </Button>
-      </form>
+      </div>
 
-      <p className="text-xs text-slate-400">
-        Tu peux chercher par FSA (3 premiers caracteres, ex: `H2X`) ou code postal complet (ex: `H2X1Y4`).
-      </p>
+      <div className="mx-auto max-w-6xl space-y-6">
+        <section className="relative overflow-hidden rounded-[28px] border border-white/20 shadow-[0_20px_60px_-42px_rgba(7,6,25,0.95)]">
+          <Image
+            src="/images/hero-fab.png"
+            alt="Parent et enfant au coucher du soleil."
+            fill
+            className="object-cover object-center"
+            unoptimized
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#18113a]/92 via-[#20154a]/84 to-[#25184a]/74" aria-hidden />
 
-      {error ? <Alert tone="error">{error}</Alert> : null}
+          <div className="relative grid gap-6 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="max-w-xl text-white">
+              <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">Recherche d&apos;allies</h1>
+              <p className="mt-3 text-sm text-[#ece7ff] sm:text-base">
+                Entrez votre code postal et trouvez rapidement des ressources de confiance proches de vous.
+              </p>
+            </div>
 
-      {data ? (
-        <Card className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-200">
-            Total: <strong>{total}</strong> | Page: <strong>{currentPage}</strong> / {totalPages}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" onClick={onPreviousPage} disabled={!canGoPrevious}>
-              Precedent
-            </Button>
-            <Button type="button" variant="secondary" onClick={onNextPage} disabled={!canGoNext}>
-              Suivant
-            </Button>
+            <form
+              onSubmit={onSubmit}
+              className="rounded-2xl border border-[#ddd8f0] bg-white/95 p-4 text-[#221a43] shadow-[0_22px_42px_-34px_rgba(23,17,54,0.95)] backdrop-blur-sm"
+            >
+              <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <Input
+                  value={formPostalCode}
+                  onChange={(e) => setFormPostalCode(normalizePostalCode(e.target.value))}
+                  placeholder="Code postal (H2X ou H2X1Y4)"
+                  className="!border-[#d7d3ea] !bg-white !text-[#211a3e] placeholder:!text-[#7a7394] focus:!border-[#3469b9] focus:!ring-[#3469b9]/35"
+                />
+                <Input
+                  value={formTags}
+                  onChange={(e) => setFormTags(e.target.value)}
+                  placeholder="Tags (ex: gardien, ménage, tutorat)"
+                  className="!border-[#d7d3ea] !bg-white !text-[#211a3e] placeholder:!text-[#7a7394] focus:!border-[#3469b9] focus:!ring-[#3469b9]/35"
+                />
+                <Button
+                  type="submit"
+                  disabled={loading || !isPostalCodeValid}
+                  className="!rounded-xl !bg-[#3469b9] !px-5 !text-sm !font-semibold !text-white hover:!bg-[#2d5ea8] disabled:!bg-[#a8b8db]"
+                >
+                  {loading ? "Recherche..." : "Rechercher"}
+                </Button>
+              </div>
+              <p className="mt-3 text-xs text-[#6f688e]">
+                Recherche par FSA (3 caracteres, ex: H2X) ou code complet (6 caracteres, ex: H2X1Y4).
+              </p>
+            </form>
           </div>
-        </Card>
-      ) : null}
+        </section>
 
-      {isPreview ? (
-        <Alert tone="info">
-          Mode preview actif: seuls quelques alliés sont visibles. Passe en abonnement actif pour pagination +
-          contacts.
-        </Alert>
-      ) : null}
+        {error ? <Alert tone="error">{error}</Alert> : null}
 
-      {loading ? (
+        {data ? (
+          <Card className="border-[#d7d2ea] bg-white/95 text-[#2a2349] shadow-[0_16px_36px_-30px_rgba(21,16,49,0.95)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm">
+                Total: <strong>{total}</strong> | Page: <strong>{currentPage}</strong> / {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={onPreviousPage}
+                  disabled={!canGoPrevious}
+                  className="!bg-[#ece9fa] !text-[#3e3560] hover:!bg-[#e1ddf5]"
+                >
+                  Precedent
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={onNextPage}
+                  disabled={!canGoNext}
+                  className="!bg-[#ece9fa] !text-[#3e3560] hover:!bg-[#e1ddf5]"
+                >
+                  Suivant
+                </Button>
+              </div>
+            </div>
+          </Card>
+        ) : null}
+
+        {isPreview ? (
+          <Alert tone="info">
+            Mode preview actif: seuls quelques alliés sont visibles. Passe en abonnement actif pour pagination et
+            contacts.
+          </Alert>
+        ) : null}
+
+        {loading ? (
+          <section className="grid gap-3">
+            {Array.from({ length: skeletonCount }).map((_, index) => (
+              <Card
+                key={`skeleton-${index}`}
+                className="animate-pulse border-[#d7d2ea] bg-white/95 text-[#2a2349] shadow-[0_16px_36px_-30px_rgba(21,16,49,0.95)]"
+              >
+                <div className="h-5 w-40 rounded bg-[#d9d3ee]" />
+                <div className="mt-3 h-4 w-56 rounded bg-[#ece8f8]" />
+                <div className="mt-2 h-4 w-64 rounded bg-[#ece8f8]" />
+              </Card>
+            ))}
+          </section>
+        ) : null}
+
+        {showEmptyState ? (
+          <Card className="border-[#d7d2ea] bg-white/95 text-[#2a2349] shadow-[0_16px_36px_-30px_rgba(21,16,49,0.95)]">
+            <p className="text-sm">Aucun resultat pour ce filtre. Essaie un autre code postal ou des tags differents.</p>
+          </Card>
+        ) : null}
+
         <section className="grid gap-3">
-          {Array.from({ length: skeletonCount }).map((_, index) => (
-            <Card key={`skeleton-${index}`} className="animate-pulse">
-              <div className="h-5 w-40 rounded bg-slate-700" />
-              <div className="mt-3 h-4 w-56 rounded bg-slate-800" />
-              <div className="mt-2 h-4 w-64 rounded bg-slate-800" />
-            </Card>
+          {data?.results?.map((resource) => (
+            <ResourceCard key={resource.id} resource={resource} isPremiumUser={!data?.limitedPreview} />
           ))}
         </section>
-      ) : null}
-
-      {showEmptyState ? (
-        <Card>
-          <p className="text-sm text-slate-300">
-            Aucun resultat pour ce filtre. Essaie un autre code postal ou des tags differents.
-          </p>
-        </Card>
-      ) : null}
-
-      <section className="grid gap-3">
-        {data?.results?.map((resource) => (
-          <ResourceCard
-            key={resource.id}
-            resource={resource}
-            isPremiumUser={!data?.limitedPreview}
-          />
-        ))}
-      </section>
+      </div>
     </main>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * @deprecated Ancien questionnaire démo. L’inscription allié utilise désormais le formulaire répit
+ * @deprecated Ancien questionnaire démo. L'inscription allié utilise désormais le formulaire FAB
  * (`allyRegistration` + `AllyOnboardingWizard`). Conservé pour rétrocompatibilité des données `questionnaireAnswers`.
  */
 export type AllyQuestionType = "choice" | "text";
