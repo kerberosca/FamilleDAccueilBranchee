@@ -9,7 +9,7 @@ services:
     environment:
       NODE_ENV: development
       DEV_BYPASS_AUTH: "true"
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/famille_accueil?schema=public
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/famille_accueil?schema=public}
     ports:
       - "3000:3000"
     volumes:
@@ -36,9 +36,9 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: famille_accueil
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-famille_accueil}
     ports:
       - "5432:5432"
     volumes:
