@@ -351,7 +351,7 @@ export default function MePage() {
           availability: parseAvailabilityOrThrow(availabilityJson)
         }
       });
-      setSuccess("Profil FAMILY mis a jour.");
+      setSuccess("Profil FAMILY mis à jour.");
       const refreshed = await apiGet<FamilyProfileResponse>("/profiles/me", { token: accessToken });
       setProfile(refreshed);
       const updatedSnapshot: FormSnapshot = {
@@ -457,7 +457,7 @@ export default function MePage() {
         <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
           <h1 className="text-2xl font-semibold sm:text-3xl">Mon profil</h1>
           <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
-            Mettez a jour vos informations pour mieux connecter familles et allies.
+            Mettez à jour vos informations pour mieux connecter familles et alliés.
           </p>
         </section>
 
@@ -488,7 +488,7 @@ export default function MePage() {
           </Card>
         ) : null}
 
-        {me?.role === "ADMIN" ? <Alert tone="info">Le role ADMIN n&apos;a pas de profil editable dans cette version.</Alert> : null}
+        {me?.role === "ADMIN" ? <Alert tone="info">Le rôle ADMIN n&apos;a pas de profil éditable dans cette version.</Alert> : null}
 
         {me?.role === "FAMILY" ? (
           <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
@@ -638,7 +638,7 @@ export default function MePage() {
             <FieldError error={fieldErrors.availabilityJson} />
             {(profile as ResourceProfileResponse | null)?.verificationStatus ? (
               <Alert tone="info">
-                Moderation: {(profile as ResourceProfileResponse).verificationStatus} /{" "}
+                Modération: {(profile as ResourceProfileResponse).verificationStatus} /{" "}
                 {(profile as ResourceProfileResponse).publishStatus}
               </Alert>
             ) : null}

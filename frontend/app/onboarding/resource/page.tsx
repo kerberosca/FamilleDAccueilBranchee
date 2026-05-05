@@ -32,7 +32,7 @@ export default function ResourceOnboardingPage() {
         allyRegistration: p.allyRegistration,
       },
     });
-    setTokens(response.accessToken, response.refreshToken);
+    setTokens(response.accessToken, response.refreshToken ?? null);
     setSuccess(
       "Candidature enregistrée. Votre profil est en attente de validation. Vous pouvez ensuite le modifier dans Mon profil."
     );

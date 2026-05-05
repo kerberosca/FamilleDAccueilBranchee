@@ -21,20 +21,17 @@ type MaintenanceContextValue = {
 
 const MaintenanceContext = createContext<MaintenanceContextValue | undefined>(undefined);
 
-function fetchMaintenanceStatus(): Promise<boolean> {
+async function fetchMaintenanceStatus(): Promise<boolean> {
   const url = `${API_BASE}/maintenance/status`;
-  return fetch(url, { cache: "no-store" })
-    .then((res) => {
-      if (res.status === 503) return true;
-      if (!res.ok) return false;
-      return res.json() as Promise<MaintenanceStatus>;
-    })
-    .then((data) => {
-      if (typeof data === "boolean") return data;
-      if (data !== undefined && typeof data.enabled === "boolean") return data.enabled;
-      return false;
-    })
-    .catch(() => false);
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (res.status === 503) return true;
+    if (!res.ok) return false;
+    const data = (await res.json()) as MaintenanceStatus;
+    return data.enabled;
+  } catch {
+    return false;
+  }
 }
 
 export function MaintenanceProvider({ children }: { children: React.ReactNode }) {

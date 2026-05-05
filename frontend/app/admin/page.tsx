@@ -371,7 +371,7 @@ export default function AdminPage() {
       await apiPatch(`/users/${userId}/role`, { token: accessToken, body: { role } });
       await refreshCurrentTab();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur lors du changement de role");
+      setError(e instanceof Error ? e.message : "Erreur lors du changement de rôle");
     } finally {
       setBusyId(null);
     }
@@ -381,9 +381,9 @@ export default function AdminPage() {
     <main className="mx-auto max-w-6xl space-y-4 p-6">
       <h1 className="text-2xl font-semibold">Console Admin</h1>
       <RequireAuth>
-        {loadingMe ? <Alert tone="info">Verification du role admin...</Alert> : null}
+        {loadingMe ? <Alert tone="info">Vérification du rôle admin...</Alert> : null}
         {error ? <Alert tone="error">{error}</Alert> : null}
-        {me && !isAdmin ? <Alert tone="error">Acces refuse: ce compte n&apos;est pas ADMIN.</Alert> : null}
+        {me && !isAdmin ? <Alert tone="error">Accès refusé : ce compte n&apos;est pas ADMIN.</Alert> : null}
 
         {isAdmin ? (
           <>
@@ -407,12 +407,12 @@ export default function AdminPage() {
                   disabled={maintenanceBusy}
                   onClick={() => void setMaintenance(false)}
                 >
-                  Desactiver la maintenance
+                  Désactiver la maintenance
                 </Button>
               </div>
               {maintenanceStatus?.updatedAt ? (
                 <p className="text-xs text-slate-500">
-                  Derniere modification : {new Date(maintenanceStatus.updatedAt).toLocaleString("fr-CA")}
+                  Dernière modification : {new Date(maintenanceStatus.updatedAt).toLocaleString("fr-CA")}
                 </p>
               ) : null}
             </Card>
@@ -439,7 +439,7 @@ export default function AdminPage() {
                     <option value="BANNED">BANNED</option>
                   </select>
                   <select className={SELECT_CLASS} value={familySortBy} onChange={(e) => setFamilySortBy(e.target.value)}>
-                    <option value="createdAt">Tri: creation</option>
+                    <option value="createdAt">Tri: création</option>
                     <option value="email">Tri: email</option>
                     <option value="status">Tri: statut</option>
                   </select>
@@ -448,7 +448,7 @@ export default function AdminPage() {
                     <option value="asc">asc</option>
                   </select>
                   <Button variant="secondary" onClick={() => void refreshCurrentTab()}>
-                    Rafraichir
+                    Rafraîchir
                   </Button>
                 </div>
 
@@ -458,13 +458,13 @@ export default function AdminPage() {
                     disabled={busyId === "bulk-family-ACTIVE" || selectedFamilyIds.length === 0}
                     onClick={() => void bulkUpdateFamilyStatus("ACTIVE")}
                   >
-                    Activer selection ({selectedFamilyIds.length})
+                    Activer sélection ({selectedFamilyIds.length})
                   </Button>
                   <Button
                     disabled={busyId === "bulk-family-BANNED" || selectedFamilyIds.length === 0}
                     onClick={() => void bulkUpdateFamilyStatus("BANNED")}
                   >
-                    Bannir selection ({selectedFamilyIds.length})
+                    Bannir sélection ({selectedFamilyIds.length})
                   </Button>
                 </div>
 
@@ -487,7 +487,7 @@ export default function AdminPage() {
                         </div>
                       </label>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-slate-500">Role:</span>
+                        <span className="text-xs text-slate-500">Rôle:</span>
                         <select
                           className={SELECT_CLASS}
                           value={family.role}
@@ -509,7 +509,7 @@ export default function AdminPage() {
                       </div>
                     </Card>
                   ))}
-                  {!loadingData && families.length === 0 ? <Alert tone="info">Aucune famille trouvee.</Alert> : null}
+                  {!loadingData && families.length === 0 ? <Alert tone="info">Aucune famille trouvée.</Alert> : null}
                 </div>
 
                 <PaginationControls
@@ -532,7 +532,7 @@ export default function AdminPage() {
                 <div className="grid gap-2 md:grid-cols-6">
                   <Input placeholder="Recherche nom, email, ville, code postal" value={resourceQuery} onChange={(e) => setResourceQuery(e.target.value)} />
                   <select className={SELECT_CLASS} value={verificationStatus} onChange={(e) => setVerificationStatus(e.target.value)}>
-                    <option value="">Verification: toutes</option>
+                    <option value="">Vérification: toutes</option>
                     <option value="DRAFT">DRAFT</option>
                     <option value="PENDING_VERIFICATION">PENDING_VERIFICATION</option>
                     <option value="VERIFIED">VERIFIED</option>
@@ -545,9 +545,9 @@ export default function AdminPage() {
                     <option value="SUSPENDED">SUSPENDED</option>
                   </select>
                   <select className={SELECT_CLASS} value={resourceSortBy} onChange={(e) => setResourceSortBy(e.target.value)}>
-                    <option value="updatedAt">Tri: mise a jour</option>
+                    <option value="updatedAt">Tri: mise à jour</option>
                     <option value="displayName">Tri: nom</option>
-                    <option value="verificationStatus">Tri: verification</option>
+                    <option value="verificationStatus">Tri: vérification</option>
                     <option value="publishStatus">Tri: publication</option>
                   </select>
                   <select className={SELECT_CLASS} value={resourceSortOrder} onChange={(e) => setResourceSortOrder(e.target.value)}>
@@ -555,7 +555,7 @@ export default function AdminPage() {
                     <option value="asc">asc</option>
                   </select>
                   <Button variant="secondary" onClick={() => void refreshCurrentTab()}>
-                    Rafraichir
+                    Rafraîchir
                   </Button>
                 </div>
 
@@ -571,7 +571,7 @@ export default function AdminPage() {
                       })
                     }
                   >
-                    Approuver selection ({selectedResourceIds.length})
+                    Approuver sélection ({selectedResourceIds.length})
                   </Button>
                   <Button
                     disabled={busyId === "bulk-resource" || selectedResourceIds.length === 0}
@@ -583,7 +583,7 @@ export default function AdminPage() {
                       })
                     }
                   >
-                    Rejeter selection ({selectedResourceIds.length})
+                    Rejeter sélection ({selectedResourceIds.length})
                   </Button>
                 </div>
 
@@ -598,7 +598,7 @@ export default function AdminPage() {
                             <strong>{resource.displayName}</strong> - {resource.user.email}
                           </p>
                           <p>
-                            Etats: {resource.verificationStatus} / {resource.publishStatus} / {resource.onboardingState}
+                            États: {resource.verificationStatus} / {resource.publishStatus} / {resource.onboardingState}
                             {resource.backgroundCheckStatus ? ` · Antécédents: ${resource.backgroundCheckStatus}` : null}
                           </p>
                           <p>
@@ -624,7 +624,7 @@ export default function AdminPage() {
                         </div>
                       </label>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-slate-500">Role:</span>
+                        <span className="text-xs text-slate-500">Rôle:</span>
                         <select
                           className={SELECT_CLASS}
                           value={resource.user.role ?? "RESOURCE"}
@@ -716,7 +716,7 @@ export default function AdminPage() {
               <Card className="space-y-3">
                 <div className="flex gap-2">
                   <Button variant="secondary" onClick={() => void refreshCurrentTab()}>
-                    Rafraichir
+                    Rafraîchir
                   </Button>
                 </div>
                 {loadingData ? <Alert tone="info">Chargement de l&apos;audit...</Alert> : null}
@@ -727,7 +727,7 @@ export default function AdminPage() {
                         <strong>{item.action}</strong> - {item.targetType}:{item.targetId}
                       </p>
                       <p>
-                        Par {item.actorUser?.email ?? item.actorUserId} a {new Date(item.createdAt).toLocaleString("fr-CA")}
+                        Par {item.actorUser?.email ?? item.actorUserId} à {new Date(item.createdAt).toLocaleString("fr-CA")}
                       </p>
                       <pre className="overflow-auto text-xs opacity-80">{JSON.stringify(item.payload, null, 2)}</pre>
                     </Card>
@@ -771,7 +771,7 @@ function PaginationControls({
       </p>
       <div className="flex gap-2">
         <Button variant="secondary" disabled={page <= 1} onClick={onPrev}>
-          Precedent
+          Précédent
         </Button>
         <Button variant="secondary" disabled={page >= totalPages} onClick={onNext}>
           Suivant

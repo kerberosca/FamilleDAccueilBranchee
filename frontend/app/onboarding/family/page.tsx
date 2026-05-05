@@ -61,7 +61,7 @@ export default function FamilyOnboardingPage() {
           tags: toTags(tags),
         },
       });
-      setTokens(response.accessToken, response.refreshToken);
+      setTokens(response.accessToken, response.refreshToken ?? null);
       setSuccess("Compte FAMILY cree. Vous pouvez maintenant lancer le checkout abonnement.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
@@ -106,7 +106,7 @@ export default function FamilyOnboardingPage() {
         <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
           <h1 className="text-2xl font-semibold sm:text-3xl">Inscription famille</h1>
           <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
-            Creez votre espace puis activez l'abonnement pour contacter les allies.
+            Créez votre espace puis activez l'abonnement pour contacter les alliés.
           </p>
         </section>
 
@@ -196,7 +196,7 @@ export default function FamilyOnboardingPage() {
               disabled={loadingRegister || !acceptPolicy}
               className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
             >
-              {loadingRegister ? "Creation..." : "Creer mon compte FAMILY"}
+              {loadingRegister ? "Création..." : "Créer mon compte FAMILY"}
             </Button>
           </form>
         </Card>

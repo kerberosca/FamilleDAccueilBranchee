@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearSession();
   }, [accessToken, clearSession]);
 
-  // Au chargement : dev = lecture access depuis localStorage ; sinon refresh seulement sur les pages protegees.
+  // Au chargement : dev = lecture access depuis localStorage ; sinon refresh seulement sur les pages protégées.
   useEffect(() => {
     if (typeof window === "undefined") {
       setIsAuthLoading(false);
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Écoute des tokens renouvelés par l’API (refresh automatique sur 401)
+  // Écoute des tokens renouvelés par l'API (refresh automatique sur 401)
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ accessToken: string }>).detail;

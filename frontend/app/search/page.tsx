@@ -201,7 +201,7 @@ export default function SearchPage() {
 
           <div className="relative grid gap-6 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="max-w-xl text-white">
-              <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">Recherche d&apos;allies</h1>
+              <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">Recherche d&apos;alliés</h1>
               <p className="mt-3 text-sm text-[#ece7ff] sm:text-base">
                 Entrez votre code postal et trouvez rapidement des ressources de confiance proches de vous.
               </p>
@@ -255,7 +255,7 @@ export default function SearchPage() {
                   disabled={!canGoPrevious}
                   className="!bg-[#ece9fa] !text-[#3e3560] hover:!bg-[#e1ddf5]"
                 >
-                  Precedent
+                  Précédent
                 </Button>
                 <Button
                   type="button"

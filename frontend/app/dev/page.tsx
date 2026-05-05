@@ -29,7 +29,7 @@ export default function DevPage() {
     setLoadingRole(role);
     try {
       const response = await apiPost<DevLoginResponse>("/dev/login-as", { body: { role } });
-      setTokens(response.accessToken, response.refreshToken);
+      setTokens(response.accessToken, response.refreshToken ?? null);
       const nextPath = new URLSearchParams(window.location.search).get("next") || "/me";
       router.push(nextPath);
     } catch (e) {
@@ -52,7 +52,7 @@ export default function DevPage() {
     <main className="mx-auto max-w-2xl space-y-4 p-6">
       <h1 className="text-2xl font-semibold">Login dev rapide</h1>
       <Card>
-        <p className="text-sm text-slate-300">Choisis un role pour appeler `POST /dev/login-as`.</p>
+        <p className="text-sm text-slate-300">Choisis un rôle pour appeler `POST /dev/login-as`.</p>
 
         <div className="mt-3 flex flex-wrap gap-3">
           {(["ADMIN", "FAMILLE", "RESSOURCE"] as DevRole[]).map((role) => (

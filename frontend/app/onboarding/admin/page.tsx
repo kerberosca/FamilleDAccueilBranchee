@@ -29,7 +29,7 @@ export default function AdminOnboardingPage() {
       const response = await apiPost<DevLoginResponse>("/dev/login-as", {
         body: { role: "ADMIN" },
       });
-      setTokens(response.accessToken, response.refreshToken);
+      setTokens(response.accessToken, response.refreshToken ?? null);
       setSuccess("Session ADMIN ouverte. Allez sur /me ou commencez la moderation.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");

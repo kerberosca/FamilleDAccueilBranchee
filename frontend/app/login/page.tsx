@@ -36,7 +36,7 @@ function LoginForm() {
       const res = await apiPost<LoginResponse>("/auth/login", {
         body: { email: email.trim(), password },
       });
-      setTokens(res.accessToken, res.refreshToken);
+      setTokens(res.accessToken, res.refreshToken ?? null);
       router.push(next);
     } catch (err) {
       const message =
@@ -71,12 +71,12 @@ function LoginForm() {
           </span>
           <h1 className="mt-4 text-3xl font-semibold leading-tight sm:text-4xl">Connexion</h1>
           <p className="mt-3 text-sm text-[#ece7ff] sm:text-base">
-            Accedez a votre espace FAB pour gerer votre profil, vos demandes et vos messages.
+            Accédez à votre espace FAB pour gérer votre profil, vos demandes et vos messages.
           </p>
           <div className="mt-6 space-y-2 text-sm text-[#e5e0fa]">
-            <p>1. Profil et disponibilites centralises</p>
-            <p>2. Recherche d&apos;allies en quelques clics</p>
-            <p>3. Parcours simple et securise</p>
+            <p>1. Profil et disponibilités centralisées</p>
+            <p>2. Recherche d&apos;alliés en quelques clics</p>
+            <p>3. Parcours simple et sécurisé</p>
           </div>
         </section>
 
@@ -108,7 +108,7 @@ function LoginForm() {
                 {loading ? "Connexion..." : "Se connecter"}
               </Button>
               <Link href="/forgot-password" className="text-sm font-medium text-[#3d5fa8] hover:text-[#2e4f97]">
-                Mot de passe oublie ?
+                Mot de passe oublié ?
               </Link>
             </div>
           </form>
@@ -117,7 +117,7 @@ function LoginForm() {
 
           <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <Link href="/onboarding" className="font-medium text-[#3d5fa8] hover:text-[#2e4f97]">
-              Creer un compte
+              Créer un compte
             </Link>
             {DEV_BYPASS ? (
               <Link href="/dev" className="font-medium text-[#3d5fa8] hover:text-[#2e4f97]">

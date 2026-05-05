@@ -267,7 +267,7 @@ export class AuthService {
   }
 
   async verifyEmail(token: string) {
-    this.logger.log(`Email verification token received: ${token}`);
+    this.logger.log("Email verification token received.");
     return { success: true };
   }
 

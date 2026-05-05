@@ -6,7 +6,7 @@ import { Card } from "../../components/ui/card";
 const PATHS = [
   {
     title: "Famille",
-    description: "Creer un compte FAMILY puis activer l'abonnement.",
+    description: "Créer un compte FAMILY puis activer l'abonnement.",
     href: "/onboarding/family",
     badgeClass: "bg-[#f17d55]",
   },
@@ -18,7 +18,7 @@ const PATHS = [
   },
   {
     title: "Admin",
-    description: "Compte interne uniquement. Acces seed ou bypass dev selon environnement.",
+    description: "Compte interne uniquement. Accès seed ou bypass dev selon environnement.",
     href: "/onboarding/admin",
     badgeClass: "bg-[#7f59db]",
   },

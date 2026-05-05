@@ -90,7 +90,7 @@ function MessagesContent() {
         <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
           <h1 className="text-2xl font-semibold sm:text-3xl">Messages</h1>
           <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
-            Echangez avec les familles et les allies dans un espace simple et clair.
+            Échangez avec les familles et les alliés dans un espace simple et clair.
           </p>
         </section>
 
@@ -129,7 +129,7 @@ function MessagesContent() {
                   </div>
                 </form>
               ) : (
-                <Alert tone="info">Seules les familles peuvent contacter les allies.</Alert>
+                <Alert tone="info">Seules les familles peuvent contacter les alliés.</Alert>
               )}
             </Card>
           ) : null}
