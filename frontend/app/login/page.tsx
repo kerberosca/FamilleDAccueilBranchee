@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
@@ -18,15 +18,26 @@ type LoginResponse = {
 
 const DEV_BYPASS = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true";
 
+function safeInternalNext(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/me";
+  return raw;
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/me";
-  const { setTokens } = useAuth();
+  const { setTokens, isAuthenticated, isAuthLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthLoading) return;
+    if (!isAuthenticated) return;
+    router.replace(safeInternalNext(next));
+  }, [isAuthenticated, isAuthLoading, next, router]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -50,6 +61,26 @@ function LoginForm() {
       setLoading(false);
     }
   };
+
+  if (isAuthLoading) {
+    return (
+      <main className="relative isolate overflow-hidden px-4 pb-16 pt-10 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-md pt-8">
+          <Alert tone="info">Vérification de la session...</Alert>
+        </div>
+      </main>
+    );
+  }
+
+  if (isAuthenticated) {
+    return (
+      <main className="relative isolate overflow-hidden px-4 pb-16 pt-10 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-md pt-8">
+          <Alert tone="info">Redirection...</Alert>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative isolate overflow-hidden px-4 pb-16 pt-10 sm:px-6 lg:px-8">

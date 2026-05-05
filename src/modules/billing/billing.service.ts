@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   ResourceOnboardingState,
@@ -98,6 +98,14 @@ export class BillingService {
     });
   }
 
+  async mockActivateFamilySubscription(userId: string) {
+    if (!this.shouldUseMockBillingEndpoint()) {
+      throw new ForbiddenException("Activation mock indisponible dans cet environnement.");
+    }
+    await this.markFamilySubscriptionActive(userId, `cus_mock_${userId}`, `sub_mock_${Date.now()}`);
+    return { success: true };
+  }
+
   async markResourcePaymentCompleted(userId: string) {
     await this.prisma.resourceProfile.update({
       where: { userId },
@@ -176,5 +184,13 @@ export class BillingService {
     }
     const key = this.configService.get<string>("STRIPE_SECRET_KEY", "");
     return !key || key.includes("xxx") || key.includes("placeholder");
+  }
+
+  private shouldUseMockBillingEndpoint(): boolean {
+    const nodeEnv = this.configService.get<string>("NODE_ENV", "development");
+    if (nodeEnv === "production") {
+      return false;
+    }
+    return this.configService.get<string>("DEV_BYPASS_AUTH") === "true";
   }
 }

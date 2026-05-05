@@ -87,6 +87,36 @@ describe("Smoke e2e", () => {
     expect(res.body.results[0].contactPhone).toBeUndefined();
   });
 
+  /** R2 / charge visiteur : pas de 401 sur la recherche publique (pas de refresh côté client dans ce scénario). */
+  it("GET /api/v1/search/resources sans jeton supporte plusieurs appels consécutifs (200)", async () => {
+    const server = app.getHttpServer();
+    for (let i = 0; i < 15; i += 1) {
+      await request(server).get("/api/v1/search/resources?postalCode=H2X1Y4").expect(200);
+    }
+  });
+
+  /**
+   * R4 : enchaîner des POST /auth/refresh légitimes reste sous la limite throttle (10 / 60 s sur refresh).
+   * Simule un usage type « quelques pages /me » sans déclencher de 429.
+   */
+  it("POST /api/v1/auth/refresh en chaîne (8x) ne renvoie pas 429", async () => {
+    const server = app.getHttpServer();
+    const login = await request(server).post("/api/v1/dev/login-as").send({ role: "FAMILLE" }).expect(201);
+    let refreshToken = login.body.refreshToken as string;
+    expect(refreshToken).toBeDefined();
+
+    for (let i = 0; i < 8; i += 1) {
+      const res = await request(server)
+        .post("/api/v1/auth/refresh")
+        .send({ refreshToken })
+        .expect(201);
+      expect(res.body.accessToken).toBeDefined();
+      const next = refreshTokenFromSetCookie(res);
+      expect(next).toBeTruthy();
+      refreshToken = next!;
+    }
+  });
+
   it("GET /api/v1/search/resources avec famille premium inclut les contacts", async () => {
     const token = await loginAs("FAMILLE");
     const res = await request(app.getHttpServer())
@@ -141,6 +171,21 @@ describe("Smoke e2e", () => {
     expect(createdSub?.status).toBe(SubscriptionStatus.ACTIVE);
   });
 
+  it("POST /api/v1/billing/family/mock-activate exige une famille connectee", async () => {
+    await request(app.getHttpServer())
+      .post("/api/v1/billing/family/mock-activate")
+      .send({ userId: familyUserId })
+      .expect((res) => expect([401, 403]).toContain(res.status));
+
+    const familyToken = await loginAs("FAMILLE");
+    const res = await request(app.getHttpServer())
+      .post("/api/v1/billing/family/mock-activate")
+      .set("Authorization", `Bearer ${familyToken}`)
+      .expect(201);
+
+    expect(res.body.success).toBe(true);
+  });
+
   it("CORS expose les headers pour localhost:3000", async () => {
     const res = await request(app.getHttpServer())
       .get("/api/v1/health")
@@ -160,6 +205,16 @@ describe("Smoke e2e", () => {
     expect(res.body.timestamp).toBeDefined();
   });
 
+  it("POST /api/v1/auth/verify-email refuse un jeton inconnu", async () => {
+    const res = await request(app.getHttpServer())
+      .post("/api/v1/auth/verify-email")
+      .send({ token: "jeton-inconnu" })
+      .expect(400);
+
+    expect(res.body.statusCode).toBe(400);
+    expect(res.body.message).toBeDefined();
+  });
+
   async function loginAs(role: "ADMIN" | "FAMILLE" | "RESSOURCE") {
     const res = await request(app.getHttpServer()).post("/api/v1/dev/login-as").send({ role }).expect(201);
     expect(res.body.accessToken).toBeDefined();
@@ -167,6 +222,17 @@ describe("Smoke e2e", () => {
     return res.body.accessToken as string;
   }
 });
+
+function refreshTokenFromSetCookie(res: { headers: Record<string, string | string[] | undefined> }): string | null {
+  const raw = res.headers["set-cookie"];
+  if (!raw) return null;
+  const lines = Array.isArray(raw) ? raw : [raw];
+  for (const line of lines) {
+    const m = /^refresh_token=([^;]+)/.exec(line);
+    if (m) return m[1];
+  }
+  return null;
+}
 
 function configureTestEnv() {
   process.env.NODE_ENV = "test";

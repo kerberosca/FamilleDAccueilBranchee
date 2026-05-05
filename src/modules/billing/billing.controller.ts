@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Post, Req, UseGuards } from "@nestjs/common";
+import { Controller, Headers, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Role } from "@prisma/client";
 import { Request } from "express";
@@ -38,9 +38,11 @@ export class BillingController {
     return this.billingService.handleStripeWebhook(body, signature);
   }
 
-  @Public()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.FAMILY)
   @Post("family/mock-activate")
-  async mockActivate(@Body() body: { userId: string }) {
-    return this.billingService.markFamilySubscriptionActive(body.userId);
+  async mockActivate(@CurrentUser() user: JwtPayload) {
+    return this.billingService.mockActivateFamilySubscription(user.sub);
   }
 }

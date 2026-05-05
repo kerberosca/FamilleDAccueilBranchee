@@ -267,8 +267,8 @@ export class AuthService {
   }
 
   async verifyEmail(token: string) {
-    this.logger.log("Email verification token received.");
-    return { success: true };
+    this.logger.warn("Email verification attempt rejected: no verification token store is configured.");
+    throw new BadRequestException("Lien de vérification invalide ou expiré.");
   }
 
   private async generateAndPersistTokens(user: User): Promise<TokenPair> {

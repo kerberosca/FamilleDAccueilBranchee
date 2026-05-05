@@ -8,7 +8,7 @@ import { apiPost } from "./api";
 
 const ACCESS_STORAGE_KEY_DEV = "fab.dev.access_token";
 const IS_DEV_STORAGE = process.env.NODE_ENV !== "production";
-const REFRESH_ON_LOAD_PATHS = ["/admin", "/me", "/messages"];
+const REFRESH_ON_LOAD_PATHS = ["/admin", "/me", "/messages", "/login"];
 
 type AuthContextValue = {
   accessToken: string | null;
