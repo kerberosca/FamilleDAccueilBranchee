@@ -11,6 +11,8 @@ import { useMaintenance } from "../lib/maintenance-context";
 import { CookieBanner } from "./cookie-banner";
 import { MaintenancePage } from "./maintenance-page";
 
+type UserRole = "ADMIN" | "FAMILY" | "RESOURCE";
+
 function NavLink({
   href,
   children,
@@ -45,10 +47,15 @@ function NavLink({
 
 export function AppFrame({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isAuthenticated, logout } = useAuth();
+  const { accessToken, isAuthenticated, logout } = useAuth();
   const { isDevMode, setDevMode } = useDevMode();
   const { maintenance } = useMaintenance();
   const pathname = usePathname();
+  const userRole = getRoleFromAccessToken(accessToken);
+  const canUseProfile = userRole === "FAMILY" || userRole === "RESOURCE";
+  const canUseSearch = !isAuthenticated || userRole === "FAMILY";
+  const canUseMessages = userRole === "FAMILY" || userRole === "RESOURCE";
+  const canUseAdmin = userRole === "ADMIN";
 
   if (maintenance === true && pathname !== "/admin" && pathname !== "/login") {
     return <MaintenancePage />;
@@ -116,13 +123,13 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
             </Link>
             <nav className="flex flex-wrap items-center gap-0.5 sm:gap-1" aria-label="Navigation principale">
               <NavLink href="/" onClick={handleNavClick}>Accueil</NavLink>
-              <NavLink href="/onboarding" onClick={handleNavClick}>Premiers pas</NavLink>
-              <NavLink href="/login" onClick={handleNavClick}>Connexion</NavLink>
+              {!isAuthenticated && <NavLink href="/onboarding" onClick={handleNavClick}>Premiers pas</NavLink>}
+              {!isAuthenticated && <NavLink href="/login" onClick={handleNavClick}>Connexion</NavLink>}
               {isDevMode && <NavLink href="/dev" onClick={handleNavClick}>Dev</NavLink>}
-              <NavLink href="/me" onClick={handleNavClick}>Mon profil</NavLink>
-              <NavLink href="/search" onClick={handleNavClick}>Recherche</NavLink>
-              <NavLink href="/messages" onClick={handleNavClick}>Messages</NavLink>
-              <NavLink href="/admin" onClick={handleNavClick}>Admin</NavLink>
+              {canUseProfile && <NavLink href="/me" onClick={handleNavClick}>Mon profil</NavLink>}
+              {canUseSearch && <NavLink href="/search" onClick={handleNavClick}>Recherche</NavLink>}
+              {canUseMessages && <NavLink href="/messages" onClick={handleNavClick}>Messages</NavLink>}
+              {canUseAdmin && <NavLink href="/admin" onClick={handleNavClick}>Admin</NavLink>}
             </nav>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -190,4 +197,23 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
       <CookieBanner />
     </div>
   );
+}
+
+function getRoleFromAccessToken(accessToken: string | null): UserRole | null {
+  if (!accessToken || typeof window === "undefined") return null;
+
+  try {
+    const payloadPart = accessToken.split(".")[1];
+    if (!payloadPart) return null;
+    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const payload = JSON.parse(window.atob(padded)) as { role?: string };
+    return isUserRole(payload.role) ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
+function isUserRole(role: string | undefined): role is UserRole {
+  return role === "ADMIN" || role === "FAMILY" || role === "RESOURCE";
 }

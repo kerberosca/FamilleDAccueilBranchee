@@ -1,12 +1,14 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { API_BASE } from "./api";
 import { AUTH_TOKENS_EVENT } from "./auth-constants";
 import { apiPost } from "./api";
 
 const ACCESS_STORAGE_KEY_DEV = "fab.dev.access_token";
 const IS_DEV_STORAGE = process.env.NODE_ENV !== "production";
+const REFRESH_ON_LOAD_PATHS = ["/admin", "/me", "/messages"];
 
 type AuthContextValue = {
   accessToken: string | null;
@@ -14,12 +16,15 @@ type AuthContextValue = {
   setTokens: (access: string | null, refresh: string | null) => void;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  isAuthLoading: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [accessToken, setAccessTokenState] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const setAccessToken = useCallback((token: string | null) => {
     setAccessTokenState(token);
@@ -52,20 +57,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearSession();
   }, [accessToken, clearSession]);
 
-  // Au chargement : dev = lecture access depuis localStorage ; sinon tentative de refresh via cookie (httpOnly)
+  // Au chargement : dev = lecture access depuis localStorage ; sinon refresh seulement sur les pages protegees.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      setIsAuthLoading(false);
+      return;
+    }
 
     if (IS_DEV_STORAGE) {
       const storedAccess = window.localStorage.getItem(ACCESS_STORAGE_KEY_DEV);
       if (storedAccess) {
         setAccessTokenState(storedAccess);
+        setIsAuthLoading(false);
         return;
       }
     }
 
+    if (accessToken) {
+      setIsAuthLoading(false);
+      return;
+    }
+
+    if (!shouldRefreshOnLoad(pathname)) {
+      setIsAuthLoading(false);
+      return;
+    }
+
+    setIsAuthLoading(true);
     void tryRefreshOnLoad();
-  }, []);
+  }, [accessToken, pathname]);
 
   async function tryRefreshOnLoad() {
     try {
@@ -86,6 +106,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {
       clearSession();
+    } finally {
+      setIsAuthLoading(false);
     }
   }
 
@@ -110,9 +132,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAccessToken,
       setTokens,
       logout,
-      isAuthenticated: Boolean(accessToken)
+      isAuthenticated: Boolean(accessToken),
+      isAuthLoading
     }),
-    [accessToken, setAccessToken, setTokens, logout]
+    [accessToken, setAccessToken, setTokens, logout, isAuthLoading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -124,4 +147,9 @@ export function useAuth() {
     throw new Error("useAuth must be used inside AuthProvider");
   }
   return ctx;
+}
+
+function shouldRefreshOnLoad(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return REFRESH_ON_LOAD_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
