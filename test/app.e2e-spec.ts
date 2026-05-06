@@ -5,6 +5,7 @@ import { execSync } from "node:child_process";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { setupApp } from "../src/app.setup";
+import { AuthService } from "../src/modules/auth/auth.service";
 import { StripeService } from "../src/modules/billing/stripe.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 
@@ -126,6 +127,67 @@ describe("Smoke e2e", () => {
 
     expect(res.body.results[0].contactEmail).toBe("ressource@local.test");
     expect(res.body.results[0].contactPhone).toBe("514-555-0000");
+  });
+
+  /** S1 (option B) : administrateur — même niveau d’accès que famille premium (contacts, pagination). */
+  it("GET /api/v1/search/resources avec jeton admin : limitedPreview false et contacts inclus", async () => {
+    const token = await loginAs("ADMIN");
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(res.body.limitedPreview).toBe(false);
+    expect(res.body.pageSize).toBe(10);
+    expect(res.body.results.length).toBeGreaterThan(0);
+    expect(res.body.results[0].contactEmail).toBe("ressource@local.test");
+    expect(res.body.results[0].contactPhone).toBe("514-555-0000");
+  });
+
+  /** S3 : allié (ressource) — pas d’accès plein à la recherche. */
+  it("GET /api/v1/search/resources avec jeton ressource : preview sans contacts", async () => {
+    const token = await loginAs("RESSOURCE");
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(res.body.limitedPreview).toBe(true);
+    expect(res.body.pageSize).toBe(3);
+    expect(res.body.results[0].contactEmail).toBeUndefined();
+    expect(res.body.results[0].contactPhone).toBeUndefined();
+  });
+
+  /** S3 : famille sans abonnement actif — preview comme le visiteur. */
+  it("GET /api/v1/search/resources avec famille sans abonnement : preview sans contacts", async () => {
+    const authService = app.get(AuthService);
+    const noSubFamily = await prisma.user.create({
+      data: {
+        email: "e2e_famille_sans_sub@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille sans abo e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            needsTags: []
+          }
+        }
+      }
+    });
+    const { accessToken } = await authService.issueTokensForUser(noSubFamily.id);
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(res.body.limitedPreview).toBe(true);
+    expect(res.body.pageSize).toBe(3);
+    expect(res.body.results[0].contactEmail).toBeUndefined();
   });
 
   it("POST /billing/.../checkout-session renvoie une URL mockee", async () => {

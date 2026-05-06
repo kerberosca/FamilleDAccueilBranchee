@@ -18,7 +18,8 @@ const PATHS = [
   },
   {
     title: "Admin",
-    description: "Compte interne uniquement. Accès seed ou bypass dev selon environnement.",
+    description:
+      "Compte interne uniquement. Accès via compte seed ou contournement dev selon l’environnement.",
     href: "/onboarding/admin",
     badgeClass: "bg-[#7f59db]",
   },

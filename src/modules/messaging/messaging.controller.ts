@@ -13,7 +13,7 @@ import { MessagingService } from "./messaging.service";
 @ApiTags("messaging")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.FAMILY, Role.RESOURCE)
+@Roles(Role.FAMILY, Role.RESOURCE, Role.ADMIN)
 @Controller({ path: "messaging", version: "1" })
 export class MessagingController {
   constructor(private readonly messagingService: MessagingService) {}

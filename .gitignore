@@ -16,3 +16,12 @@ backups/
 
 # Documentation cybersécurité (exclue du dépôt)
 docs/cybersecurite/
+
+# Sortie d'audit locale (ne pas committer)
+api-audit.err
+
+# Artefacts TypeScript (build incrémental)
+*.tsbuildinfo
+
+# Sources GIMP / fichiers de travail graphique (hors livrable runtime)
+*.xcf

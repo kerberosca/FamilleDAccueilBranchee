@@ -30,7 +30,7 @@ export class SearchService {
     };
 
     const totalFound = await this.prisma.resourceProfile.count({ where });
-    const premium = await this.isPremiumFamily(user);
+    const premium = await this.hasFullSearchAccess(user);
     const take = premium ? PREMIUM_PAGE_SIZE : PREVIEW_LIMIT;
     const skip = premium ? (page - 1) * PREMIUM_PAGE_SIZE : 0;
 
@@ -75,8 +75,15 @@ export class SearchService {
     };
   }
 
-  private async isPremiumFamily(user?: JwtPayload): Promise<boolean> {
-    if (!user || user.role !== Role.FAMILY) {
+  /** Famille abonnée ou administrateur : résultats complets (contacts, pagination). */
+  private async hasFullSearchAccess(user?: JwtPayload): Promise<boolean> {
+    if (!user) {
+      return false;
+    }
+    if (user.role === Role.ADMIN) {
+      return true;
+    }
+    if (user.role !== Role.FAMILY) {
       return false;
     }
     return this.subscriptionAccessService.hasActiveFamilySubscription(user.sub);

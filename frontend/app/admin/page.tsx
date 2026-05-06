@@ -381,7 +381,7 @@ export default function AdminPage() {
     <main className="mx-auto max-w-6xl space-y-4 p-6">
       <h1 className="text-2xl font-semibold">Console Admin</h1>
       <RequireAuth>
-        {loadingMe ? <Alert tone="info">Vérification du rôle admin...</Alert> : null}
+        {loadingMe ? <Alert tone="info">Vérification du rôle administrateur…</Alert> : null}
         {error ? <Alert tone="error">{error}</Alert> : null}
         {me && !isAdmin ? <Alert tone="error">Accès refusé : ce compte n&apos;est pas ADMIN.</Alert> : null}
 
@@ -434,18 +434,18 @@ export default function AdminPage() {
                 <div className="grid gap-2 md:grid-cols-5">
                   <Input placeholder="Recherche email, nom, ville, code postal" value={familyQuery} onChange={(e) => setFamilyQuery(e.target.value)} />
                   <select className={SELECT_CLASS} value={familyStatus} onChange={(e) => setFamilyStatus(e.target.value)}>
-                    <option value="">Tous statuts</option>
+                    <option value="">Tous les statuts</option>
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="BANNED">BANNED</option>
                   </select>
                   <select className={SELECT_CLASS} value={familySortBy} onChange={(e) => setFamilySortBy(e.target.value)}>
-                    <option value="createdAt">Tri: création</option>
-                    <option value="email">Tri: email</option>
-                    <option value="status">Tri: statut</option>
+                    <option value="createdAt">Tri : création</option>
+                    <option value="email">Tri : courriel</option>
+                    <option value="status">Tri : statut</option>
                   </select>
                   <select className={SELECT_CLASS} value={familySortOrder} onChange={(e) => setFamilySortOrder(e.target.value)}>
-                    <option value="desc">desc</option>
-                    <option value="asc">asc</option>
+                    <option value="desc">Décroissant</option>
+                    <option value="asc">Croissant</option>
                   </select>
                   <Button variant="secondary" onClick={() => void refreshCurrentTab()}>
                     Rafraîchir
@@ -468,7 +468,7 @@ export default function AdminPage() {
                   </Button>
                 </div>
 
-                {loadingData ? <Alert tone="info">Chargement des familles...</Alert> : null}
+                {loadingData ? <Alert tone="info">Chargement des familles…</Alert> : null}
                 <div className="space-y-2">
                   {families.map((family) => (
                     <Card key={family.id} className="space-y-2">
@@ -479,7 +479,7 @@ export default function AdminPage() {
                             <strong>{family.profile?.displayName ?? "(sans profil)"}</strong> - {family.email}
                           </p>
                           <p>
-                            Statut user: {family.status} | Abonnement: {family.subscription?.status ?? "INACTIVE"}
+                            Statut du compte : {family.status} | Abonnement : {family.subscription?.status ?? "INACTIVE"}
                           </p>
                           <p>
                             Localisation: {family.profile?.city ?? "-"}, {family.profile?.region ?? "-"} ({family.profile?.postalCode ?? "-"})
@@ -532,27 +532,27 @@ export default function AdminPage() {
                 <div className="grid gap-2 md:grid-cols-6">
                   <Input placeholder="Recherche nom, email, ville, code postal" value={resourceQuery} onChange={(e) => setResourceQuery(e.target.value)} />
                   <select className={SELECT_CLASS} value={verificationStatus} onChange={(e) => setVerificationStatus(e.target.value)}>
-                    <option value="">Vérification: toutes</option>
+                    <option value="">Vérification : toutes</option>
                     <option value="DRAFT">DRAFT</option>
                     <option value="PENDING_VERIFICATION">PENDING_VERIFICATION</option>
                     <option value="VERIFIED">VERIFIED</option>
                     <option value="REJECTED">REJECTED</option>
                   </select>
                   <select className={SELECT_CLASS} value={publishStatus} onChange={(e) => setPublishStatus(e.target.value)}>
-                    <option value="">Publication: toutes</option>
+                    <option value="">Publication : toutes</option>
                     <option value="HIDDEN">HIDDEN</option>
                     <option value="PUBLISHED">PUBLISHED</option>
                     <option value="SUSPENDED">SUSPENDED</option>
                   </select>
                   <select className={SELECT_CLASS} value={resourceSortBy} onChange={(e) => setResourceSortBy(e.target.value)}>
-                    <option value="updatedAt">Tri: mise à jour</option>
-                    <option value="displayName">Tri: nom</option>
-                    <option value="verificationStatus">Tri: vérification</option>
-                    <option value="publishStatus">Tri: publication</option>
+                    <option value="updatedAt">Tri : mise à jour</option>
+                    <option value="displayName">Tri : nom</option>
+                    <option value="verificationStatus">Tri : vérification</option>
+                    <option value="publishStatus">Tri : publication</option>
                   </select>
                   <select className={SELECT_CLASS} value={resourceSortOrder} onChange={(e) => setResourceSortOrder(e.target.value)}>
-                    <option value="desc">desc</option>
-                    <option value="asc">asc</option>
+                    <option value="desc">Décroissant</option>
+                    <option value="asc">Croissant</option>
                   </select>
                   <Button variant="secondary" onClick={() => void refreshCurrentTab()}>
                     Rafraîchir
@@ -587,7 +587,7 @@ export default function AdminPage() {
                   </Button>
                 </div>
 
-                {loadingData ? <Alert tone="info">Chargement des alliés...</Alert> : null}
+                {loadingData ? <Alert tone="info">Chargement des alliés…</Alert> : null}
                 <div className="space-y-2">
                   {resources.map((resource) => (
                     <Card key={resource.id} className="space-y-2">
@@ -719,7 +719,7 @@ export default function AdminPage() {
                     Rafraîchir
                   </Button>
                 </div>
-                {loadingData ? <Alert tone="info">Chargement de l&apos;audit...</Alert> : null}
+                {loadingData ? <Alert tone="info">Chargement de l&apos;audit…</Alert> : null}
                 <div className="space-y-2">
                   {auditItems.map((item) => (
                     <Card key={item.id} className="text-sm">
@@ -767,7 +767,7 @@ function PaginationControls({
   return (
     <div className="flex items-center justify-between gap-2 text-sm">
       <p>
-        Total: <strong>{total}</strong> | Page {page}/{totalPages}
+        Total : <strong>{total}</strong> | Page {page}/{totalPages}
       </p>
       <div className="flex gap-2">
         <Button variant="secondary" disabled={page <= 1} onClick={onPrev}>

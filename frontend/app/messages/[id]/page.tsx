@@ -28,7 +28,7 @@ export default function ConversationPage() {
   const params = useParams();
   const router = useRouter();
   const conversationId = typeof params.id === "string" ? params.id : "";
-  const { accessToken } = useAuth();
+  const { accessToken, isAuthLoading } = useAuth();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +38,7 @@ export default function ConversationPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!accessToken || !conversationId) return;
+    if (isAuthLoading || !accessToken || !conversationId) return;
     const run = async () => {
       setLoading(true);
       setError(null);
@@ -56,7 +56,7 @@ export default function ConversationPage() {
       }
     };
     void run();
-  }, [accessToken, conversationId]);
+  }, [accessToken, conversationId, isAuthLoading]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -103,18 +103,23 @@ export default function ConversationPage() {
 
         <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
           <h1 className="text-2xl font-semibold sm:text-3xl">Conversation</h1>
-          <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">Suivez vos echanges en temps reel.</p>
+          <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">Suivez vos échanges en temps réel.</p>
         </section>
 
         <RequireAuth>
-          {loading ? <Alert tone="info">Chargement...</Alert> : null}
+          {loading ? <Alert tone="info">Chargement…</Alert> : null}
           {error ? <Alert tone="error">{error}</Alert> : null}
 
           {!loading && conversation ? (
             <>
               <Card className="space-y-2 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
                 <p className="text-sm text-slate-300">
-                  Avec {me?.role === "FAMILY" ? conversation.resource?.displayName : conversation.family?.displayName}
+                  Avec{" "}
+                  {me?.role === "ADMIN"
+                    ? `${conversation.family?.displayName ?? "—"} — ${conversation.resource?.displayName ?? "—"}`
+                    : me?.role === "FAMILY"
+                      ? conversation.resource?.displayName
+                      : conversation.family?.displayName}
                 </p>
               </Card>
 
@@ -131,7 +136,7 @@ export default function ConversationPage() {
                             : "mr-8 border-[#4f476f] bg-[#110d2a]"
                         }`}
                       >
-                        <span className="font-medium text-white">{isMe ? "Toi" : "Autre"}</span>
+                        <span className="font-medium text-white">{isMe ? "Vous" : "Autre"}</span>
                         <span className="ml-2 text-slate-200">{msg.content}</span>
                         <p className="mt-1 text-xs text-slate-400">{new Date(msg.createdAt).toLocaleString("fr-CA")}</p>
                       </div>
@@ -140,23 +145,29 @@ export default function ConversationPage() {
                   <div ref={bottomRef} />
                 </div>
 
-                <form onSubmit={onSubmitMessage} className="flex gap-2 border-t border-[#4f476f] p-3">
-                  <input
-                    type="text"
-                    className="flex-1 rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100 placeholder:text-[#8b84ad] focus:border-[#6f8fe2] focus:outline-none focus:ring-1 focus:ring-[#6f8fe2]/35"
-                    placeholder="Votre message..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    required
-                  />
-                  <Button
-                    type="submit"
-                    disabled={sending}
-                    className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
-                  >
-                    {sending ? "..." : "Envoyer"}
-                  </Button>
-                </form>
+                {me?.role === "ADMIN" ? (
+                  <div className="border-t border-[#4f476f] p-3">
+                    <Alert tone="info">Lecture seule : les administrateurs ne peuvent pas envoyer de messages ici.</Alert>
+                  </div>
+                ) : (
+                  <form onSubmit={onSubmitMessage} className="flex gap-2 border-t border-[#4f476f] p-3">
+                    <input
+                      type="text"
+                      className="flex-1 rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100 placeholder:text-[#8b84ad] focus:border-[#6f8fe2] focus:outline-none focus:ring-1 focus:ring-[#6f8fe2]/35"
+                      placeholder="Votre message…"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      required
+                    />
+                    <Button
+                      type="submit"
+                      disabled={sending}
+                      className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
+                    >
+                      {sending ? "Envoi…" : "Envoyer"}
+                    </Button>
+                  </form>
+                )}
               </Card>
             </>
           ) : null}

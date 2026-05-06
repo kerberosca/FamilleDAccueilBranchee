@@ -1,0 +1,58 @@
+<svg width="900" height="620" viewBox="0 0 900 620" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Tutorat</title>
+  <desc id="desc">Illustration de tutorat avec un livre ouvert, un crayon, un adulte et un jeune en apprentissage.</desc>
+  <defs>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(664 116) rotate(139) scale(690 430)">
+      <stop stop-color="#F9BE68" stop-opacity=".78"/>
+      <stop offset=".44" stop-color="#6F8FE2" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#100C2A"/>
+    </radialGradient>
+    <linearGradient id="card" x1="95" y1="76" x2="817" y2="551" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F1EDFF"/>
+    </linearGradient>
+    <linearGradient id="bookLeft" x1="224" y1="345" x2="449" y2="487" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7FAFF"/>
+      <stop offset="1" stop-color="#DCE8FF"/>
+    </linearGradient>
+    <linearGradient id="bookRight" x1="451" y1="344" x2="678" y2="487" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF8EB"/>
+      <stop offset="1" stop-color="#FFE0B3"/>
+    </linearGradient>
+    <filter id="shadow" x="42" y="48" width="814" height="548" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#130E31" flood-opacity=".24"/>
+    </filter>
+  </defs>
+  <rect width="900" height="620" rx="54" fill="#130E31"/>
+  <rect width="900" height="620" rx="54" fill="url(#glow)"/>
+  <circle cx="728" cy="114" r="20" fill="#62BEAB"/>
+  <circle cx="776" cy="164" r="8" fill="#FFFFFF" opacity=".78"/>
+  <circle cx="156" cy="498" r="12" fill="#F17D55"/>
+  <g filter="url(#shadow)">
+    <rect x="72" y="74" width="756" height="472" rx="42" fill="url(#card)"/>
+  </g>
+  <path d="M456 338C404 300 297 306 220 344V486C292 452 385 454 456 502V338Z" fill="url(#bookLeft)" stroke="#B9C9F4" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M456 338C508 300 615 306 692 344V486C620 452 527 454 456 502V338Z" fill="url(#bookRight)" stroke="#EDBF7A" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M456 341V499" stroke="#4D4671" stroke-width="8" stroke-linecap="round"/>
+  <path d="M264 374H393M264 413H392M512 374H644M512 413H626" stroke="#6E668B" stroke-width="8" stroke-linecap="round" opacity=".42"/>
+  <path d="M611 160L675 224L501 398L437 334L611 160Z" fill="#F9BE68" stroke="#D29145" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M437 334L417 418L501 398L437 334Z" fill="#FFF2D9" stroke="#D29145" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M417 418L458 408L427 376L417 418Z" fill="#342A55"/>
+  <path d="M614 160L675 221" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" opacity=".54"/>
+  <g transform="translate(208 170)">
+    <circle cx="58" cy="55" r="40" fill="#F0A469"/>
+    <path d="M19 140C28 101 88 101 97 140V176H19V140Z" fill="#3567B7"/>
+    <path d="M21 49C36 18 80 14 97 47C72 38 48 38 21 49Z" fill="#271E46"/>
+  </g>
+  <g transform="translate(322 206)">
+    <circle cx="50" cy="46" r="32" fill="#EFA16B"/>
+    <path d="M18 127C25 95 76 95 83 127V154H18V127Z" fill="#62BEAB"/>
+    <path d="M23 40C35 18 70 17 82 42C60 36 42 35 23 40Z" fill="#271E46"/>
+  </g>
+  <path d="M700 276L718 312L756 321L718 331L700 366L682 331L644 321L682 312L700 276Z" fill="#7F59DB"/>
+  <path d="M188 126L200 150L226 157L200 164L188 188L176 164L150 157L176 150L188 126Z" fill="#F17D55"/>
+  <rect x="120" y="104" width="236" height="68" rx="34" fill="#FFFFFF" stroke="#DCD6EF"/>
+  <circle cx="154" cy="138" r="22" fill="#3567B7"/>
+  <path d="M144 139H164M154 129V149" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  <text x="192" y="147" fill="#18133C" font-family="Outfit, Arial, sans-serif" font-size="28" font-weight="800">Tutorat</text>
+</svg>

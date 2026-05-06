@@ -66,7 +66,7 @@ function LoginForm() {
     return (
       <main className="relative isolate overflow-hidden px-4 pb-16 pt-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-md pt-8">
-          <Alert tone="info">Vérification de la session...</Alert>
+          <Alert tone="info">Vérification de la session…</Alert>
         </div>
       </main>
     );
@@ -76,7 +76,7 @@ function LoginForm() {
     return (
       <main className="relative isolate overflow-hidden px-4 pb-16 pt-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-md pt-8">
-          <Alert tone="info">Redirection...</Alert>
+          <Alert tone="info">Redirection…</Alert>
         </div>
       </main>
     );
@@ -115,7 +115,7 @@ function LoginForm() {
           <form onSubmit={onSubmit} className="grid gap-3">
             <Input
               type="email"
-              placeholder="Email"
+              placeholder="Courriel"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -136,7 +136,7 @@ function LoginForm() {
                 disabled={loading}
                 className="!rounded-xl !bg-[#3469b9] !px-5 !py-2.5 !text-sm !font-semibold !text-white hover:!bg-[#2d5ea8] disabled:!bg-[#a8b8db]"
               >
-                {loading ? "Connexion..." : "Se connecter"}
+                {loading ? "Connexion…" : "Se connecter"}
               </Button>
               <Link href="/forgot-password" className="text-sm font-medium text-[#3d5fa8] hover:text-[#2e4f97]">
                 Mot de passe oublié ?
@@ -152,7 +152,7 @@ function LoginForm() {
             </Link>
             {DEV_BYPASS ? (
               <Link href="/dev" className="font-medium text-[#3d5fa8] hover:text-[#2e4f97]">
-                Mode dev (bypass login)
+                Mode dev (connexion automatique)
               </Link>
             ) : null}
           </div>
@@ -167,7 +167,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <main className="mx-auto max-w-md p-6">
-          <p className="text-slate-300">Chargement...</p>
+          <p className="text-slate-300">Chargement…</p>
         </main>
       }
     >

@@ -142,8 +142,8 @@ export default function HomePage() {
                 Des gestes simples qui changent une semaine.
               </h2>
               <p className="mt-4 text-base leading-7 text-[#554c76]">
-                Les familles d'accueil portent beaucoup. Un allié choisit un type de soutien clair et l'offre au bon
-                moment, près de chez lui, avec un cadre simple.
+                Chaque allié indique ce qu&apos;il offre et où il intervient ; la famille choisit qui lui convient, sans
+                ambiguïté.
               </p>
             </div>
 

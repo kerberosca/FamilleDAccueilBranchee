@@ -1,0 +1,52 @@
+<svg width="900" height="620" viewBox="0 0 900 620" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Entretien Menage</title>
+  <desc id="desc">Illustration d'entretien menage avec seau, balai, vaporisateur et etincelles de proprete.</desc>
+  <defs>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(228 116) rotate(42) scale(720 430)">
+      <stop stop-color="#7ED8C7" stop-opacity=".82"/>
+      <stop offset=".42" stop-color="#F17D55" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#100C2A"/>
+    </radialGradient>
+    <linearGradient id="card" x1="95" y1="76" x2="817" y2="551" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F1EDFF"/>
+    </linearGradient>
+    <linearGradient id="bucket" x1="292" y1="287" x2="547" y2="509" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F9BE68"/>
+      <stop offset="1" stop-color="#F17D55"/>
+    </linearGradient>
+    <filter id="shadow" x="42" y="48" width="814" height="548" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#130E31" flood-opacity=".24"/>
+    </filter>
+  </defs>
+  <rect width="900" height="620" rx="54" fill="#130E31"/>
+  <rect width="900" height="620" rx="54" fill="url(#glow)"/>
+  <circle cx="722" cy="112" r="20" fill="#F17D55"/>
+  <circle cx="780" cy="166" r="8" fill="#FFFFFF" opacity=".76"/>
+  <circle cx="160" cy="496" r="12" fill="#F9BE68"/>
+  <g filter="url(#shadow)">
+    <rect x="72" y="74" width="756" height="472" rx="42" fill="url(#card)"/>
+  </g>
+  <path d="M585 141L634 161L506 474L457 454L585 141Z" fill="#6F8FE2"/>
+  <path d="M615 153L637 162L509 475L488 466L615 153Z" fill="#4E66B7" opacity=".45"/>
+  <path d="M504 444C542 451 572 472 586 510L456 510C462 473 478 451 504 444Z" fill="#62BEAB"/>
+  <path d="M438 256H612C608 331 596 420 579 488H471C454 420 442 331 438 256Z" fill="url(#bucket)" stroke="#C75E43" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M467 257C477 212 573 212 584 257" stroke="#372B59" stroke-width="14" stroke-linecap="round"/>
+  <path d="M462 318H590" stroke="#FFE6C9" stroke-width="10" stroke-linecap="round" opacity=".75"/>
+  <path d="M313 194H377L398 484H292L313 194Z" fill="#F7F4FF" stroke="#D7D0EA" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M323 158H364C377 158 388 169 388 182V194H299V182C299 169 310 158 323 158Z" fill="#7F59DB"/>
+  <path d="M315 258H386" stroke="#62BEAB" stroke-width="12" stroke-linecap="round"/>
+  <path d="M333 344H395" stroke="#3567B7" stroke-width="10" stroke-linecap="round"/>
+  <path d="M214 212C266 200 309 228 322 276" stroke="#261B48" stroke-width="14" stroke-linecap="round"/>
+  <path d="M185 476L305 271" stroke="#F17D55" stroke-width="16" stroke-linecap="round"/>
+  <path d="M155 502C181 454 230 438 291 453L239 542C204 540 176 526 155 502Z" fill="#7F59DB"/>
+  <path d="M210 463L173 526" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity=".65"/>
+  <path d="M260 460L218 534" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity=".65"/>
+  <path d="M688 266L706 302L744 311L706 321L688 356L670 321L632 311L670 302L688 266Z" fill="#F9BE68"/>
+  <path d="M196 127L208 151L234 157L208 164L196 188L184 164L158 157L184 151L196 127Z" fill="#62BEAB"/>
+  <rect x="120" y="104" width="306" height="68" rx="34" fill="#FFFFFF" stroke="#DCD6EF"/>
+  <circle cx="154" cy="138" r="22" fill="#F17D55"/>
+  <path d="M146 140L155 149L169 128" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="192" y="132" fill="#18133C" font-family="Outfit, Arial, sans-serif" font-size="25" font-weight="800">Entretien</text>
+  <text x="192" y="159" fill="#4E466C" font-family="Outfit, Arial, sans-serif" font-size="22" font-weight="700">Menage</text>
+</svg>

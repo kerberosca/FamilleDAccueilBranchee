@@ -26,7 +26,7 @@ function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const contactResourceId = searchParams.get("contact");
-  const { accessToken } = useAuth();
+  const { accessToken, isAuthLoading } = useAuth();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ function MessagesContent() {
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (isAuthLoading || !accessToken) return;
     const run = async () => {
       setLoading(true);
       setError(null);
@@ -47,13 +47,13 @@ function MessagesContent() {
         setMe(meData);
         setConversations(Array.isArray(convData) ? convData : []);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Erreur chargement.");
+        setError(e instanceof Error ? e.message : "Erreur lors du chargement.");
       } finally {
         setLoading(false);
       }
     };
     void run();
-  }, [accessToken]);
+  }, [accessToken, isAuthLoading]);
 
   const onSubmitNewConversation = async (e: FormEvent) => {
     e.preventDefault();
@@ -67,7 +67,7 @@ function MessagesContent() {
       });
       router.replace(`/messages/${conv.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Impossible de creer la conversation.");
+      setError(err instanceof Error ? err.message : "Impossible de créer la conversation.");
     } finally {
       setSending(false);
     }
@@ -90,13 +90,18 @@ function MessagesContent() {
         <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
           <h1 className="text-2xl font-semibold sm:text-3xl">Messages</h1>
           <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
-            Échangez avec les familles et les alliés dans un espace simple et clair.
+            {me?.role === "ADMIN"
+              ? "Vue d’ensemble des conversations (lecture seule)."
+              : "Échangez avec les familles et les alliés dans un espace simple et clair."}
           </p>
         </section>
 
         <RequireAuth>
-          {loading ? <Alert tone="info">Chargement...</Alert> : null}
+          {loading ? <Alert tone="info">Chargement…</Alert> : null}
           {error ? <Alert tone="error">{error}</Alert> : null}
+          {me?.role === "ADMIN" && !loading ? (
+            <Alert tone="info">En tant qu’administrateur, vous voyez toutes les conversations ; l’envoi de messages n’est pas disponible depuis ce compte.</Alert>
+          ) : null}
 
           {contactResourceId && me && !loading ? (
             <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
@@ -105,7 +110,7 @@ function MessagesContent() {
                 <form onSubmit={onSubmitNewConversation} className="grid gap-3">
                   <textarea
                     className="min-h-28 w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100 placeholder:text-[#8b84ad] focus:border-[#6f8fe2] focus:outline-none focus:ring-1 focus:ring-[#6f8fe2]/35"
-                    placeholder="Votre message initial..."
+                    placeholder="Votre message initial…"
                     value={initialMessage}
                     onChange={(e) => setInitialMessage(e.target.value)}
                     required
@@ -116,7 +121,7 @@ function MessagesContent() {
                       disabled={sending}
                       className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
                     >
-                      {sending ? "Envoi..." : "Envoyer et ouvrir la conversation"}
+                      {sending ? "Envoi…" : "Envoyer et ouvrir la conversation"}
                     </Button>
                     <Button
                       type="button"
@@ -128,6 +133,8 @@ function MessagesContent() {
                     </Button>
                   </div>
                 </form>
+              ) : me.role === "ADMIN" ? (
+                <Alert tone="info">Les administrateurs ne peuvent pas ouvrir une nouvelle conversation depuis cette page.</Alert>
               ) : (
                 <Alert tone="info">Seules les familles peuvent contacter les alliés.</Alert>
               )}
@@ -141,7 +148,12 @@ function MessagesContent() {
             ) : (
               <ul className="space-y-2">
                 {conversations.map((c) => {
-                  const label = me?.role === "FAMILY" ? c.resource?.displayName : c.family?.displayName;
+                  const label =
+                    me?.role === "FAMILY"
+                      ? c.resource?.displayName
+                      : me?.role === "RESOURCE"
+                        ? c.family?.displayName
+                        : `${c.family?.displayName ?? "—"} — ${c.resource?.displayName ?? "—"}`;
                   return (
                     <li key={c.id}>
                       <Link
@@ -167,7 +179,7 @@ export default function MessagesPage() {
     <Suspense
       fallback={
         <main className="mx-auto max-w-2xl p-6">
-          <p className="text-slate-300">Chargement...</p>
+          <p className="text-slate-300">Chargement…</p>
         </main>
       }
     >

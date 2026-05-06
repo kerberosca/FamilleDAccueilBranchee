@@ -132,7 +132,9 @@ export default function SearchPage() {
     event.preventDefault();
     const nextPostalCode = normalizePostalCode(formPostalCode);
     if (!isValidPostalInput(nextPostalCode)) {
-      setError("Code postal invalide. Utilise 3 caracteres (FSA, ex: H2X) ou 6 caracteres (ex: H2X1Y4).");
+      setError(
+        "Code postal invalide. Utilisez 3 caractères (FSA, ex. H2X) ou 6 caractères (ex. H2X1Y4)."
+      );
       return;
     }
     await runSearch(
@@ -221,7 +223,7 @@ export default function SearchPage() {
                 <Input
                   value={formTags}
                   onChange={(e) => setFormTags(e.target.value)}
-                  placeholder="Tags (ex: gardien, ménage, tutorat)"
+                  placeholder="Étiquettes (ex. gardien, ménage, tutorat)"
                   className="!border-[#d7d3ea] !bg-white !text-[#211a3e] placeholder:!text-[#7a7394] focus:!border-[#3469b9] focus:!ring-[#3469b9]/35"
                 />
                 <Button
@@ -229,11 +231,11 @@ export default function SearchPage() {
                   disabled={loading || !isPostalCodeValid}
                   className="!rounded-xl !bg-[#3469b9] !px-5 !text-sm !font-semibold !text-white hover:!bg-[#2d5ea8] disabled:!bg-[#a8b8db]"
                 >
-                  {loading ? "Recherche..." : "Rechercher"}
+                  {loading ? "Recherche…" : "Rechercher"}
                 </Button>
               </div>
               <p className="mt-3 text-xs text-[#6f688e]">
-                Recherche par FSA (3 caracteres, ex: H2X) ou code complet (6 caracteres, ex: H2X1Y4).
+                Recherche par FSA (3 caractères, ex. H2X) ou code complet (6 caractères, ex. H2X1Y4).
               </p>
             </form>
           </div>
@@ -245,7 +247,7 @@ export default function SearchPage() {
           <Card className="border-[#d7d2ea] bg-white/95 text-[#2a2349] shadow-[0_16px_36px_-30px_rgba(21,16,49,0.95)]">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm">
-                Total: <strong>{total}</strong> | Page: <strong>{currentPage}</strong> / {totalPages}
+                Total : <strong>{total}</strong> | Page : <strong>{currentPage}</strong> / {totalPages}
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -273,8 +275,8 @@ export default function SearchPage() {
 
         {isPreview ? (
           <Alert tone="info">
-            Mode preview actif: seuls quelques alliés sont visibles. Passe en abonnement actif pour pagination et
-            contacts.
+            Mode aperçu actif : seuls quelques alliés sont visibles. Passez à un abonnement actif pour la pagination et
+            les contacts.
           </Alert>
         ) : null}
 
@@ -295,7 +297,9 @@ export default function SearchPage() {
 
         {showEmptyState ? (
           <Card className="border-[#d7d2ea] bg-white/95 text-[#2a2349] shadow-[0_16px_36px_-30px_rgba(21,16,49,0.95)]">
-            <p className="text-sm">Aucun resultat pour ce filtre. Essaie un autre code postal ou des tags differents.</p>
+            <p className="text-sm">
+              Aucun résultat pour ce filtre. Essayez un autre code postal ou d&apos;autres étiquettes.
+            </p>
           </Card>
         ) : null}
 

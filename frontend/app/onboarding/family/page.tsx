@@ -40,7 +40,9 @@ export default function FamilyOnboardingPage() {
   const onRegister = async (event: FormEvent) => {
     event.preventDefault();
     if (!acceptPolicy) {
-      setError("Vous devez accepter la Politique de confidentialite et le traitement de vos donnees pour vous inscrire.");
+      setError(
+        "Vous devez accepter la Politique de confidentialité et le traitement de vos données pour vous inscrire."
+      );
       return;
     }
     setError(null);
@@ -62,7 +64,7 @@ export default function FamilyOnboardingPage() {
         },
       });
       setTokens(response.accessToken, response.refreshToken ?? null);
-      setSuccess("Compte FAMILY cree. Vous pouvez maintenant lancer le checkout abonnement.");
+      setSuccess("Compte FAMILY créé. Vous pouvez maintenant lancer le paiement d’abonnement.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
@@ -72,7 +74,7 @@ export default function FamilyOnboardingPage() {
 
   const onCheckout = async () => {
     if (!accessToken) {
-      setError("Token manquant. Inscrivez-vous d'abord.");
+      setError("Session introuvable. Inscrivez-vous d’abord.");
       return;
     }
     setError(null);
@@ -111,10 +113,10 @@ export default function FamilyOnboardingPage() {
         </section>
 
         <p className="text-sm text-slate-200">
-          Vos donnees seront enregistrees pour la mise en relation. Vous pourrez supprimer votre compte depuis "Mon profil".
-          Consultez notre{" "}
+          Vos données seront enregistrées pour la mise en relation. Vous pourrez supprimer votre compte depuis « Mon
+          profil ». Consultez notre{" "}
           <Link href="/confidentialite" className="font-medium text-[#b9ccff] underline hover:text-[#d3dfff]">
-            Politique de confidentialite
+            Politique de confidentialité
           </Link>
           .
         </p>
@@ -129,12 +131,13 @@ export default function FamilyOnboardingPage() {
                 className="mt-0.5 rounded border-[#5e567f] bg-[#0f0b24] text-[#6f8fe2]"
               />
               <span>
-                J'ai lu la Politique de confidentialite et j'accepte le traitement de mes donnees pour la mise en relation.
+                J’ai lu la Politique de confidentialité et j’accepte le traitement de mes données pour la mise en
+                relation.
               </span>
             </label>
 
             <Input
-              placeholder="Email"
+              placeholder="Courriel"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
@@ -142,7 +145,7 @@ export default function FamilyOnboardingPage() {
               className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
             />
             <Input
-              placeholder="Mot de passe (8 caracteres min, majuscule, chiffre, special)"
+              placeholder="Mot de passe (8 caractères min., majuscule, chiffre, caractère spécial)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               type="password"
@@ -152,7 +155,7 @@ export default function FamilyOnboardingPage() {
             />
             <PasswordStrength password={password} />
             <Input
-              placeholder="Nom affiche"
+              placeholder="Nom affiché"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               required
@@ -173,20 +176,20 @@ export default function FamilyOnboardingPage() {
               className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
             />
             <Input
-              placeholder="Region"
+              placeholder="Région"
               value={region}
               onChange={(e) => setRegion(e.target.value)}
               required
               className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
             />
             <Input
-              placeholder="Bio (optionnel)"
+              placeholder="Biographie (optionnel)"
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
             />
             <Input
-              placeholder="Tags CSV (optionnel)"
+              placeholder="Étiquettes, séparées par des virgules (optionnel)"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               className="!border-[#4f476f] !bg-[#0f0b24] !text-white placeholder:!text-[#8b84ad] focus:!border-[#6f8fe2] focus:!ring-[#6f8fe2]/35"
@@ -196,20 +199,20 @@ export default function FamilyOnboardingPage() {
               disabled={loadingRegister || !acceptPolicy}
               className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
             >
-              {loadingRegister ? "Création..." : "Créer mon compte FAMILY"}
+              {loadingRegister ? "Création…" : "Créer mon compte FAMILY"}
             </Button>
           </form>
         </Card>
 
         <Card className="space-y-2 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
-          <p className="text-sm text-slate-300">Etape suivante: activer l'abonnement FAMILY via Stripe.</p>
+          <p className="text-sm text-slate-300">Étape suivante : activer l’abonnement FAMILY via Stripe.</p>
           <Button
             type="button"
             onClick={onCheckout}
             disabled={loadingCheckout || !accessToken}
             className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
           >
-            {loadingCheckout ? "Redirection..." : "Activer abonnement FAMILY"}
+            {loadingCheckout ? "Redirection…" : "Activer l’abonnement FAMILY"}
           </Button>
         </Card>
 

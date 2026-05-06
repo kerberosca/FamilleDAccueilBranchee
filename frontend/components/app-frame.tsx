@@ -6,12 +6,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { useAuth } from "../lib/auth-context";
+import { getRoleFromAccessToken } from "../lib/jwt-role";
 import { useDevMode } from "../lib/dev-mode";
 import { useMaintenance } from "../lib/maintenance-context";
 import { CookieBanner } from "./cookie-banner";
 import { MaintenancePage } from "./maintenance-page";
-
-type UserRole = "ADMIN" | "FAMILY" | "RESOURCE";
 
 function NavLink({
   href,
@@ -52,9 +51,9 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
   const { maintenance } = useMaintenance();
   const pathname = usePathname();
   const userRole = getRoleFromAccessToken(accessToken);
-  const canUseProfile = userRole === "FAMILY" || userRole === "RESOURCE";
-  const canUseSearch = !isAuthenticated || userRole === "FAMILY";
-  const canUseMessages = userRole === "FAMILY" || userRole === "RESOURCE";
+  const canUseProfile = userRole === "FAMILY" || userRole === "RESOURCE" || userRole === "ADMIN";
+  const canUseSearch = !isAuthenticated || userRole === "FAMILY" || userRole === "ADMIN";
+  const canUseMessages = userRole === "FAMILY" || userRole === "RESOURCE" || userRole === "ADMIN";
   const canUseAdmin = userRole === "ADMIN";
 
   if (maintenance === true && pathname !== "/admin" && pathname !== "/login") {
@@ -197,23 +196,4 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
       <CookieBanner />
     </div>
   );
-}
-
-function getRoleFromAccessToken(accessToken: string | null): UserRole | null {
-  if (!accessToken || typeof window === "undefined") return null;
-
-  try {
-    const payloadPart = accessToken.split(".")[1];
-    if (!payloadPart) return null;
-    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    const payload = JSON.parse(window.atob(padded)) as { role?: string };
-    return isUserRole(payload.role) ? payload.role : null;
-  } catch {
-    return null;
-  }
-}
-
-function isUserRole(role: string | undefined): role is UserRole {
-  return role === "ADMIN" || role === "FAMILY" || role === "RESOURCE";
 }

@@ -53,9 +53,9 @@ export default function ResourceOnboardingPage() {
 
       <div className="mx-auto max-w-3xl space-y-4">
         <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
-          <h1 className="text-2xl font-semibold sm:text-3xl">Devenir allié - inscription</h1>
+          <h1 className="text-2xl font-semibold sm:text-3xl">Devenir allié — inscription</h1>
           <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
-            Choisissez votre type d'allié: gardien compétent, entretien ménage ou tutorat.
+            Choisissez votre type d’allié : gardien compétent, entretien ménager ou tutorat.
           </p>
           <p className="mt-2 text-sm text-[#ebe6ff]">
             Voir la référence:{" "}

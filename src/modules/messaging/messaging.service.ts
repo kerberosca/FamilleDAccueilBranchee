@@ -65,6 +65,16 @@ export class MessagingService {
   }
 
   async listConversations(currentUser: JwtPayload) {
+    if (currentUser.role === Role.ADMIN) {
+      return this.prisma.conversation.findMany({
+        include: {
+          family: true,
+          resource: true,
+          messages: { orderBy: { createdAt: "asc" }, take: 50 }
+        },
+        orderBy: { updatedAt: "desc" }
+      });
+    }
     if (currentUser.role === Role.FAMILY) {
       const family = await this.prisma.familyProfile.findUnique({ where: { userId: currentUser.sub } });
       if (!family) {
@@ -97,6 +107,9 @@ export class MessagingService {
   }
 
   async sendMessage(currentUser: JwtPayload, conversationId: string, dto: SendMessageDto) {
+    if (currentUser.role === Role.ADMIN) {
+      throw new ForbiddenException("Les comptes administrateur ont un accès en lecture seule aux conversations");
+    }
     const conversation = await this.getConversationById(currentUser, conversationId);
     if (currentUser.role === Role.FAMILY) {
       const premium = await this.subscriptionAccessService.hasActiveFamilySubscription(currentUser.sub);
@@ -127,9 +140,10 @@ export class MessagingService {
       throw new NotFoundException("Conversation not found");
     }
 
+    const isAdmin = currentUser.role === Role.ADMIN;
     const isFamilyOwner = conversation.family.userId === currentUser.sub;
     const isResourceOwner = conversation.resource.userId === currentUser.sub;
-    if (!isFamilyOwner && !isResourceOwner) {
+    if (!isAdmin && !isFamilyOwner && !isResourceOwner) {
       throw new ForbiddenException("Not part of this conversation");
     }
     return conversation;

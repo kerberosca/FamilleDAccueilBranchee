@@ -1,0 +1,96 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Les trois types d'allies FAB</title>
+  <desc id="desc">Panneau illustrant les trois types d'allies: gardien competent, entretien menage et tutorat.</desc>
+  <defs>
+    <radialGradient id="space" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(840 112) rotate(139) scale(960 650)">
+      <stop stop-color="#F9BE68" stop-opacity=".7"/>
+      <stop offset=".34" stop-color="#6F8FE2" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#100C2A"/>
+    </radialGradient>
+    <linearGradient id="panel" x1="90" y1="72" x2="1110" y2="706" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EFEAFF"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="455" y1="112" x2="936" y2="612" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4B7ECC"/>
+      <stop offset=".48" stop-color="#92C6FF"/>
+      <stop offset="1" stop-color="#20355F"/>
+    </linearGradient>
+    <linearGradient id="tablet" x1="500" y1="360" x2="710" y2="510" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EEF2FF"/>
+      <stop offset="1" stop-color="#B8C9EA"/>
+    </linearGradient>
+    <filter id="softShadow" x="40" y="36" width="1120" height="700" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="30" flood-color="#130E31" flood-opacity=".24"/>
+    </filter>
+    <filter id="chipShadow" x="0" y="0" width="1200" height="760" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#130E31" flood-opacity=".18"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="760" rx="54" fill="#130E31"/>
+  <rect width="1200" height="760" rx="54" fill="url(#space)"/>
+  <circle cx="1004" cy="92" r="24" fill="#F9BE68"/>
+  <circle cx="1084" cy="154" r="10" fill="#FFFFFF" opacity=".72"/>
+  <circle cx="102" cy="656" r="13" fill="#62BEAB" opacity=".8"/>
+
+  <g filter="url(#softShadow)">
+    <rect x="70" y="58" width="1060" height="644" rx="46" fill="url(#panel)"/>
+  </g>
+
+  <circle cx="750" cy="354" r="278" fill="#DDE7FF"/>
+  <circle cx="750" cy="354" r="258" fill="url(#ring)" opacity=".9"/>
+  <circle cx="750" cy="354" r="212" fill="#EEF2FF"/>
+  <circle cx="750" cy="354" r="178" fill="#F7F4FF"/>
+  <path d="M476 330C576 195 754 118 966 88" stroke="#FFFFFF" stroke-opacity=".45" stroke-width="4"/>
+  <path d="M504 642C646 708 840 700 1044 596" stroke="#2E2353" stroke-opacity=".12" stroke-width="5"/>
+
+  <g transform="translate(598 156)">
+    <path d="M126 142C170 139 224 165 250 222C280 287 275 394 232 440C199 475 78 478 44 438C6 393 1 292 28 229C51 174 84 146 126 142Z" fill="#F2B47D"/>
+    <path d="M87 44C142 4 221 32 226 105C235 197 164 216 93 199C21 182 9 101 87 44Z" fill="#8A4B37"/>
+    <path d="M48 115C56 69 96 38 151 43C204 48 229 84 228 128C210 112 186 99 150 99C111 99 82 106 48 115Z" fill="#5D2E27"/>
+    <circle cx="132" cy="128" r="64" fill="#F0A469"/>
+    <path d="M91 114C111 100 150 99 177 113" stroke="#5D2E27" stroke-width="8" stroke-linecap="round" opacity=".55"/>
+    <path d="M102 148C120 165 152 166 171 148" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+    <path d="M44 300C56 245 210 244 230 302L252 478H18L44 300Z" fill="#F9D8C7"/>
+    <path d="M52 300C76 335 194 335 222 300L238 478H36L52 300Z" fill="#F7F4FF"/>
+    <rect x="50" y="324" width="184" height="118" rx="22" fill="url(#tablet)" stroke="#9EACCA" stroke-width="5"/>
+    <path d="M84 372H198" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" opacity=".7"/>
+  </g>
+
+  <g filter="url(#chipShadow)">
+    <rect x="93" y="118" width="342" height="118" rx="26" fill="#FFFFFF" stroke="#D7D0EA"/>
+    <circle cx="151" cy="177" r="46" fill="#E8FFF8"/>
+    <path d="M151 136C176 151 202 154 224 156V190C224 229 201 258 151 278C101 258 78 229 78 190V156C100 154 126 151 151 136Z" transform="scale(.65) translate(112 98)" fill="#62BEAB"/>
+    <path d="M132 178L145 191L170 163" stroke="#62BEAB" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="222" y="168" fill="#18133C" font-family="Outfit, Arial, sans-serif" font-size="31" font-weight="800">Gardien</text>
+    <text x="222" y="201" fill="#4E466C" font-family="Outfit, Arial, sans-serif" font-size="27" font-weight="700">competent</text>
+  </g>
+
+  <g filter="url(#chipShadow)">
+    <rect x="96" y="510" width="358" height="122" rx="26" fill="#FFFFFF" stroke="#D7D0EA"/>
+    <circle cx="158" cy="571" r="47" fill="#FFF1DF"/>
+    <path d="M128 577H188L178 615H138L128 577Z" fill="#F17D55"/>
+    <path d="M136 560C145 535 171 535 180 560" stroke="#342A55" stroke-width="7" stroke-linecap="round"/>
+    <path d="M111 614L158 536" stroke="#62BEAB" stroke-width="9" stroke-linecap="round"/>
+    <path d="M100 622C114 596 139 589 171 596L145 638C126 639 112 633 100 622Z" fill="#7F59DB"/>
+    <text x="226" y="562" fill="#18133C" font-family="Outfit, Arial, sans-serif" font-size="31" font-weight="800">Entretien</text>
+    <text x="226" y="596" fill="#4E466C" font-family="Outfit, Arial, sans-serif" font-size="27" font-weight="700">Menage</text>
+  </g>
+
+  <g filter="url(#chipShadow)">
+    <rect x="888" y="298" width="230" height="94" rx="28" fill="#FFFFFF" stroke="#D7D0EA"/>
+    <circle cx="935" cy="345" r="36" fill="#EFF4FF"/>
+    <path d="M914 341C931 329 954 329 969 341V365C953 354 932 354 914 365V341Z" fill="#3567B7"/>
+    <path d="M935 333V365" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+    <path d="M964 318L982 336L942 376L924 358L964 318Z" fill="#F9BE68" stroke="#D29145" stroke-width="4"/>
+    <text x="990" y="355" fill="#18133C" font-family="Outfit, Arial, sans-serif" font-size="30" font-weight="800">Tutorat</text>
+  </g>
+
+  <rect x="116" y="286" width="296" height="132" rx="24" fill="#FFFFFF" stroke="#D7D0EA"/>
+  <circle cx="168" cy="352" r="32" fill="#7F59DB"/>
+  <path d="M154 352H182M168 338V366" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+  <text x="220" y="336" fill="#18133C" font-family="Outfit, Arial, sans-serif" font-size="24" font-weight="800">Un type clair</text>
+  <text x="220" y="368" fill="#5A5278" font-family="Outfit, Arial, sans-serif" font-size="20" font-weight="600">Une offre simple</text>
+  <text x="220" y="396" fill="#5A5278" font-family="Outfit, Arial, sans-serif" font-size="20" font-weight="600">a comprendre</text>
+</svg>

@@ -134,7 +134,7 @@ export default function MePage() {
     if (!isDirty) {
       return;
     }
-    const warningMessage = "Tu as des modifications non enregistrees. Quitter cette page ?";
+    const warningMessage = "Vous avez des modifications non enregistrées. Quitter cette page ?";
 
     const handleRefreshShortcut = (event: KeyboardEvent) => {
       const isF5 = event.key === "F5";
@@ -168,7 +168,7 @@ export default function MePage() {
     if (!isDirty) {
       return;
     }
-    const warningMessage = "Tu as des modifications non enregistrees. Quitter cette page ?";
+    const warningMessage = "Vous avez des modifications non enregistrées. Quitter cette page ?";
     const handleDocumentClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
       const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
@@ -468,12 +468,14 @@ export default function MePage() {
             disabled={loggingOut}
             className="!rounded-xl !border !border-[#5a527f] !bg-[#1b153d] !px-4 !py-2 !text-sm !text-[#ece8ff] hover:!bg-[#241c4d]"
           >
-            {loggingOut ? "Deconnexion..." : "Se deconnecter"}
+            {loggingOut ? "Déconnexion…" : "Se déconnecter"}
           </Button>
 
-        {loading ? <Alert tone="info">Chargement du profil...</Alert> : null}
+        {loading ? <Alert tone="info">Chargement du profil…</Alert> : null}
         {isDirty ? (
-          <Alert tone="info">Tu as des modifications non enregistrees. Pense a enregistrer avant de quitter la page.</Alert>
+          <Alert tone="info">
+            Vous avez des modifications non enregistrées. Pensez à enregistrer avant de quitter la page.
+          </Alert>
         ) : null}
         {error ? <Alert tone="error">{error}</Alert> : null}
         {success ? <Alert tone="info">{success}</Alert> : null}
@@ -492,9 +494,9 @@ export default function MePage() {
 
         {me?.role === "FAMILY" ? (
           <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
-            <h2 className="text-lg font-medium">Editer mon profil FAMILY</h2>
+            <h2 className="text-lg font-medium">Éditer mon profil FAMILY</h2>
             <Input
-              placeholder="Nom affiche"
+              placeholder="Nom affiché"
               value={displayName}
               onChange={(e) => {
                 setDisplayName(e.target.value);
@@ -521,7 +523,7 @@ export default function MePage() {
             />
             <FieldError error={fieldErrors.city} />
             <Input
-              placeholder="Region"
+              placeholder="Région"
               value={region}
               onChange={(e) => {
                 setRegion(e.target.value);
@@ -529,11 +531,15 @@ export default function MePage() {
               }}
             />
             <FieldError error={fieldErrors.region} />
-            <Input placeholder="Bio" value={bio} onChange={(e) => setBio(e.target.value)} />
-            <Input placeholder="Besoins (CSV)" value={tagsCsv} onChange={(e) => setTagsCsv(e.target.value)} />
+            <Input placeholder="Biographie" value={bio} onChange={(e) => setBio(e.target.value)} />
+            <Input
+              placeholder="Besoins (séparés par des virgules)"
+              value={tagsCsv}
+              onChange={(e) => setTagsCsv(e.target.value)}
+            />
             <textarea
               className="min-h-28 w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100 placeholder:text-[#8b84ad] focus:border-[#6f8fe2] focus:outline-none focus:ring-1 focus:ring-[#6f8fe2]/35"
-              placeholder='Disponibilite JSON (optionnel), ex: {"weekend":true}'
+              placeholder='Disponibilité JSON (optionnel), ex. {"weekend":true}'
               value={availabilityJson}
               onChange={(e) => {
                 setAvailabilityJson(e.target.value);
@@ -543,7 +549,7 @@ export default function MePage() {
             <FieldError error={fieldErrors.availabilityJson} />
             <div className="flex flex-wrap gap-2">
               <Button onClick={saveFamilyProfile} disabled={saving} className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]">
-                {saving ? "Enregistrement..." : "Enregistrer le profil FAMILY"}
+                {saving ? "Enregistrement…" : "Enregistrer le profil FAMILY"}
               </Button>
               <Button
                 variant="secondary"
@@ -559,9 +565,9 @@ export default function MePage() {
 
         {me?.role === "RESOURCE" ? (
           <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
-            <h2 className="text-lg font-medium">Editer mon profil allié</h2>
+            <h2 className="text-lg font-medium">Éditer mon profil allié</h2>
             <Input
-              placeholder="Nom affiche"
+              placeholder="Nom affiché"
               value={displayName}
               onChange={(e) => {
                 setDisplayName(e.target.value);
@@ -588,7 +594,7 @@ export default function MePage() {
             />
             <FieldError error={fieldErrors.city} />
             <Input
-              placeholder="Region"
+              placeholder="Région"
               value={region}
               onChange={(e) => {
                 setRegion(e.target.value);
@@ -601,8 +607,12 @@ export default function MePage() {
               value={streetAddress}
               onChange={(e) => setStreetAddress(e.target.value)}
             />
-            <Input placeholder="Bio" value={bio} onChange={(e) => setBio(e.target.value)} />
-            <Input placeholder="Competences (CSV)" value={tagsCsv} onChange={(e) => setTagsCsv(e.target.value)} />
+            <Input placeholder="Biographie" value={bio} onChange={(e) => setBio(e.target.value)} />
+            <Input
+              placeholder="Compétences (séparées par des virgules)"
+              value={tagsCsv}
+              onChange={(e) => setTagsCsv(e.target.value)}
+            />
             <Input
               placeholder="Tarif horaire"
               type="number"
@@ -616,7 +626,7 @@ export default function MePage() {
             />
             <FieldError error={fieldErrors.hourlyRate} />
             <Input
-              placeholder="Email de contact"
+              placeholder="Courriel de contact"
               type="email"
               value={contactEmail}
               onChange={(e) => {
@@ -625,10 +635,14 @@ export default function MePage() {
               }}
             />
             <FieldError error={fieldErrors.contactEmail} />
-            <Input placeholder="Telephone de contact" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+            <Input
+              placeholder="Téléphone de contact"
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+            />
             <textarea
               className="min-h-28 w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100 placeholder:text-[#8b84ad] focus:border-[#6f8fe2] focus:outline-none focus:ring-1 focus:ring-[#6f8fe2]/35"
-              placeholder='Disponibilite JSON (optionnel), ex: {"soir":"lundi-mardi"}'
+              placeholder='Disponibilité JSON (optionnel), ex. {"soir":"lundi-mardi"}'
               value={availabilityJson}
               onChange={(e) => {
                 setAvailabilityJson(e.target.value);
@@ -670,11 +684,11 @@ export default function MePage() {
               href="/me/ally-candidature"
               className="inline-flex rounded-xl border border-[#6f8fe2]/45 bg-[#1d1840] px-4 py-2 text-sm font-medium text-[#b9ccff] no-underline hover:bg-[#292358] hover:text-[#d4dfff]"
             >
-              Mettre à jour ma candidature allié
+              Mettre à jour ma candidature d&apos;allié
             </Link>
             <div className="flex flex-wrap gap-2">
               <Button onClick={saveResourceProfile} disabled={saving} className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]">
-                {saving ? "Enregistrement..." : "Enregistrer le profil allié"}
+                {saving ? "Enregistrement…" : "Enregistrer le profil allié"}
               </Button>
               <Button
                 variant="secondary"
@@ -744,7 +758,7 @@ function parseAvailabilityOrThrow(value: string): unknown {
   try {
     return JSON.parse(trimmed);
   } catch {
-    throw new Error("Le champ disponibilite doit contenir un JSON valide.");
+    throw new Error("Le champ disponibilité doit contenir un JSON valide.");
   }
 }
 
@@ -757,7 +771,7 @@ function validateCommonFields(input: {
 }): FieldErrors {
   const errors: FieldErrors = {};
   if (input.displayName.trim().length < 2) {
-    errors.displayName = "Le nom affiche doit contenir au moins 2 caracteres.";
+    errors.displayName = "Le nom affiché doit contenir au moins 2 caractères.";
   }
   if (!isValidCanadianPostalCode(input.postalCode)) {
     errors.postalCode = "Code postal invalide (ex: G1R4P5 ou G1R 4P5).";
@@ -766,13 +780,13 @@ function validateCommonFields(input: {
     errors.city = "La ville est requise.";
   }
   if (input.region.trim().length < 2) {
-    errors.region = "La region est requise.";
+    errors.region = "La région est requise.";
   }
   if (input.availabilityJson.trim()) {
     try {
       JSON.parse(input.availabilityJson.trim());
     } catch {
-      errors.availabilityJson = "Disponibilite doit etre un JSON valide.";
+      errors.availabilityJson = "La disponibilité doit être un JSON valide.";
     }
   }
   return errors;
@@ -783,13 +797,13 @@ function validateResourceFields(input: { hourlyRate: string; contactEmail: strin
   if (input.hourlyRate.trim()) {
     const value = Number(input.hourlyRate);
     if (Number.isNaN(value) || value < 0) {
-      errors.hourlyRate = "Le tarif horaire doit etre un nombre positif.";
+      errors.hourlyRate = "Le tarif horaire doit être un nombre positif.";
     }
   }
   if (input.contactEmail.trim()) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(input.contactEmail.trim())) {
-      errors.contactEmail = "Email de contact invalide.";
+      errors.contactEmail = "Courriel de contact invalide.";
     }
   }
   return errors;
