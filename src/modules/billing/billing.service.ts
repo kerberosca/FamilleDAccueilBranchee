@@ -118,18 +118,18 @@ export class BillingService {
   }
 
   async handleStripeWebhook(rawBody: Buffer, signature?: string) {
-    if (this.configService.get<string>("NODE_ENV") === "test") {
+    if (this.shouldAcceptUnsignedMockWebhook()) {
       const mockEvent = this.parseMockWebhookEvent(rawBody);
       if (mockEvent) {
         await this.handleCheckoutCompletedEvent(mockEvent);
-        return { received: true, validated: false };
+        return { received: true, validated: false, mocked: true };
       }
     }
 
     const webhookSecret = this.configService.get<string>("STRIPE_WEBHOOK_SECRET");
     if (!webhookSecret || !signature) {
-      this.logger.warn("Webhook signature validation skipped (missing config/signature)");
-      return { received: true, validated: false };
+      this.logger.warn("Stripe webhook rejected (missing config/signature)");
+      throw new BadRequestException("Stripe webhook signature missing or not configured");
     }
 
     const event = this.stripeService.client.webhooks.constructEvent(rawBody, signature, webhookSecret);
@@ -184,6 +184,10 @@ export class BillingService {
     }
     const key = this.configService.get<string>("STRIPE_SECRET_KEY", "");
     return !key || key.includes("xxx") || key.includes("placeholder");
+  }
+
+  private shouldAcceptUnsignedMockWebhook(): boolean {
+    return this.configService.get<string>("NODE_ENV") === "test" || this.shouldUseMockCheckout();
   }
 
   private shouldUseMockBillingEndpoint(): boolean {

@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { AllyType, BackgroundCheckStatus } from "@prisma/client";
 import { Type } from "class-transformer";
-import { IsArray, IsEnum, IsNumber, IsObject, IsOptional, IsString } from "class-validator";
+import { IsArray, IsEnum, IsNumber, IsObject, IsOptional, IsString, Min } from "class-validator";
 
 export class UpdateResourceProfileDto {
   @ApiPropertyOptional()
@@ -49,6 +49,7 @@ export class UpdateResourceProfileDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  @Min(0, { message: "Le tarif horaire doit etre un nombre positif." })
   hourlyRate?: number;
 
   @ApiPropertyOptional()

@@ -227,6 +227,56 @@ describe("Smoke e2e", () => {
     expect(res.body.results[0].contactEmail).toBeUndefined();
   });
 
+  it("PATCH /api/v1/profiles/resource/me refuse un tarif horaire negatif", async () => {
+    const token = await loginAs("RESSOURCE");
+    const res = await request(app.getHttpServer())
+      .patch("/api/v1/profiles/resource/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ hourlyRate: -5 })
+      .expect(400);
+
+    expect(res.body.message).toContain("Le tarif horaire doit etre un nombre positif.");
+  });
+
+  it("GET /api/v1/search/resources avec abonnement actif expire : preview sans contacts", async () => {
+    const authService = app.get(AuthService);
+    const expiredFamily = await prisma.user.create({
+      data: {
+        email: "e2e_famille_sub_expiree@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille sub expiree e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            needsTags: []
+          }
+        },
+        subscriptions: {
+          create: {
+            status: SubscriptionStatus.ACTIVE,
+            stripeCustomerId: "cus_expired_family",
+            stripeSubscriptionId: "sub_expired_family",
+            currentPeriodEnd: new Date(Date.now() - 24 * 60 * 60 * 1000)
+          }
+        }
+      }
+    });
+    const { accessToken } = await authService.issueTokensForUser(expiredFamily.id);
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(res.body.limitedPreview).toBe(true);
+    expect(res.body.results[0].contactEmail).toBeUndefined();
+    expect(res.body.results[0].contactPhone).toBeUndefined();
+  });
+
   it("POST /billing/.../checkout-session renvoie une URL mockee", async () => {
     const familyToken = await loginAs("FAMILLE");
     const resourceToken = await loginAs("RESSOURCE");
@@ -262,12 +312,61 @@ describe("Smoke e2e", () => {
       }
     };
 
-    await request(app.getHttpServer()).post("/api/v1/billing/stripe/webhook").send(webhookPayload).expect(201);
+    const res = await request(app.getHttpServer()).post("/api/v1/billing/stripe/webhook").send(webhookPayload).expect(201);
+
+    expect(res.body).toEqual({ received: true, validated: false, mocked: true });
 
     const createdSub = await prisma.subscription.findUnique({
       where: { stripeSubscriptionId: "sub_test_123" }
     });
     expect(createdSub?.status).toBe(SubscriptionStatus.ACTIVE);
+  });
+
+  it("POST /api/v1/billing/stripe/webhook ressource met le profil en attente verification", async () => {
+    const resourceUser = await prisma.user.create({
+      data: {
+        email: "e2e_webhook_resource@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        resourceProfile: {
+          create: {
+            displayName: "Ressource webhook e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            skillsTags: ["Tutorat"],
+            hourlyRate: 30,
+            verificationStatus: ResourceVerificationStatus.DRAFT,
+            publishStatus: ResourcePublishStatus.HIDDEN,
+            onboardingState: ResourceOnboardingState.PENDING_PAYMENT,
+            contactEmail: "e2e_webhook_resource@local.test",
+            contactPhone: "514-555-1234"
+          }
+        }
+      }
+    });
+    const webhookPayload = {
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          metadata: {
+            kind: "RESOURCE_ONBOARDING",
+            userId: resourceUser.id
+          },
+          customer: "cus_resource_test"
+        }
+      }
+    };
+
+    const res = await request(app.getHttpServer()).post("/api/v1/billing/stripe/webhook").send(webhookPayload).expect(201);
+    expect(res.body).toEqual({ received: true, validated: false, mocked: true });
+
+    const profile = await prisma.resourceProfile.findUnique({ where: { userId: resourceUser.id } });
+    expect(profile?.onboardingState).toBe(ResourceOnboardingState.PENDING_VERIFICATION);
+    expect(profile?.verificationStatus).toBe(ResourceVerificationStatus.PENDING_VERIFICATION);
+    expect(profile?.publishStatus).toBe(ResourcePublishStatus.HIDDEN);
   });
 
   it("POST /api/v1/billing/family/mock-activate exige une famille connectee", async () => {

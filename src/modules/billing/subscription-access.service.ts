@@ -10,7 +10,8 @@ export class SubscriptionAccessService {
     const sub = await this.prisma.subscription.findFirst({
       where: {
         userId,
-        status: SubscriptionStatus.ACTIVE
+        status: SubscriptionStatus.ACTIVE,
+        OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { gt: new Date() } }]
       },
       orderBy: { updatedAt: "desc" }
     });

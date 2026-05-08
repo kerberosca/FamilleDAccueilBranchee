@@ -56,7 +56,9 @@ type AuditResponse = PageMeta & { items: AuditItem[] };
 
 type MaintenanceStatus = { enabled: boolean; updatedAt: string; updatedBy: string | null };
 
-const SELECT_CLASS = "rounded-md border border-slate-700 bg-slate-900 px-3 py-2";
+const SELECT_CLASS = "min-w-0 max-w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2";
+const ADMIN_CARD_CLASS = "min-w-0 overflow-hidden";
+const ADMIN_TEXT_CLASS = "min-w-0 break-words";
 
 export default function AdminPage() {
   const { accessToken } = useAuth();
@@ -378,7 +380,7 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl space-y-4 p-6">
+    <main className="mx-auto max-w-6xl space-y-4 overflow-x-hidden px-4 py-6 sm:p-6">
       <h1 className="text-2xl font-semibold">Console Admin</h1>
       <RequireAuth>
         {loadingMe ? <Alert tone="info">Vérification du rôle administrateur…</Alert> : null}
@@ -387,14 +389,14 @@ export default function AdminPage() {
 
         {isAdmin ? (
           <>
-            <Card className="mb-4 space-y-2">
+            <Card className={`mb-4 space-y-2 ${ADMIN_CARD_CLASS}`}>
               <h2 className="text-lg font-medium">Mode maintenance</h2>
               <p className="text-sm text-slate-400">
                 {maintenanceStatus?.enabled
                   ? "Le site affiche une page maintenance pour les visiteurs. Seuls /health et cette console restent utilisables."
                   : "Le site est normalement accessible."}
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant={maintenanceStatus?.enabled ? "primary" : "secondary"}
                   disabled={maintenanceBusy}
@@ -430,8 +432,8 @@ export default function AdminPage() {
             </div>
 
             {tab === "families" ? (
-              <Card className="space-y-3">
-                <div className="grid gap-2 md:grid-cols-5">
+              <Card className={`space-y-3 ${ADMIN_CARD_CLASS}`}>
+                <div className="grid min-w-0 gap-2 md:grid-cols-5">
                   <Input placeholder="Recherche email, nom, ville, code postal" value={familyQuery} onChange={(e) => setFamilyQuery(e.target.value)} />
                   <select className={SELECT_CLASS} value={familyStatus} onChange={(e) => setFamilyStatus(e.target.value)}>
                     <option value="">Tous les statuts</option>
@@ -469,12 +471,12 @@ export default function AdminPage() {
                 </div>
 
                 {loadingData ? <Alert tone="info">Chargement des familles…</Alert> : null}
-                <div className="space-y-2">
+                <div className="min-w-0 space-y-2">
                   {families.map((family) => (
-                    <Card key={family.id} className="space-y-2">
-                      <label className="flex items-start gap-2">
+                    <Card key={family.id} className={`space-y-2 ${ADMIN_CARD_CLASS}`}>
+                      <label className="flex min-w-0 items-start gap-2">
                         <input type="checkbox" checked={selectedFamilyIds.includes(family.id)} onChange={() => toggleFamilySelection(family.id)} />
-                        <div className="text-sm">
+                        <div className={`text-sm ${ADMIN_TEXT_CLASS}`}>
                           <p>
                             <strong>{family.profile?.displayName ?? "(sans profil)"}</strong> - {family.email}
                           </p>
@@ -499,7 +501,7 @@ export default function AdminPage() {
                           <option value="ADMIN">ADMIN</option>
                         </select>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button variant="secondary" disabled={busyId === family.id || family.status === "ACTIVE"} onClick={() => void updateFamilyStatus(family.id, "ACTIVE")}>
                           Activer
                         </Button>
@@ -528,8 +530,8 @@ export default function AdminPage() {
             ) : null}
 
             {tab === "resources" ? (
-              <Card className="space-y-3">
-                <div className="grid gap-2 md:grid-cols-6">
+              <Card className={`space-y-3 ${ADMIN_CARD_CLASS}`}>
+                <div className="grid min-w-0 gap-2 md:grid-cols-6">
                   <Input placeholder="Recherche nom, email, ville, code postal" value={resourceQuery} onChange={(e) => setResourceQuery(e.target.value)} />
                   <select className={SELECT_CLASS} value={verificationStatus} onChange={(e) => setVerificationStatus(e.target.value)}>
                     <option value="">Vérification : toutes</option>
@@ -588,12 +590,12 @@ export default function AdminPage() {
                 </div>
 
                 {loadingData ? <Alert tone="info">Chargement des alliés…</Alert> : null}
-                <div className="space-y-2">
+                <div className="min-w-0 space-y-2">
                   {resources.map((resource) => (
-                    <Card key={resource.id} className="space-y-2">
-                      <label className="flex items-start gap-2">
+                    <Card key={resource.id} className={`space-y-2 ${ADMIN_CARD_CLASS}`}>
+                      <label className="flex min-w-0 items-start gap-2">
                         <input type="checkbox" checked={selectedResourceIds.includes(resource.id)} onChange={() => toggleResourceSelection(resource.id)} />
-                        <div className="text-sm">
+                        <div className={`text-sm ${ADMIN_TEXT_CLASS}`}>
                           <p>
                             <strong>{resource.displayName}</strong> - {resource.user.email}
                           </p>
@@ -605,7 +607,7 @@ export default function AdminPage() {
                             Localisation: {resource.city}, {resource.region} ({resource.postalCode})
                           </p>
                           {resource.streetAddress ? (
-                            <p className="text-slate-400">Adresse : {resource.streetAddress}</p>
+                            <p className="break-words text-slate-400">Adresse : {resource.streetAddress}</p>
                           ) : null}
                           {resource.allyDeclarationsAcceptedAt ? (
                             <p className="text-xs text-slate-500">
@@ -616,7 +618,7 @@ export default function AdminPage() {
                           {resource.allyRegistration ? (
                             <details className="mt-1 text-xs">
                               <summary className="cursor-pointer text-cyan-400">Dossier candidature allié (JSON)</summary>
-                              <pre className="mt-2 max-h-48 overflow-auto rounded bg-slate-950 p-2 text-[10px] text-slate-300">
+                              <pre className="mt-2 max-h-48 max-w-full overflow-auto rounded bg-slate-950 p-2 text-[10px] text-slate-300">
                                 {JSON.stringify(resource.allyRegistration, null, 2)}
                               </pre>
                             </details>
@@ -713,23 +715,23 @@ export default function AdminPage() {
             ) : null}
 
             {tab === "audit" ? (
-              <Card className="space-y-3">
-                <div className="flex gap-2">
+              <Card className={`space-y-3 ${ADMIN_CARD_CLASS}`}>
+                <div className="flex flex-wrap gap-2">
                   <Button variant="secondary" onClick={() => void refreshCurrentTab()}>
                     Rafraîchir
                   </Button>
                 </div>
                 {loadingData ? <Alert tone="info">Chargement de l&apos;audit…</Alert> : null}
-                <div className="space-y-2">
+                <div className="min-w-0 space-y-2">
                   {auditItems.map((item) => (
-                    <Card key={item.id} className="text-sm">
+                    <Card key={item.id} className={`text-sm ${ADMIN_CARD_CLASS}`}>
                       <p>
                         <strong>{item.action}</strong> - {item.targetType}:{item.targetId}
                       </p>
                       <p>
                         Par {item.actorUser?.email ?? item.actorUserId} à {new Date(item.createdAt).toLocaleString("fr-CA")}
                       </p>
-                      <pre className="overflow-auto text-xs opacity-80">{JSON.stringify(item.payload, null, 2)}</pre>
+                      <pre className="max-w-full overflow-auto text-xs opacity-80">{JSON.stringify(item.payload, null, 2)}</pre>
                     </Card>
                   ))}
                   {!loadingData && auditItems.length === 0 ? <Alert tone="info">Aucun log pour le moment.</Alert> : null}
@@ -765,11 +767,11 @@ function PaginationControls({
   onNext: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 text-sm">
-      <p>
+    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <p className="min-w-0">
         Total : <strong>{total}</strong> | Page {page}/{totalPages}
       </p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button variant="secondary" disabled={page <= 1} onClick={onPrev}>
           Précédent
         </Button>
