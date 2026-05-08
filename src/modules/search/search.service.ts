@@ -56,8 +56,8 @@ export class SearchService {
               region: resource.region,
               postalCode: resource.postalCode,
               skillsTags: resource.skillsTags,
-              averageRating: resource.averageRating,
-              hourlyRate: resource.hourlyRate,
+              averageRating: decimalToNumber(resource.averageRating),
+              hourlyRate: decimalToNumber(resource.hourlyRate),
               bio: resource.bio,
               contactEmail: resource.contactEmail,
               contactPhone: resource.contactPhone
@@ -68,8 +68,8 @@ export class SearchService {
               city: resource.city,
               region: resource.region,
               skillsTags: resource.skillsTags,
-              averageRating: resource.averageRating,
-              hourlyRate: resource.hourlyRate
+              averageRating: decimalToNumber(resource.averageRating),
+              hourlyRate: decimalToNumber(resource.hourlyRate)
             }
       )
     };
@@ -102,4 +102,22 @@ function splitTags(tags?: string): string[] {
 
 function normalizePostalCode(value: string): string {
   return value.replace(/\s+/g, "").toUpperCase();
+}
+
+function decimalToNumber(value: unknown): number | null {
+  if (value == null) {
+    return null;
+  }
+  if (typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
+    return value.toNumber();
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }

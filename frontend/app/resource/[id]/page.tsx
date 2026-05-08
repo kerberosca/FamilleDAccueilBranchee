@@ -27,36 +27,51 @@ type ResourceDetail = {
 export default function ResourceDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { accessToken, isAuthenticated } = useAuth();
+  const { accessToken, isAuthenticated, isAuthLoading } = useAuth();
   const resourceId = typeof params.id === "string" ? params.id : "";
   const [resource, setResource] = useState<ResourceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isAuthLoading) {
+      setLoading(true);
+      return;
+    }
+
     if (!resourceId) {
       setLoading(false);
       setError("Identifiant allié manquant.");
       return;
     }
+
+    let ignore = false;
+
     const run = async () => {
       setLoading(true);
       setError(null);
       try {
         const data = await apiGet<ResourceDetail>(`/profiles/resource/${resourceId}`, { token: accessToken ?? undefined });
+        if (ignore) return;
         setResource(data);
       } catch (e) {
+        if (ignore) return;
         if (e instanceof ApiError && e.statusCode === 404) {
           setError("Profil non disponible.");
         } else {
           setError(e instanceof Error ? e.message : "Allié introuvable.");
         }
       } finally {
+        if (ignore) return;
         setLoading(false);
       }
     };
     void run();
-  }, [resourceId, accessToken]);
+
+    return () => {
+      ignore = true;
+    };
+  }, [resourceId, accessToken, isAuthLoading]);
 
   const handleContact = () => {
     if (!isAuthenticated) {

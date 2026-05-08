@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={outfit.variable}>
+    <html lang="fr" className={outfit.variable} data-scroll-behavior="smooth">
       <body className="min-h-screen font-sans">
         <AuthProvider>
           <MaintenanceProvider>

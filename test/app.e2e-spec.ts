@@ -3,7 +3,6 @@ import { Test } from "@nestjs/testing";
 import { ResourceOnboardingState, ResourcePublishStatus, ResourceVerificationStatus, Role, SubscriptionStatus, UserStatus } from "@prisma/client";
 import { execSync } from "node:child_process";
 import request from "supertest";
-import { AppModule } from "../src/app.module";
 import { setupApp } from "../src/app.setup";
 import { AuthService } from "../src/modules/auth/auth.service";
 import { StripeService } from "../src/modules/billing/stripe.service";
@@ -24,6 +23,7 @@ describe("Smoke e2e", () => {
   beforeAll(async () => {
     configureTestEnv();
     execSync("npx prisma db push --skip-generate", { stdio: "inherit", env: process.env });
+    const { AppModule } = await import("../src/app.module");
 
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule]
@@ -51,7 +51,7 @@ describe("Smoke e2e", () => {
     await cleanDatabase(prisma);
     const ids = await seedDevUsers(prisma);
     familyUserId = ids.familyUserId;
-  });
+  }, 30_000);
 
   afterAll(async () => {
     if (prisma) {
@@ -312,9 +312,28 @@ function configureTestEnv() {
   process.env.ADMIN_EMAIL = "admin@fab.local";
   process.env.ADMIN_PASSWORD = "ChangeMe123!";
   process.env.DATABASE_URL = withSchema(
-    process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/famille_accueil?schema=public",
+    process.env.E2E_DATABASE_URL ??
+      normalizeHostDatabaseUrl(
+        process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/famille_accueil?schema=public"
+      ),
     E2E_SCHEMA
   );
+}
+
+function normalizeHostDatabaseUrl(databaseUrl: string) {
+  if (process.platform !== "win32") {
+    return databaseUrl;
+  }
+
+  try {
+    const url = new URL(databaseUrl);
+    if (url.hostname === "postgres") {
+      url.hostname = "localhost";
+    }
+    return url.toString();
+  } catch {
+    return databaseUrl;
+  }
 }
 
 function withSchema(databaseUrl: string, schema: string) {

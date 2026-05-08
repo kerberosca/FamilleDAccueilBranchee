@@ -44,8 +44,11 @@ Base path API versionnee: `/api/v1`.
 1. Verifier Postgres en local Docker (port `5432`).
 2. Lancer:
    - `npm run test:e2e`
+   - ou, depuis les conteneurs dev: `docker exec fab-backend-dev npm run test:e2e -- --runInBand`
 3. Mode watch:
    - `npm run test:watch`
+
+Sur Windows, le setup e2e remplace automatiquement le host Postgres `postgres` par `localhost` quand les tests tournent hors conteneur. Pour forcer une URL dediee aux e2e, definir `E2E_DATABASE_URL`.
 
 Les tests couvrent:
 - health endpoint

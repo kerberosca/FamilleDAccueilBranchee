@@ -324,8 +324,8 @@ export class ProfilesService {
       region: resource.region,
       postalCode: resource.postalCode,
       skillsTags: resource.skillsTags,
-      hourlyRate: resource.hourlyRate,
-      averageRating: resource.averageRating,
+      hourlyRate: decimalToNumber(resource.hourlyRate),
+      averageRating: decimalToNumber(resource.averageRating),
       bio: resource.bio,
       verificationStatus: resource.verificationStatus,
       publishStatus: resource.publishStatus
@@ -352,7 +352,7 @@ export class ProfilesService {
       streetAddress: resource.streetAddress ?? undefined,
       bio: resource.bio,
       skillsTags: resource.skillsTags,
-      hourlyRate: resource.hourlyRate,
+      hourlyRate: decimalToNumber(resource.hourlyRate),
       availability: resource.availability,
       verificationStatus: resource.verificationStatus,
       publishStatus: resource.publishStatus,
@@ -369,6 +369,24 @@ export class ProfilesService {
 
 function normalizePostalCode(postalCode: string): string {
   return postalCode.replace(/\s+/g, "").toUpperCase();
+}
+
+function decimalToNumber(value: unknown): number | null {
+  if (value == null) {
+    return null;
+  }
+  if (typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
+    return value.toNumber();
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function allyTypeToPublicLabel(allyType: AllyType): string {
