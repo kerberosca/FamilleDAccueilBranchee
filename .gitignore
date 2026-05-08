@@ -19,6 +19,7 @@ docs/cybersecurite/
 
 # Sortie d'audit locale (ne pas committer)
 api-audit.err
+.codex_known_hosts
 
 # Artefacts TypeScript (build incrémental)
 *.tsbuildinfo
