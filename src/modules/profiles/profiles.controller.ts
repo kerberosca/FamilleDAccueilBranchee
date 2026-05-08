@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Query, UseGuards } from "@
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Role } from "@prisma/client";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { Public } from "../../common/decorators/public.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { OptionalJwtAuthGuard } from "../../common/guards/optional-jwt-auth.guard";
@@ -91,6 +92,7 @@ export class ProfilesController {
     return this.profilesService.moderateResource(resourceId, dto, user.sub);
   }
 
+  @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @Get("resource/:resourceId")
   async getResource(@Param("resourceId") resourceId: string, @CurrentUser() user?: JwtPayload) {

@@ -25,21 +25,22 @@ export class SearchService {
       publishStatus: ResourcePublishStatus.PUBLISHED,
       verificationStatus: ResourceVerificationStatus.VERIFIED,
       onboardingState: { in: [ResourceOnboardingState.VERIFIED, ResourceOnboardingState.PUBLISHED] },
-      OR: [{ postalCode: normalizedPostalCode }, { postalCode: { startsWith: prefix } }],
-      ...(tags.length > 0 ? { skillsTags: { hasSome: tags } } : {})
+      OR: [{ postalCode: normalizedPostalCode }, { postalCode: { startsWith: prefix } }]
     };
-
-    const totalFound = await this.prisma.resourceProfile.count({ where });
     const premium = await this.hasFullSearchAccess(user);
     const take = premium ? PREMIUM_PAGE_SIZE : PREVIEW_LIMIT;
     const skip = premium ? (page - 1) * PREMIUM_PAGE_SIZE : 0;
 
-    const resources = await this.prisma.resourceProfile.findMany({
+    const allPostalMatches = await this.prisma.resourceProfile.findMany({
       where,
-      orderBy: [{ averageRating: "desc" }, { createdAt: "desc" }],
-      skip,
-      take
+      orderBy: [{ averageRating: "desc" }, { createdAt: "desc" }]
     });
+    const matchingResources =
+      tags.length > 0
+        ? allPostalMatches.filter((resource) => hasSomeNormalizedTag(resource.skillsTags, tags))
+        : allPostalMatches;
+    const totalFound = matchingResources.length;
+    const resources = matchingResources.slice(skip, skip + take);
 
     return {
       totalFound,
@@ -98,6 +99,21 @@ function splitTags(tags?: string): string[] {
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+}
+
+function hasSomeNormalizedTag(resourceTags: string[], searchedTags: string[]): boolean {
+  const normalizedResourceTags = resourceTags.map(normalizeTag);
+  return searchedTags.some((searchedTag) => {
+    const normalizedSearchedTag = normalizeTag(searchedTag);
+    return normalizedResourceTags.some((resourceTag) => resourceTag.includes(normalizedSearchedTag));
+  });
+}
+
+function normalizeTag(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 function normalizePostalCode(value: string): string {

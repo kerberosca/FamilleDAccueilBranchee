@@ -310,7 +310,13 @@ export class ProfilesService {
   }
 
   private async canSeeSensitiveResourceInfo(currentUser?: JwtPayload): Promise<boolean> {
-    if (!currentUser || currentUser.role !== Role.FAMILY) {
+    if (!currentUser) {
+      return false;
+    }
+    if (currentUser.role === Role.ADMIN) {
+      return true;
+    }
+    if (currentUser.role !== Role.FAMILY) {
       return false;
     }
     return this.subscriptionAccessService.hasActiveFamilySubscription(currentUser.sub);

@@ -88,6 +88,26 @@ describe("Smoke e2e", () => {
     expect(res.body.results[0].contactPhone).toBeUndefined();
   });
 
+  it("GET /api/v1/search/resources filtre les etiquettes sans tenir compte de la casse", async () => {
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4&tags=tutorat")
+      .expect(200);
+
+    expect(res.body.totalFound).toBeGreaterThan(0);
+    expect(res.body.results[0].displayName).toBe("Ressource Locale");
+  });
+
+  it("GET /api/v1/profiles/resource/:id expose le detail public sans contact", async () => {
+    const search = await request(app.getHttpServer()).get("/api/v1/search/resources?postalCode=H2X1Y4").expect(200);
+    const resourceId = search.body.results[0].id;
+
+    const res = await request(app.getHttpServer()).get(`/api/v1/profiles/resource/${resourceId}`).expect(200);
+
+    expect(res.body.displayName).toBe("Ressource Locale");
+    expect(res.body.contactEmail).toBeUndefined();
+    expect(res.body.contactPhone).toBeUndefined();
+  });
+
   /** R2 / charge visiteur : pas de 401 sur la recherche publique (pas de refresh côté client dans ce scénario). */
   it("GET /api/v1/search/resources sans jeton supporte plusieurs appels consécutifs (200)", async () => {
     const server = app.getHttpServer();
@@ -142,6 +162,23 @@ describe("Smoke e2e", () => {
     expect(res.body.results.length).toBeGreaterThan(0);
     expect(res.body.results[0].contactEmail).toBe("ressource@local.test");
     expect(res.body.results[0].contactPhone).toBe("514-555-0000");
+  });
+
+  it("GET /api/v1/profiles/resource/:id avec jeton admin inclut les contacts", async () => {
+    const token = await loginAs("ADMIN");
+    const search = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    const resourceId = search.body.results[0].id;
+
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/profiles/resource/${resourceId}`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(res.body.contactEmail).toBe("ressource@local.test");
+    expect(res.body.contactPhone).toBe("514-555-0000");
   });
 
   /** S3 : allié (ressource) — pas d’accès plein à la recherche. */
@@ -404,7 +441,7 @@ async function seedDevUsers(prisma: PrismaService) {
           city: "Montreal",
           region: "QC",
           bio: "Profile e2e",
-          skillsTags: ["transport", "repit"],
+          skillsTags: ["Tutorat", "transport", "repit"],
           hourlyRate: 30,
           verificationStatus: ResourceVerificationStatus.VERIFIED,
           publishStatus: ResourcePublishStatus.PUBLISHED,
