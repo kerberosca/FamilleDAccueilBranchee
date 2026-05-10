@@ -40,6 +40,7 @@ export class EmailService {
 
     if (!this.resend) {
       this.logger.log(`[Email non envoyé - pas de clé] to=${to} subject=${subject}`);
+      this.logger.debug(html);
       return { ok: true };
     }
 

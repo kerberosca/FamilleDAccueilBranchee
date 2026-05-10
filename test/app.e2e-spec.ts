@@ -1,11 +1,12 @@
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import { ResourceOnboardingState, ResourcePublishStatus, ResourceVerificationStatus, Role, SubscriptionStatus, UserStatus } from "@prisma/client";
+import { AllyType, ResourceOnboardingState, ResourcePublishStatus, ResourceVerificationStatus, Role, SubscriptionStatus, UserStatus } from "@prisma/client";
 import { execSync } from "node:child_process";
 import request from "supertest";
 import { setupApp } from "../src/app.setup";
 import { AuthService } from "../src/modules/auth/auth.service";
 import { StripeService } from "../src/modules/billing/stripe.service";
+import { EmailService } from "../src/modules/email/email.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 
 const E2E_SCHEMA = "e2e_tests";
@@ -19,6 +20,7 @@ describe("Smoke e2e", () => {
     url: "https://stripe.local/checkout/session-test",
     id: "cs_test_123"
   }));
+  const emailSendMock = jest.fn(async () => ({ ok: true }));
 
   beforeAll(async () => {
     configureTestEnv();
@@ -40,6 +42,10 @@ describe("Smoke e2e", () => {
             constructEvent: jest.fn()
           }
         }
+      })
+      .overrideProvider(EmailService)
+      .useValue({
+        send: emailSendMock
       })
       .compile();
 
@@ -290,6 +296,116 @@ describe("Smoke e2e", () => {
       .expect(400);
 
     expect(res.body.message).toContain("Le tarif horaire doit etre un nombre positif.");
+  });
+
+  it("POST /api/v1/auth/register envoie un courriel de bienvenue aux allies", async () => {
+    emailSendMock.mockClear();
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/register")
+      .send({
+        email: "nouvel.allie@local.test",
+        password: "Bienvenue123!",
+        role: Role.RESOURCE,
+        displayName: "Nouvel Allie",
+        postalCode: "H2X1Y4",
+        city: "Montreal",
+        region: "QC",
+        allyType: AllyType.GARDIENS,
+        contactPhone: "514-555-1212",
+        allyRegistration: validAllyRegistration()
+      })
+      .expect(201);
+
+    expect(emailSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "nouvel.allie@local.test",
+        subject: expect.stringContaining("Bienvenue"),
+        html: expect.stringContaining("Bienvenue Nouvel Allie")
+      })
+    );
+    expect(emailSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "notifications@local.test",
+        subject: "Nouvel allié à approuver sur FAB",
+        html: expect.stringContaining("Un nouvel allié attend une approbation")
+      })
+    );
+  });
+
+  it("POST /api/v1/auth/register notifie l'equipe quand une famille s'inscrit", async () => {
+    emailSendMock.mockClear();
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/register")
+      .send({
+        email: "nouvelle.famille@local.test",
+        password: "Bienvenue123!",
+        role: Role.FAMILY,
+        displayName: "Famille Nouvelle",
+        postalCode: "H2X1Y4",
+        city: "Montreal",
+        region: "QC",
+        bio: "Famille e2e",
+        tags: ["repit"]
+      })
+      .expect(201);
+
+    expect(emailSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "notifications@local.test",
+        subject: "Nouvelle famille inscrite sur FAB",
+        html: expect.stringContaining("Une nouvelle famille d'accueil s'est inscrite")
+      })
+    );
+  });
+
+  it("PATCH /api/v1/profiles/resource/me envoie un courriel de confirmation", async () => {
+    emailSendMock.mockClear();
+    const token = await loginAs("RESSOURCE");
+
+    await request(app.getHttpServer())
+      .patch("/api/v1/profiles/resource/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        displayName: "Ressource Locale",
+        allyRegistration: validAllyRegistration({ hourlyRateSuggested: "36" })
+      })
+      .expect(200);
+
+    expect(emailSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "ressource@local.test",
+        subject: expect.stringContaining("profil allié"),
+        html: expect.stringContaining("Vos modifications ont été enregistrées")
+      })
+    );
+  });
+
+  it("PATCH /api/v1/profiles/resource/:id/moderation envoie un courriel a l'allie", async () => {
+    emailSendMock.mockClear();
+    const token = await loginAs("ADMIN");
+    const resource = await prisma.resourceProfile.findFirstOrThrow({
+      where: { displayName: "Ressource Locale" }
+    });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${resource.id}/moderation`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        verificationStatus: ResourceVerificationStatus.VERIFIED,
+        publishStatus: ResourcePublishStatus.PUBLISHED,
+        onboardingState: ResourceOnboardingState.PUBLISHED
+      })
+      .expect(200);
+
+    expect(emailSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "ressource@local.test",
+        subject: "Votre profil allié FAB est approuvé",
+        html: expect.stringContaining("Votre profil allié est approuvé")
+      })
+    );
   });
 
   it("GET /api/v1/search/resources avec abonnement actif expire : preview sans contacts", async () => {
@@ -563,6 +679,7 @@ function configureTestEnv() {
   process.env.APP_FRONTEND_URL = "http://localhost:5173";
   process.env.ADMIN_EMAIL = "admin@fab.local";
   process.env.ADMIN_PASSWORD = "ChangeMe123!";
+  process.env.NOTIFICATION_EMAIL = "notifications@local.test";
   process.env.DATABASE_URL = withSchema(
     process.env.E2E_DATABASE_URL ??
       normalizeHostDatabaseUrl(
@@ -594,6 +711,55 @@ function withSchema(databaseUrl: string, schema: string) {
   }
   const separator = databaseUrl.includes("?") ? "&" : "?";
   return `${databaseUrl}${separator}schema=${schema}`;
+}
+
+function validAllyRegistration(overrides: { hourlyRateSuggested?: string } = {}) {
+  return {
+    version: "2025-03-repit-v1",
+    section1: {
+      sectorServiced: "Montreal",
+      streetAddress: "123 rue Test",
+      contactEmail: "allie.contact@local.test",
+      age18Confirmed: true
+    },
+    section2: {
+      rcrValid: "yes",
+      rcrLevelC: "yes",
+      experienceChildren: "1_3",
+      experienceParticularNeeds: false,
+      experienceFoster: false,
+      experienceTrauma: false,
+      approachChildren: "Approche calme, fiable et respectueuse avec les enfants."
+    },
+    section3: {
+      repitSoiree: true,
+      repitNuit: false,
+      repitWeekend: true,
+      repitUrgence: false,
+      age0_5: false,
+      age6_12: true,
+      age12p: true,
+      maxChildren: "2",
+      serviceRadius: "25",
+      hourlyRateSuggested: overrides.hourlyRateSuggested ?? "32",
+      dispoSemaine: true,
+      dispoSoir: true,
+      dispoWeekend: true,
+      dispoFlexible: false
+    },
+    section4: {
+      canProvideBackgroundCheck: true,
+      canProvideTwoRefs: true,
+      canProvideRcrProof: true,
+      declNoBan: true,
+      declNoInvestigation: true,
+      declFalseStatement: true,
+      declInfoAccurate: true,
+      declIntermediary: true,
+      declFinancialDirect: true,
+      declProfileVisible: true
+    }
+  };
 }
 
 async function cleanDatabase(prisma: PrismaService) {

@@ -21,6 +21,12 @@ import {
 } from "@prisma/client";
 import * as argon2 from "argon2";
 import { randomBytes } from "crypto";
+import {
+  buildAllyWelcomeEmail,
+  buildPasswordResetEmail,
+  buildTeamNewAllyEmail,
+  buildTeamNewFamilyEmail
+} from "../email/fab-email.templates";
 import { EmailService } from "../email/email.service";
 import { MaintenanceService } from "../maintenance/maintenance.service";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -135,6 +141,26 @@ export class AuthService {
     });
 
     const tokens = await this.generateAndPersistTokens(created);
+    if (input.role === Role.RESOURCE && resourceProfile) {
+      void this.sendAllyWelcomeEmail({
+        to: input.email.toLowerCase(),
+        displayName: input.displayName,
+        allyTypeLabel: allyTypeToPublicLabel(input.allyType!)
+      });
+      void this.sendTeamNewAllyEmail({
+        displayName: input.displayName,
+        email: input.email.toLowerCase(),
+        allyTypeLabel: allyTypeToPublicLabel(input.allyType!),
+        city: input.city
+      });
+    }
+    if (input.role === Role.FAMILY) {
+      void this.sendTeamNewFamilyEmail({
+        displayName: input.displayName,
+        email: input.email.toLowerCase(),
+        city: input.city
+      });
+    }
     return {
       user: sanitizeUser(created),
       ...tokens,
@@ -224,14 +250,7 @@ export class AuthService {
     });
     const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
     const resetUrl = `${frontendUrl.replace(/\/$/, "")}/reset-password?token=${token}`;
-
-    const html = `
-      <p>Bonjour,</p>
-      <p>Une réinitialisation de mot de passe a été demandée pour ce compte. Cliquez sur le lien ci-dessous pour définir un nouveau mot de passe :</p>
-      <p><a href="${resetUrl}">Réinitialiser mon mot de passe</a></p>
-      <p>Ce lien est valable 1 heure.</p>
-      <p>Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</p>
-    `.trim();
+    const html = buildPasswordResetEmail({ resetUrl, frontendUrl });
 
     this.logger.log(`Envoi email reset vers ${normalizedEmail}...`);
     const result = await this.emailService.send({
@@ -245,6 +264,58 @@ export class AuthService {
       this.logger.log(`Email reset traité pour ${normalizedEmail} (ok=${result.ok}).`);
     }
     return { message: "Si cet email est connu, un lien a été envoyé." };
+  }
+
+  private async sendAllyWelcomeEmail(params: { to: string; displayName: string; allyTypeLabel: string }) {
+    const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
+    const result = await this.emailService.send({
+      to: params.to,
+      subject: "Bienvenue chez FAB - votre candidature allié est reçue",
+      html: buildAllyWelcomeEmail({
+        displayName: params.displayName,
+        allyTypeLabel: params.allyTypeLabel,
+        frontendUrl
+      })
+    });
+    if (!result.ok) {
+      this.logger.warn(`Envoi email bienvenue allié échoué pour ${params.to}: ${result.error}`);
+    }
+  }
+
+  private async sendTeamNewAllyEmail(params: { displayName: string; email: string; allyTypeLabel: string; city: string }) {
+    const to = this.getNotificationEmail();
+    const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
+    const result = await this.emailService.send({
+      to,
+      subject: "Nouvel allié à approuver sur FAB",
+      html: buildTeamNewAllyEmail({ ...params, frontendUrl })
+    });
+    if (!result.ok) {
+      this.logger.warn(`Envoi notification nouvel allié échoué pour ${to}: ${result.error}`);
+    }
+  }
+
+  private async sendTeamNewFamilyEmail(params: { displayName: string; email: string; city: string }) {
+    const to = this.getNotificationEmail();
+    const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
+    const result = await this.emailService.send({
+      to,
+      subject: "Nouvelle famille inscrite sur FAB",
+      html: buildTeamNewFamilyEmail({ ...params, frontendUrl })
+    });
+    if (!result.ok) {
+      this.logger.warn(`Envoi notification nouvelle famille échoué pour ${to}: ${result.error}`);
+    }
+  }
+
+  private getNotificationEmail(): string {
+    const explicit = (this.configService.get<string>("NOTIFICATION_EMAIL", "") ?? "").trim();
+    if (explicit) return explicit;
+    const from = (this.configService.get<string>("EMAIL_FROM", "") ?? "").trim();
+    const match = /<([^>]+)>/.exec(from);
+    if (match?.[1]) return match[1].trim();
+    if (from.includes("@") && !from.includes(" ")) return from;
+    return this.configService.get<string>("ADMIN_EMAIL", "admin@fab.local");
   }
 
   async resetPassword(token: string, newPassword: string) {

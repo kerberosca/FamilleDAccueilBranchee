@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import {
   AllyType,
   BackgroundCheckStatus,
@@ -14,6 +14,9 @@ import {
   parseAndValidateAllyRegistration
 } from "../auth/ally-registration.validation";
 import { SubscriptionAccessService } from "../billing/subscription-access.service";
+import { buildAllyAdminStatusEmail, buildAllyProfileUpdatedEmail } from "../email/fab-email.templates";
+import { EmailService } from "../email/email.service";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
 import { UsersService } from "../users/users.service";
@@ -24,10 +27,14 @@ import { UpdateResourceProfileDto } from "./dto/update-resource-profile.dto";
 
 @Injectable()
 export class ProfilesService {
+  private readonly logger = new Logger(ProfilesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionAccessService: SubscriptionAccessService,
-    private readonly usersService: UsersService
+    private readonly usersService: UsersService,
+    private readonly emailService: EmailService,
+    private readonly configService: ConfigService
   ) {}
 
   async getMyProfile(user: JwtPayload) {
@@ -90,7 +97,10 @@ export class ProfilesService {
           ) as Prisma.InputJsonValue)
         : undefined;
 
-    const existing = await this.prisma.resourceProfile.findUnique({ where: { userId: user.sub } });
+    const existing = await this.prisma.resourceProfile.findUnique({
+      where: { userId: user.sub },
+      include: { user: true }
+    });
     if (!existing) {
       throw new NotFoundException("Resource profile not found");
     }
@@ -136,7 +146,26 @@ export class ProfilesService {
         ...(allyRegRaw !== undefined ? derivedFromAlly : {})
       }
     });
+    void this.sendAllyProfileUpdatedEmail({
+      to: existing.user.email,
+      displayName: updated.displayName
+    });
     return this.toResourcePrivateView(updated);
+  }
+
+  private async sendAllyProfileUpdatedEmail(params: { to: string; displayName: string }) {
+    const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
+    const result = await this.emailService.send({
+      to: params.to,
+      subject: "Votre profil allié FAB a été mis à jour",
+      html: buildAllyProfileUpdatedEmail({
+        displayName: params.displayName,
+        frontendUrl
+      })
+    });
+    if (!result.ok) {
+      this.logger.warn(`Envoi email profil allié mis à jour échoué pour ${params.to}: ${result.error}`);
+    }
   }
 
   async deleteResourceByAdmin(resourceId: string, actorUserId: string) {
@@ -162,6 +191,13 @@ export class ProfilesService {
   }
 
   async moderateResource(resourceId: string, dto: ModerateResourceDto, actorUserId?: string) {
+    const existing = await this.prisma.resourceProfile.findUnique({
+      where: { id: resourceId },
+      include: { user: true }
+    });
+    if (!existing) {
+      throw new NotFoundException("Profil allié introuvable.");
+    }
     const updated = await this.prisma.resourceProfile.update({
       where: { id: resourceId },
       data: {
@@ -176,10 +212,21 @@ export class ProfilesService {
         ...dto
       });
     }
+    void this.sendAllyAdminStatusEmail({
+      to: existing.user.email,
+      displayName: updated.displayName,
+      verificationStatus: dto.verificationStatus ?? updated.verificationStatus,
+      publishStatus: dto.publishStatus ?? updated.publishStatus,
+      onboardingState: dto.onboardingState ?? updated.onboardingState
+    });
     return updated;
   }
 
   async bulkModerateResources(resourceIds: string[], dto: BulkModerateResourceDto, actorUserId: string) {
+    const existingResources = await this.prisma.resourceProfile.findMany({
+      where: { id: { in: resourceIds } },
+      include: { user: true }
+    });
     const result = await this.prisma.resourceProfile.updateMany({
       where: { id: { in: resourceIds } },
       data: {
@@ -196,7 +243,46 @@ export class ProfilesService {
       onboardingState: dto.onboardingState,
       backgroundCheckStatus: dto.backgroundCheckStatus
     });
+    for (const resource of existingResources) {
+      void this.sendAllyAdminStatusEmail({
+        to: resource.user.email,
+        displayName: resource.displayName,
+        verificationStatus: dto.verificationStatus ?? resource.verificationStatus,
+        publishStatus: dto.publishStatus ?? resource.publishStatus,
+        onboardingState: dto.onboardingState ?? resource.onboardingState
+      });
+    }
     return { updatedCount: result.count };
+  }
+
+  private async sendAllyAdminStatusEmail(params: {
+    to: string;
+    displayName: string;
+    verificationStatus?: string | null;
+    publishStatus?: string | null;
+    onboardingState?: string | null;
+  }) {
+    const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
+    const result = await this.emailService.send({
+      to: params.to,
+      subject:
+        params.verificationStatus === ResourceVerificationStatus.VERIFIED &&
+        params.publishStatus === ResourcePublishStatus.PUBLISHED
+          ? "Votre profil allié FAB est approuvé"
+          : params.verificationStatus === ResourceVerificationStatus.REJECTED
+            ? "Mise à jour de votre candidature allié FAB"
+            : "Votre profil allié FAB a été mis à jour",
+      html: buildAllyAdminStatusEmail({
+        displayName: params.displayName,
+        verificationStatus: params.verificationStatus,
+        publishStatus: params.publishStatus,
+        onboardingState: params.onboardingState,
+        frontendUrl
+      })
+    });
+    if (!result.ok) {
+      this.logger.warn(`Envoi email statut admin allié échoué pour ${params.to}: ${result.error}`);
+    }
   }
 
   async listResourcesForAdmin(filters: {
