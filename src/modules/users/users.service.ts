@@ -129,6 +129,31 @@ export class UsersService {
     };
   }
 
+  async deleteFamilyByAdmin(userId: string, reason: string, actorUserId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        familyProfile: true,
+        subscriptions: true
+      }
+    });
+    if (!user) {
+      throw new NotFoundException("Famille introuvable.");
+    }
+    if (user.role !== Role.FAMILY) {
+      throw new BadRequestException("Seul un compte famille peut etre supprime via cet endpoint.");
+    }
+
+    await this.logAdminAction(actorUserId, "FAMILY_DELETED", "USER", userId, {
+      reason,
+      email: user.email,
+      displayName: user.familyProfile?.displayName ?? null,
+      subscriptionStatuses: user.subscriptions.map((subscription) => subscription.status)
+    });
+    await this.prisma.user.delete({ where: { id: userId } });
+    return { success: true };
+  }
+
   async listAdminAuditLogs(filters: { page?: number; pageSize?: number }) {
     const page = clamp(filters.page, 1, 9999, 1);
     const pageSize = clamp(filters.pageSize, 1, 100, 20);

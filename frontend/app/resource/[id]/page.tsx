@@ -20,6 +20,7 @@ type ResourceDetail = {
   bio?: string | null;
   verificationStatus: string;
   publishStatus: string;
+  canContact?: boolean;
   contactEmail?: string | null;
   contactPhone?: string | null;
 };
@@ -101,6 +102,7 @@ export default function ResourceDetailPage() {
   }
 
   const hasContact = Boolean(resource.contactEmail ?? resource.contactPhone);
+  const canContact = Boolean(resource.canContact);
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
@@ -134,11 +136,17 @@ export default function ResourceDetailPage() {
           <Alert tone="info">Coordonnées visibles avec un abonnement famille actif.</Alert>
         )}
 
-        <div className="pt-2">
-          <Button onClick={handleContact}>
-            {isAuthenticated ? "Contacter cet allié" : "Se connecter pour contacter"}
-          </Button>
-        </div>
+        {!isAuthenticated ? (
+          <div className="pt-2">
+            <Button onClick={handleContact}>Se connecter pour contacter</Button>
+          </div>
+        ) : canContact ? (
+          <div className="pt-2">
+            <Button onClick={handleContact}>Contacter cet allié</Button>
+          </div>
+        ) : (
+          <Alert tone="info">Activez un abonnement famille pour contacter cet allié.</Alert>
+        )}
       </Card>
     </main>
   );

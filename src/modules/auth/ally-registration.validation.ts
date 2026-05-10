@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { AllyType } from "@prisma/client";
 
 /** Version du schéma — incrémenter si les champs obligatoires changent. */
 export const ALLY_REGISTRATION_VERSION = "2025-03-repit-v1";
@@ -60,7 +61,7 @@ function asBool(v: unknown): boolean {
   return v === true;
 }
 
-export function parseAndValidateAllyRegistration(raw: unknown): AllyRegistrationPayload {
+export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyType = AllyType.GARDIENS): AllyRegistrationPayload {
   if (raw === null || typeof raw !== "object") {
     throw new BadRequestException("allyRegistration : objet requis.");
   }
@@ -116,10 +117,10 @@ export function parseAndValidateAllyRegistration(raw: unknown): AllyRegistration
     throw new BadRequestException("Section 3 : cochez au moins une modalité de service offerte.");
   }
   const ageAny = asBool(s3.age0_5) || asBool(s3.age6_12) || asBool(s3.age12p);
-  if (!ageAny) {
+  if (allyType === AllyType.GARDIENS && !ageAny) {
     throw new BadRequestException("Section 3 : cochez au moins une tranche d'âge acceptée.");
   }
-  if (!isNonEmptyString(s3.maxChildren)) {
+  if (allyType === AllyType.GARDIENS && !isNonEmptyString(s3.maxChildren)) {
     throw new BadRequestException("Section 3 : nombre maximal d'enfants requis.");
   }
   const radius = s3.serviceRadius;
@@ -133,19 +134,9 @@ export function parseAndValidateAllyRegistration(raw: unknown): AllyRegistration
   if (Number.isNaN(rateNum) || rateNum < 0) {
     throw new BadRequestException("Section 3 : taux horaire suggéré doit être un nombre valide.");
   }
-  const dispoAny =
-    asBool(s3.dispoSemaine) ||
-    asBool(s3.dispoSoir) ||
-    asBool(s3.dispoWeekend) ||
-    asBool(s3.dispoFlexible);
-  if (!dispoAny) {
-    throw new BadRequestException("Section 3 : cochez au moins une disponibilité générale.");
-  }
-
   const s4keys = [
     "canProvideBackgroundCheck",
     "canProvideTwoRefs",
-    "canProvideRcrProof",
     "declNoBan",
     "declNoInvestigation",
     "declFalseStatement",
@@ -160,6 +151,14 @@ export function parseAndValidateAllyRegistration(raw: unknown): AllyRegistration
         "Section 4 : toutes les cases (engagements et déclarations) doivent être acceptées."
       );
     }
+  }
+  if (rcrValid === "yes" && !asBool(s4.canProvideRcrProof)) {
+    throw new BadRequestException("Section 4 : confirmez que vous pouvez fournir une preuve de certification RCR.");
+  }
+  if (rcrValid !== "yes" && asBool(s4.canProvideRcrProof)) {
+    throw new BadRequestException(
+      "Section 4 : la preuve de certification RCR ne peut pas être cochée si la certification RCR n'est pas valide."
+    );
   }
 
   return {
@@ -192,18 +191,18 @@ export function parseAndValidateAllyRegistration(raw: unknown): AllyRegistration
       age0_5: asBool(s3.age0_5),
       age6_12: asBool(s3.age6_12),
       age12p: asBool(s3.age12p),
-      maxChildren: String(s3.maxChildren).trim(),
+      maxChildren: isNonEmptyString(s3.maxChildren) ? String(s3.maxChildren).trim() : "1",
       serviceRadius: radius as "10" | "25" | "50" | "more",
       hourlyRateSuggested: String(s3.hourlyRateSuggested).trim(),
       dispoSemaine: asBool(s3.dispoSemaine),
-      dispoSoir: asBool(s3.dispoSoir),
-      dispoWeekend: asBool(s3.dispoWeekend),
+      dispoSoir: asBool(s3.dispoSoir) || asBool(s3.repitSoiree),
+      dispoWeekend: asBool(s3.dispoWeekend) || asBool(s3.repitWeekend),
       dispoFlexible: asBool(s3.dispoFlexible)
     },
     section4: {
       canProvideBackgroundCheck: true,
       canProvideTwoRefs: true,
-      canProvideRcrProof: true,
+      canProvideRcrProof: rcrValid === "yes",
       declNoBan: true,
       declNoInvestigation: true,
       declFalseStatement: true,
@@ -215,16 +214,28 @@ export function parseAndValidateAllyRegistration(raw: unknown): AllyRegistration
   };
 }
 
-export function buildSkillsTagsFromRegistration(reg: AllyRegistrationPayload, allyTypeLabel?: string): string[] {
+export function buildSkillsTagsFromRegistration(
+  reg: AllyRegistrationPayload,
+  allyTypeLabel?: string,
+  allyType: AllyType = AllyType.GARDIENS
+): string[] {
   const tags = new Set<string>();
   if (allyTypeLabel) tags.add(allyTypeLabel);
-  if (reg.section3.repitSoiree) tags.add("soirée");
-  if (reg.section3.repitNuit) tags.add("nuit");
-  if (reg.section3.repitWeekend) tags.add("fin de semaine");
-  if (reg.section3.repitUrgence) tags.add("urgence");
-  if (reg.section3.age0_5) tags.add("0-5 ans");
-  if (reg.section3.age6_12) tags.add("6-12 ans");
-  if (reg.section3.age12p) tags.add("12 ans et +");
+  const serviceTags: Record<AllyType, string[]> = {
+    GARDIENS: ["soirée", "nuit", "fin de semaine", "urgence"],
+    MENAGE: ["entretien régulier", "repas et courses", "grand ménage", "dépannage"],
+    AUTRES: ["aide aux devoirs", "tutorat", "accompagnement éducatif", "soutien ponctuel"]
+  };
+  const labels = serviceTags[allyType] ?? serviceTags.GARDIENS;
+  if (reg.section3.repitSoiree) tags.add(labels[0]);
+  if (reg.section3.repitNuit) tags.add(labels[1]);
+  if (reg.section3.repitWeekend) tags.add(labels[2]);
+  if (reg.section3.repitUrgence) tags.add(labels[3]);
+  if (allyType === AllyType.GARDIENS) {
+    if (reg.section3.age0_5) tags.add("0-5 ans");
+    if (reg.section3.age6_12) tags.add("6-12 ans");
+    if (reg.section3.age12p) tags.add("12 ans et +");
+  }
   if (reg.section2.experienceParticularNeeds) tags.add("besoins particuliers");
   if (reg.section2.experienceFoster) tags.add("famille d'accueil");
   if (reg.section2.experienceTrauma) tags.add("traumas");
@@ -234,8 +245,8 @@ export function buildSkillsTagsFromRegistration(reg: AllyRegistrationPayload, al
 export function buildAvailabilityFromRegistration(reg: AllyRegistrationPayload): Record<string, unknown> {
   return {
     semaine: reg.section3.dispoSemaine,
-    soir: reg.section3.dispoSoir,
-    finDeSemaine: reg.section3.dispoWeekend,
+    soir: reg.section3.dispoSoir || reg.section3.repitSoiree,
+    finDeSemaine: reg.section3.dispoWeekend || reg.section3.repitWeekend,
     flexible: reg.section3.dispoFlexible,
     rayonKm: reg.section3.serviceRadius,
     maxEnfants: reg.section3.maxChildren

@@ -71,6 +71,22 @@ type FormSnapshot = {
   backgroundCheckStatus?: string;
 };
 
+type FamilyAvailability = {
+  weekdays: boolean;
+  evenings: boolean;
+  weekends: boolean;
+  urgent: boolean;
+};
+
+type ResourceAvailability = {
+  weekdays: boolean;
+  evenings: boolean;
+  weekends: boolean;
+  flexible: boolean;
+  serviceRadius: string;
+  maxChildren: string;
+};
+
 type FieldErrors = Partial<
   Record<
     | "displayName"
@@ -288,6 +304,7 @@ export default function MePage() {
         if (meData.role === "FAMILY") {
           const family = profileData as FamilyProfileResponse;
           nextSnapshot.tagsCsv = family.needsTags?.join(", ") ?? "";
+          nextSnapshot.availabilityJson = serializeFamilyAvailability(parseFamilyAvailability(family.availability));
         } else if (meData.role === "RESOURCE") {
           const resource = profileData as ResourceProfileResponse;
           nextSnapshot.tagsCsv = resource.skillsTags?.join(", ") ?? "";
@@ -295,6 +312,7 @@ export default function MePage() {
           nextSnapshot.contactEmail = resource.contactEmail ?? "";
           nextSnapshot.contactPhone = resource.contactPhone ?? "";
           nextSnapshot.streetAddress = resource.streetAddress ?? "";
+          nextSnapshot.availabilityJson = serializeResourceAvailability(parseResourceAvailability(resource.availability));
           nextSnapshot.backgroundCheckStatus = resource.backgroundCheckStatus ?? "NOT_REQUESTED";
         }
         applySnapshot(nextSnapshot);
@@ -351,7 +369,7 @@ export default function MePage() {
           availability: parseAvailabilityOrThrow(availabilityJson)
         }
       });
-      setSuccess("Profil FAMILY mis à jour.");
+      setSuccess("Profil famille mis à jour.");
       const refreshed = await apiGet<FamilyProfileResponse>("/profiles/me", { token: accessToken });
       setProfile(refreshed);
       const updatedSnapshot: FormSnapshot = {
@@ -440,6 +458,17 @@ export default function MePage() {
     }
   };
 
+  const familyAvailability = parseFamilyAvailability(availabilityJson);
+  const updateFamilyAvailability = (key: keyof FamilyAvailability, checked: boolean) => {
+    setAvailabilityJson(serializeFamilyAvailability({ ...familyAvailability, [key]: checked }));
+    setFieldErrors((prev) => ({ ...prev, availabilityJson: undefined }));
+  };
+  const resourceAvailability = parseResourceAvailability(availabilityJson);
+  const updateResourceAvailability = (next: Partial<ResourceAvailability>) => {
+    setAvailabilityJson(serializeResourceAvailability({ ...resourceAvailability, ...next }));
+    setFieldErrors((prev) => ({ ...prev, availabilityJson: undefined }));
+  };
+
   return (
     <main className="relative isolate overflow-hidden px-4 pb-16 pt-8 sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0 -z-10">
@@ -493,63 +522,118 @@ export default function MePage() {
         {me?.role === "ADMIN" ? <Alert tone="info">Le rôle ADMIN n&apos;a pas de profil éditable dans cette version.</Alert> : null}
 
         {me?.role === "FAMILY" ? (
-          <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
-            <h2 className="text-lg font-medium">Éditer mon profil FAMILY</h2>
-            <Input
-              placeholder="Nom affiché"
-              value={displayName}
-              onChange={(e) => {
-                setDisplayName(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, displayName: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.displayName} />
-            <Input
-              placeholder="Code postal"
-              value={postalCode}
-              onChange={(e) => {
-                setPostalCode(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, postalCode: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.postalCode} />
-            <Input
-              placeholder="Ville"
-              value={city}
-              onChange={(e) => {
-                setCity(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, city: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.city} />
-            <Input
-              placeholder="Région"
-              value={region}
-              onChange={(e) => {
-                setRegion(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, region: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.region} />
-            <Input placeholder="Biographie" value={bio} onChange={(e) => setBio(e.target.value)} />
-            <Input
-              placeholder="Besoins (séparés par des virgules)"
-              value={tagsCsv}
-              onChange={(e) => setTagsCsv(e.target.value)}
-            />
-            <textarea
-              className="min-h-28 w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100 placeholder:text-[#8b84ad] focus:border-[#6f8fe2] focus:outline-none focus:ring-1 focus:ring-[#6f8fe2]/35"
-              placeholder='Disponibilité JSON (optionnel), ex. {"weekend":true}'
-              value={availabilityJson}
-              onChange={(e) => {
-                setAvailabilityJson(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, availabilityJson: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.availabilityJson} />
+          <Card className="space-y-5 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
+            <div>
+              <h2 className="text-lg font-medium">Informations de la famille</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Ces informations nous aident à vous proposer des alliés pertinents dans votre secteur.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="space-y-1 sm:col-span-2">
+                <span className="text-sm font-medium text-slate-200">Nom affiché</span>
+                <Input
+                  placeholder="Ex. Famille Bouchard"
+                  value={displayName}
+                  onChange={(e) => {
+                    setDisplayName(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, displayName: undefined }));
+                  }}
+                />
+                <FieldError error={fieldErrors.displayName} />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-200">Code postal</span>
+                <Input
+                  placeholder="Ex. H2X 1Y4"
+                  value={postalCode}
+                  onChange={(e) => {
+                    setPostalCode(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, postalCode: undefined }));
+                  }}
+                />
+                <FieldError error={fieldErrors.postalCode} />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-200">Ville</span>
+                <Input
+                  placeholder="Ex. Montréal"
+                  value={city}
+                  onChange={(e) => {
+                    setCity(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, city: undefined }));
+                  }}
+                />
+                <FieldError error={fieldErrors.city} />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-200">Province ou région</span>
+                <Input
+                  placeholder="Ex. QC"
+                  value={region}
+                  onChange={(e) => {
+                    setRegion(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, region: undefined }));
+                  }}
+                />
+                <FieldError error={fieldErrors.region} />
+              </label>
+
+              <label className="space-y-1 sm:col-span-2">
+                <span className="text-sm font-medium text-slate-200">Présentation</span>
+                <textarea
+                  className="min-h-24 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                  placeholder="Quelques mots sur votre famille, vos besoins ou votre contexte."
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                />
+              </label>
+
+              <label className="space-y-1 sm:col-span-2">
+                <span className="text-sm font-medium text-slate-200">Besoins principaux</span>
+                <Input
+                  placeholder="Ex. répit, transport, aide aux devoirs"
+                  value={tagsCsv}
+                  onChange={(e) => setTagsCsv(e.target.value)}
+                />
+                <p className="text-xs text-slate-500">Séparez les besoins par des virgules.</p>
+              </label>
+            </div>
+
+            <fieldset className="space-y-3 rounded-xl border border-[#4f476f] bg-[#0f0b24]/60 p-4">
+              <legend className="px-1 text-sm font-medium text-slate-200">Disponibilité recherchée</legend>
+              <p className="text-sm text-slate-400">Choisissez les moments où un soutien serait le plus utile.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <FamilyAvailabilityOption
+                  label="En semaine"
+                  checked={familyAvailability.weekdays}
+                  onChange={(checked) => updateFamilyAvailability("weekdays", checked)}
+                />
+                <FamilyAvailabilityOption
+                  label="En soirée"
+                  checked={familyAvailability.evenings}
+                  onChange={(checked) => updateFamilyAvailability("evenings", checked)}
+                />
+                <FamilyAvailabilityOption
+                  label="Fin de semaine"
+                  checked={familyAvailability.weekends}
+                  onChange={(checked) => updateFamilyAvailability("weekends", checked)}
+                />
+                <FamilyAvailabilityOption
+                  label="Besoin ponctuel ou urgent"
+                  checked={familyAvailability.urgent}
+                  onChange={(checked) => updateFamilyAvailability("urgent", checked)}
+                />
+              </div>
+            </fieldset>
+
             <div className="flex flex-wrap gap-2">
               <Button onClick={saveFamilyProfile} disabled={saving} className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]">
-                {saving ? "Enregistrement…" : "Enregistrer le profil FAMILY"}
+                {saving ? "Enregistrement…" : "Enregistrer mes informations"}
               </Button>
               <Button
                 variant="secondary"
@@ -564,92 +648,196 @@ export default function MePage() {
         ) : null}
 
         {me?.role === "RESOURCE" ? (
-          <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
-            <h2 className="text-lg font-medium">Éditer mon profil allié</h2>
-            <Input
-              placeholder="Nom affiché"
-              value={displayName}
-              onChange={(e) => {
-                setDisplayName(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, displayName: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.displayName} />
-            <Input
-              placeholder="Code postal"
-              value={postalCode}
-              onChange={(e) => {
-                setPostalCode(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, postalCode: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.postalCode} />
-            <Input
-              placeholder="Ville"
-              value={city}
-              onChange={(e) => {
-                setCity(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, city: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.city} />
-            <Input
-              placeholder="Région"
-              value={region}
-              onChange={(e) => {
-                setRegion(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, region: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.region} />
-            <Input
-              placeholder="Adresse postale"
-              value={streetAddress}
-              onChange={(e) => setStreetAddress(e.target.value)}
-            />
-            <Input placeholder="Biographie" value={bio} onChange={(e) => setBio(e.target.value)} />
-            <Input
-              placeholder="Compétences (séparées par des virgules)"
-              value={tagsCsv}
-              onChange={(e) => setTagsCsv(e.target.value)}
-            />
-            <Input
-              placeholder="Tarif horaire"
-              type="number"
-              min="0"
-              step="0.01"
-              value={hourlyRate}
-              onChange={(e) => {
-                setHourlyRate(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, hourlyRate: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.hourlyRate} />
-            <Input
-              placeholder="Courriel de contact"
-              type="email"
-              value={contactEmail}
-              onChange={(e) => {
-                setContactEmail(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, contactEmail: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.contactEmail} />
-            <Input
-              placeholder="Téléphone de contact"
-              value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
-            />
-            <textarea
-              className="min-h-28 w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100 placeholder:text-[#8b84ad] focus:border-[#6f8fe2] focus:outline-none focus:ring-1 focus:ring-[#6f8fe2]/35"
-              placeholder='Disponibilité JSON (optionnel), ex. {"soir":"lundi-mardi"}'
-              value={availabilityJson}
-              onChange={(e) => {
-                setAvailabilityJson(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, availabilityJson: undefined }));
-              }}
-            />
-            <FieldError error={fieldErrors.availabilityJson} />
+          <Card className="space-y-5 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
+            <div>
+              <h2 className="text-lg font-medium">Informations de l'allié</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Ces informations aident les familles à comprendre votre offre et à vous contacter.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="space-y-1 sm:col-span-2">
+                <span className="text-sm font-medium text-slate-200">Nom affiché</span>
+                <Input
+                  placeholder="Ex. Alex Tremblay"
+                  value={displayName}
+                  onChange={(e) => {
+                    setDisplayName(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, displayName: undefined }));
+                  }}
+                />
+                <FieldError error={fieldErrors.displayName} />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-200">Code postal</span>
+                <Input
+                  placeholder="Ex. H2X 1Y4"
+                  value={postalCode}
+                  onChange={(e) => {
+                    setPostalCode(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, postalCode: undefined }));
+                  }}
+                />
+                <FieldError error={fieldErrors.postalCode} />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-200">Ville</span>
+                <Input
+                  placeholder="Ex. Montréal"
+                  value={city}
+                  onChange={(e) => {
+                    setCity(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, city: undefined }));
+                  }}
+                />
+                <FieldError error={fieldErrors.city} />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-200">Province ou région</span>
+                <Input
+                  placeholder="Ex. QC"
+                  value={region}
+                  onChange={(e) => {
+                    setRegion(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, region: undefined }));
+                  }}
+                />
+                <FieldError error={fieldErrors.region} />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-slate-200">Adresse postale</span>
+                <Input
+                  placeholder="Adresse utilisée pour la validation interne"
+                  value={streetAddress}
+                  onChange={(e) => setStreetAddress(e.target.value)}
+                />
+              </label>
+
+              <label className="space-y-1 sm:col-span-2">
+                <span className="text-sm font-medium text-slate-200">Présentation</span>
+                <textarea
+                  className="min-h-24 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                  placeholder="Décrivez votre approche, votre expérience et le type de soutien offert."
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                />
+              </label>
+            </div>
+
+            <fieldset className="space-y-4 rounded-xl border border-[#4f476f] bg-[#0f0b24]/60 p-4">
+              <legend className="px-1 text-sm font-medium text-slate-200">Services et tarifs</legend>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-1 sm:col-span-2">
+                  <span className="text-sm font-medium text-slate-200">Compétences et services</span>
+                  <Input
+                    placeholder="Ex. gardien, aide aux devoirs, transport"
+                    value={tagsCsv}
+                    onChange={(e) => setTagsCsv(e.target.value)}
+                  />
+                  <p className="text-xs text-slate-500">Séparez les services par des virgules.</p>
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-200">Tarif horaire suggéré</span>
+                  <Input
+                    placeholder="Ex. 28"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={hourlyRate}
+                    onChange={(e) => {
+                      setHourlyRate(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, hourlyRate: undefined }));
+                    }}
+                  />
+                  <FieldError error={fieldErrors.hourlyRate} />
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset className="space-y-4 rounded-xl border border-[#4f476f] bg-[#0f0b24]/60 p-4">
+              <legend className="px-1 text-sm font-medium text-slate-200">Coordonnées</legend>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-200">Courriel de contact</span>
+                  <Input
+                    placeholder="nom@exemple.com"
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => {
+                      setContactEmail(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, contactEmail: undefined }));
+                    }}
+                  />
+                  <FieldError error={fieldErrors.contactEmail} />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-200">Téléphone de contact</span>
+                  <Input
+                    placeholder="Ex. 514-555-1234"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                  />
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset className="space-y-4 rounded-xl border border-[#4f476f] bg-[#0f0b24]/60 p-4">
+              <legend className="px-1 text-sm font-medium text-slate-200">Disponibilité</legend>
+              <p className="text-sm text-slate-400">Indiquez les moments où vous êtes généralement disponible.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <ResourceAvailabilityOption
+                  label="En semaine"
+                  checked={resourceAvailability.weekdays}
+                  onChange={(checked) => updateResourceAvailability({ weekdays: checked })}
+                />
+                <ResourceAvailabilityOption
+                  label="En soirée"
+                  checked={resourceAvailability.evenings}
+                  onChange={(checked) => updateResourceAvailability({ evenings: checked })}
+                />
+                <ResourceAvailabilityOption
+                  label="Fin de semaine"
+                  checked={resourceAvailability.weekends}
+                  onChange={(checked) => updateResourceAvailability({ weekends: checked })}
+                />
+                <ResourceAvailabilityOption
+                  label="Horaire flexible"
+                  checked={resourceAvailability.flexible}
+                  onChange={(checked) => updateResourceAvailability({ flexible: checked })}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-200">Rayon de service</span>
+                  <select
+                    className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                    value={resourceAvailability.serviceRadius}
+                    onChange={(e) => updateResourceAvailability({ serviceRadius: e.target.value })}
+                  >
+                    <option value="">Non précisé</option>
+                    <option value="10">10 km</option>
+                    <option value="25">25 km</option>
+                    <option value="50">50 km</option>
+                    <option value="more">Plus de 50 km</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-sm font-medium text-slate-200">Nombre maximum d'enfants</span>
+                  <Input
+                    placeholder="Ex. 2"
+                    value={resourceAvailability.maxChildren}
+                    onChange={(e) => updateResourceAvailability({ maxChildren: e.target.value })}
+                  />
+                </label>
+              </div>
+            </fieldset>
             {(profile as ResourceProfileResponse | null)?.verificationStatus ? (
               <Alert tone="info">
                 Modération: {(profile as ResourceProfileResponse).verificationStatus} /{" "}
@@ -762,6 +950,104 @@ function parseAvailabilityOrThrow(value: string): unknown {
   }
 }
 
+function parseFamilyAvailability(value: unknown): FamilyAvailability {
+  const availability: FamilyAvailability = {
+    weekdays: false,
+    evenings: false,
+    weekends: false,
+    urgent: false
+  };
+  if (!value) {
+    return availability;
+  }
+
+  let parsed = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return availability;
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return availability;
+  }
+
+  const record = parsed as Record<string, unknown>;
+  return {
+    weekdays: Boolean(record.weekdays ?? record.weekday ?? record.semaine),
+    evenings: Boolean(record.evenings ?? record.evening ?? record.soir),
+    weekends: Boolean(record.weekends ?? record.weekend ?? record.finSemaine),
+    urgent: Boolean(record.urgent ?? record.emergency ?? record.urgence)
+  };
+}
+
+function serializeFamilyAvailability(value: FamilyAvailability): string {
+  const payload = {
+    weekdays: value.weekdays,
+    evenings: value.evenings,
+    weekends: value.weekends,
+    urgent: value.urgent
+  };
+  const hasSelection = Object.values(payload).some(Boolean);
+  return hasSelection ? JSON.stringify(payload) : "";
+}
+
+function parseResourceAvailability(value: unknown): ResourceAvailability {
+  const availability: ResourceAvailability = {
+    weekdays: false,
+    evenings: false,
+    weekends: false,
+    flexible: false,
+    serviceRadius: "",
+    maxChildren: ""
+  };
+  if (!value) {
+    return availability;
+  }
+
+  let parsed = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return availability;
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return availability;
+  }
+
+  const record = parsed as Record<string, unknown>;
+  return {
+    weekdays: Boolean(record.semaine ?? record.weekdays ?? record.dispoSemaine),
+    evenings: Boolean(record.soir ?? record.evenings ?? record.dispoSoir),
+    weekends: Boolean(record.finDeSemaine ?? record.weekends ?? record.dispoWeekend),
+    flexible: Boolean(record.flexible ?? record.dispoFlexible),
+    serviceRadius: record.rayonKm != null ? String(record.rayonKm) : record.serviceRadius != null ? String(record.serviceRadius) : "",
+    maxChildren: record.maxEnfants != null ? String(record.maxEnfants) : record.maxChildren != null ? String(record.maxChildren) : ""
+  };
+}
+
+function serializeResourceAvailability(value: ResourceAvailability): string {
+  const payload = {
+    semaine: value.weekdays,
+    soir: value.evenings,
+    finDeSemaine: value.weekends,
+    flexible: value.flexible,
+    rayonKm: value.serviceRadius || undefined,
+    maxEnfants: value.maxChildren.trim() || undefined
+  };
+  const hasSelection =
+    payload.semaine ||
+    payload.soir ||
+    payload.finDeSemaine ||
+    payload.flexible ||
+    Boolean(payload.rayonKm) ||
+    Boolean(payload.maxEnfants);
+  return hasSelection ? JSON.stringify(payload) : "";
+}
+
 function validateCommonFields(input: {
   displayName: string;
   postalCode: string;
@@ -819,4 +1105,48 @@ function FieldError({ error }: { error?: string }) {
     return null;
   }
   return <p className="text-sm text-rose-300">{error}</p>;
+}
+
+function FamilyAvailabilityOption({
+  label,
+  checked,
+  onChange
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-3 rounded-lg border border-[#4f476f] bg-[#151033] px-3 py-2 text-sm text-slate-200">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-600"
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function ResourceAvailabilityOption({
+  label,
+  checked,
+  onChange
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-3 rounded-lg border border-[#4f476f] bg-[#151033] px-3 py-2 text-sm text-slate-200">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-600"
+      />
+      <span>{label}</span>
+    </label>
+  );
 }

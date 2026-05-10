@@ -39,7 +39,7 @@ export default function FormulaireAllieRepitPage() {
         <h2 className="text-xl font-semibold text-white">Section 3 — Votre offre de service</h2>
         <ul className="list-inside list-disc text-sm">
           <li>Type d'allié choisi : Gardien compétent, Entretien Ménage ou Tutorat</li>
-          <li>Modalités de service : soirée, nuit, week-end, urgence / dépannage</li>
+          <li>Types de répit : soirée, nuit, fin de semaine, urgence / dépannage</li>
           <li>Âges acceptés, nombre maximal d&apos;enfants, secteur (distance)</li>
           <li>Taux horaire suggéré, disponibilités générales</li>
         </ul>

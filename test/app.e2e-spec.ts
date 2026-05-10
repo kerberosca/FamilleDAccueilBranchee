@@ -106,6 +106,7 @@ describe("Smoke e2e", () => {
     expect(res.body.displayName).toBe("Ressource Locale");
     expect(res.body.contactEmail).toBeUndefined();
     expect(res.body.contactPhone).toBeUndefined();
+    expect(res.body.canContact).toBe(false);
   });
 
   /** R2 / charge visiteur : pas de 401 sur la recherche publique (pas de refresh côté client dans ce scénario). */
@@ -179,6 +180,25 @@ describe("Smoke e2e", () => {
 
     expect(res.body.contactEmail).toBe("ressource@local.test");
     expect(res.body.contactPhone).toBe("514-555-0000");
+    expect(res.body.canContact).toBe(false);
+  });
+
+  it("GET /api/v1/profiles/resource/:id avec famille premium autorise le contact", async () => {
+    const token = await loginAs("FAMILLE");
+    const search = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    const resourceId = search.body.results[0].id;
+
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/profiles/resource/${resourceId}`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(res.body.contactEmail).toBe("ressource@local.test");
+    expect(res.body.contactPhone).toBe("514-555-0000");
+    expect(res.body.canContact).toBe(true);
   });
 
   /** S3 : allié (ressource) — pas d’accès plein à la recherche. */
@@ -225,6 +245,40 @@ describe("Smoke e2e", () => {
     expect(res.body.limitedPreview).toBe(true);
     expect(res.body.pageSize).toBe(3);
     expect(res.body.results[0].contactEmail).toBeUndefined();
+  });
+
+  it("GET /api/v1/profiles/resource/:id avec famille sans abonnement interdit le contact", async () => {
+    const authService = app.get(AuthService);
+    const noSubFamily = await prisma.user.create({
+      data: {
+        email: "e2e_detail_famille_sans_sub@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille detail sans abo e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            needsTags: []
+          }
+        }
+      }
+    });
+    const { accessToken } = await authService.issueTokensForUser(noSubFamily.id);
+    const search = await request(app.getHttpServer()).get("/api/v1/search/resources?postalCode=H2X1Y4").expect(200);
+    const resourceId = search.body.results[0].id;
+
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/profiles/resource/${resourceId}`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(res.body.contactEmail).toBeUndefined();
+    expect(res.body.contactPhone).toBeUndefined();
+    expect(res.body.canContact).toBe(false);
   });
 
   it("PATCH /api/v1/profiles/resource/me refuse un tarif horaire negatif", async () => {
@@ -382,6 +436,68 @@ describe("Smoke e2e", () => {
       .expect(201);
 
     expect(res.body.success).toBe(true);
+  });
+
+  it("DELETE /api/v1/users/families/:userId supprime une famille et cree un audit log", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const family = await prisma.user.create({
+      data: {
+        email: "e2e_delete_family@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille a supprimer e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            needsTags: []
+          }
+        },
+        subscriptions: {
+          create: {
+            status: SubscriptionStatus.ACTIVE,
+            stripeCustomerId: "cus_delete_family",
+            stripeSubscriptionId: "sub_delete_family"
+          }
+        }
+      }
+    });
+
+    const res = await request(app.getHttpServer())
+      .delete(`/api/v1/users/families/${family.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "Compte test e2e" })
+      .expect(200);
+
+    expect(res.body).toEqual({ success: true });
+    await expect(prisma.user.findUnique({ where: { id: family.id } })).resolves.toBeNull();
+    await expect(prisma.familyProfile.findUnique({ where: { userId: family.id } })).resolves.toBeNull();
+    await expect(prisma.subscription.findMany({ where: { userId: family.id } })).resolves.toEqual([]);
+
+    const audit = await prisma.adminAuditLog.findFirst({
+      where: { action: "FAMILY_DELETED", targetId: family.id },
+      orderBy: { createdAt: "desc" }
+    });
+    expect(audit).toBeTruthy();
+    expect(audit?.payload).toMatchObject({
+      reason: "Compte test e2e",
+      email: "e2e_delete_family@local.test",
+      displayName: "Famille a supprimer e2e"
+    });
+  });
+
+  it("DELETE /api/v1/users/families/:userId refuse un compte non-famille", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const resource = await prisma.user.findFirstOrThrow({ where: { role: Role.RESOURCE } });
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/users/families/${resource.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "Mauvais type de compte" })
+      .expect(400);
   });
 
   it("CORS expose les headers pour localhost:3000", async () => {

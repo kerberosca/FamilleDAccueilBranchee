@@ -79,9 +79,9 @@ export class AuthService {
       | undefined;
 
     if (input.role === Role.RESOURCE) {
-      const reg = parseAndValidateAllyRegistration(input.allyRegistration);
+      const reg = parseAndValidateAllyRegistration(input.allyRegistration, input.allyType!);
 	      const allyLabel = allyTypeToPublicLabel(input.allyType!);
-      const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel);
+      const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel, input.allyType!);
       const skillsTags = [...new Set([...fromReg, ...(input.tags ?? [])])];
       const hourlyRaw = parseFloat(reg.section3.hourlyRateSuggested.replace(",", "."));
       const bioText = input.bio?.trim() ? input.bio : reg.section2.approachChildren;

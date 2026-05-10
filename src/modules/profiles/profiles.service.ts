@@ -98,10 +98,10 @@ export class ProfilesService {
     let allyRegJson: Prisma.InputJsonValue | undefined;
     let derivedFromAlly: Partial<Prisma.ResourceProfileUpdateInput> = {};
     if (allyRegRaw !== undefined) {
-      const reg = parseAndValidateAllyRegistration(allyRegRaw);
-	      const nextAllyType = rest.allyType ?? existing.allyType;
+	      const nextAllyType = rest.allyType ?? existing.allyType ?? AllyType.GARDIENS;
+      const reg = parseAndValidateAllyRegistration(allyRegRaw, nextAllyType);
 	      const allyLabel = nextAllyType ? allyTypeToPublicLabel(nextAllyType) : undefined;
-	      const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel);
+	      const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel, nextAllyType);
       const skillsTags = [...new Set([...fromReg, ...(rest.skillsTags ?? existing.skillsTags)])];
       const hourlyRaw = parseFloat(reg.section3.hourlyRateSuggested.replace(",", "."));
       allyRegJson = JSON.parse(JSON.stringify(reg)) as Prisma.InputJsonValue;
@@ -305,8 +305,9 @@ export class ProfilesService {
     if (!isPublishedAndVerified && !isAdmin) {
       throw new NotFoundException("Resource not found");
     }
+    const canContact = await this.canContactResource(currentUser);
     const premium = await this.canSeeSensitiveResourceInfo(currentUser);
-    return premium ? this.toResourcePremiumView(resource) : this.toResourcePublicView(resource);
+    return premium ? this.toResourcePremiumView(resource, canContact) : this.toResourcePublicView(resource, canContact);
   }
 
   private async canSeeSensitiveResourceInfo(currentUser?: JwtPayload): Promise<boolean> {
@@ -322,7 +323,14 @@ export class ProfilesService {
     return this.subscriptionAccessService.hasActiveFamilySubscription(currentUser.sub);
   }
 
-  private toResourcePublicView(resource: Prisma.ResourceProfileGetPayload<{ include: { user: true } }> | any) {
+  private async canContactResource(currentUser?: JwtPayload): Promise<boolean> {
+    if (!currentUser || currentUser.role !== Role.FAMILY) {
+      return false;
+    }
+    return this.subscriptionAccessService.hasActiveFamilySubscription(currentUser.sub);
+  }
+
+  private toResourcePublicView(resource: Prisma.ResourceProfileGetPayload<{ include: { user: true } }> | any, canContact = false) {
     return {
       id: resource.id,
       displayName: resource.displayName,
@@ -334,13 +342,14 @@ export class ProfilesService {
       averageRating: decimalToNumber(resource.averageRating),
       bio: resource.bio,
       verificationStatus: resource.verificationStatus,
-      publishStatus: resource.publishStatus
+      publishStatus: resource.publishStatus,
+      canContact
     };
   }
 
-  private toResourcePremiumView(resource: Prisma.ResourceProfileGetPayload<{ include: { user: true } }> | any) {
+  private toResourcePremiumView(resource: Prisma.ResourceProfileGetPayload<{ include: { user: true } }> | any, canContact = false) {
     return {
-      ...this.toResourcePublicView(resource),
+      ...this.toResourcePublicView(resource, canContact),
       contactEmail: resource.contactEmail,
       contactPhone: resource.contactPhone
     };

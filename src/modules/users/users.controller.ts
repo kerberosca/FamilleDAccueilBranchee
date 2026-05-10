@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Body, UseGuards, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Role } from "@prisma/client";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -7,6 +7,7 @@ import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
 import { BulkUpdateUserStatusDto } from "./dto/bulk-update-user-status.dto";
+import { DeleteFamilyDto } from "./dto/delete-family.dto";
 import { UpdateUserRoleDto } from "./dto/update-user-role.dto";
 import { UpdateUserStatusDto } from "./dto/update-user-status.dto";
 import { UsersService } from "./users.service";
@@ -68,5 +69,11 @@ export class UsersController {
   @Patch(":userId/role")
   async updateRole(@CurrentUser() user: JwtPayload, @Param("userId") userId: string, @Body() body: UpdateUserRoleDto) {
     return this.usersService.updateRole(userId, body.role, user.sub);
+  }
+
+  @Roles(Role.ADMIN)
+  @Delete("families/:userId")
+  async deleteFamily(@CurrentUser() user: JwtPayload, @Param("userId") userId: string, @Body() body: DeleteFamilyDto) {
+    return this.usersService.deleteFamilyByAdmin(userId, body.reason, user.sub);
   }
 }

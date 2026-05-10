@@ -262,6 +262,32 @@ export default function AdminPage() {
     }
   };
 
+  const deleteFamily = async (userId: string, displayName: string, email: string) => {
+    if (!accessToken) return;
+    const confirmed = window.confirm(
+      `Supprimer definitivement la famille "${displayName}" (${email}) ?\n\nAction reservee aux cas clairs : doublon, compte test, demande legale ou erreur d'inscription. Cette action supprime le compte, le profil, les conversations, les messages et les abonnements lies.`
+    );
+    if (!confirmed) return;
+
+    const reason = window.prompt("Indique la raison administrative de la suppression definitive :");
+    if (!reason?.trim()) {
+      setError("Suppression annulee : une raison administrative est requise.");
+      return;
+    }
+
+    setBusyId(`delete-family-${userId}`);
+    setError(null);
+    try {
+      await apiDelete(`/users/families/${userId}`, { token: accessToken, body: { reason: reason.trim() } });
+      await refreshCurrentTab();
+      setTab("audit");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors de la suppression de la famille.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const bulkUpdateFamilyStatus = async (status: "ACTIVE" | "BANNED") => {
     if (!accessToken || selectedFamilyIds.length === 0) {
       return;
@@ -507,6 +533,16 @@ export default function AdminPage() {
                         </Button>
                         <Button disabled={busyId === family.id || family.status === "BANNED"} onClick={() => void updateFamilyStatus(family.id, "BANNED")}>
                           Bannir
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          disabled={busyId === `delete-family-${family.id}`}
+                          onClick={() =>
+                            void deleteFamily(family.id, family.profile?.displayName ?? "(sans profil)", family.email)
+                          }
+                          className="text-rose-400 hover:bg-rose-900/30 hover:text-rose-300"
+                        >
+                          Supprimer definitivement
                         </Button>
                       </div>
                     </Card>

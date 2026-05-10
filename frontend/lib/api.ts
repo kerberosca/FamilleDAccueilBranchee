@@ -81,7 +81,7 @@ async function requestJson<T>(
     method: options.method,
     headers,
     credentials: "include",
-    body: options.method === "GET" || options.method === "DELETE" ? undefined : (typeof options.body === "undefined" ? undefined : JSON.stringify(options.body))
+    body: options.method === "GET" ? undefined : (typeof options.body === "undefined" ? undefined : JSON.stringify(options.body))
   });
 
   let json: unknown = null;

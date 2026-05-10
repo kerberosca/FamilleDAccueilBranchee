@@ -64,6 +64,37 @@ const ALLY_OPTIONS: { value: AllyType; label: string }[] = [
   { value: "AUTRES", label: ALLY_TYPE_LABELS.AUTRES }
 ];
 
+const SERVICE_OPTIONS: Record<AllyType, { intro: string; labels: Record<"repitSoiree" | "repitNuit" | "repitWeekend" | "repitUrgence", string> }> = {
+  GARDIENS: {
+    intro:
+      "Choisissez les types de répit que vous pouvez offrir. Ces choix décrivent aussi les moments où vous êtes disponible lorsqu'ils se recoupent.",
+    labels: {
+      repitSoiree: "Répit en soirée",
+      repitNuit: "Répit de nuit",
+      repitWeekend: "Répit de fin de semaine",
+      repitUrgence: "Urgence ou dépannage ponctuel"
+    }
+  },
+  MENAGE: {
+    intro: "Choisissez les services d'aide à la maison que vous pouvez offrir.",
+    labels: {
+      repitSoiree: "Entretien ménager régulier",
+      repitNuit: "Préparation de repas ou courses",
+      repitWeekend: "Grand ménage ou remise en ordre",
+      repitUrgence: "Aide ponctuelle ou dépannage"
+    }
+  },
+  AUTRES: {
+    intro: "Choisissez les services de tutorat ou d'accompagnement que vous pouvez offrir.",
+    labels: {
+      repitSoiree: "Aide aux devoirs",
+      repitNuit: "Tutorat scolaire",
+      repitWeekend: "Accompagnement éducatif",
+      repitUrgence: "Soutien ponctuel avant examen ou remise"
+    }
+  }
+};
+
 const STEP_LABELS_REGISTER = [
   "Bienvenue",
   "Compte",
@@ -108,6 +139,8 @@ export function AllyOnboardingWizard({
   });
 
   const maxStep = isRegister ? 7 : 5;
+  const selectedAllyType = allyType ?? "GARDIENS";
+  const isChildCareOffer = selectedAllyType === "GARDIENS";
 
   useEffect(() => {
     if (isRegister && step === 3 && !reg.section1.sectorServiced.trim() && city.trim()) {
@@ -183,22 +216,15 @@ export function AllyOnboardingWizard({
         reg.section3.repitUrgence;
       if (!repitAny) return "Cochez au moins une modalité de service.";
       const ageAny = reg.section3.age0_5 || reg.section3.age6_12 || reg.section3.age12p;
-      if (!ageAny) return "Cochez au moins une tranche d'âge.";
-      if (!reg.section3.maxChildren.trim()) return "Nombre maximal d'enfants requis.";
+      if (isChildCareOffer && !ageAny) return "Cochez au moins une tranche d'âge.";
+      if (isChildCareOffer && !reg.section3.maxChildren.trim()) return "Nombre maximal d'enfants requis.";
       if (!reg.section3.hourlyRateSuggested.trim()) return "Taux horaire suggéré requis.";
-      const dispoAny =
-        reg.section3.dispoSemaine ||
-        reg.section3.dispoSoir ||
-        reg.section3.dispoWeekend ||
-        reg.section3.dispoFlexible;
-      if (!dispoAny) return "Cochez au moins une disponibilité.";
     }
     if (step === sec4Step) {
       const s4 = reg.section4;
       if (
         !s4.canProvideBackgroundCheck ||
         !s4.canProvideTwoRefs ||
-        !s4.canProvideRcrProof ||
         !s4.declNoBan ||
         !s4.declNoInvestigation ||
         !s4.declFalseStatement ||
@@ -207,7 +233,10 @@ export function AllyOnboardingWizard({
         !s4.declFinancialDirect ||
         !s4.declProfileVisible
       ) {
-        return "Toutes les cases de la section Engagement doivent être cochées.";
+        return "Toutes les cases obligatoires de la section Engagement doivent être cochées.";
+      }
+      if (reg.section2.rcrValid === "yes" && !s4.canProvideRcrProof) {
+        return "Confirmez que vous pouvez fournir une preuve de certification RCR.";
       }
     }
     return null;
@@ -268,12 +297,13 @@ export function AllyOnboardingWizard({
     ? STEP_LABELS_REGISTER[step] ?? ""
     : ["Informations générales", "Compétences", "Offre", "Engagement", "Récap"][step] ?? "";
 
-  const chk = (checked: boolean, onChange: (v: boolean) => void) => (
+  const chk = (checked: boolean, onChange: (v: boolean) => void, disabled = false) => (
     <input
       type="checkbox"
       checked={checked}
+      disabled={disabled}
       onChange={(e) => onChange(e.target.checked)}
-      className="mt-1 rounded border-[#5e567f] bg-[#0f0b24] text-[#6f8fe2]"
+      className="mt-1 rounded border-[#5e567f] bg-[#0f0b24] text-[#6f8fe2] disabled:opacity-50"
     />
   );
 
@@ -435,7 +465,11 @@ export function AllyOnboardingWizard({
               onChange={(e) =>
                 setReg((r) => ({
                   ...r,
-                  section2: { ...r.section2, rcrValid: e.target.value as AllyRegistrationPayload["section2"]["rcrValid"] }
+                  section2: { ...r.section2, rcrValid: e.target.value as AllyRegistrationPayload["section2"]["rcrValid"] },
+                  section4: {
+                    ...r.section4,
+                    canProvideRcrProof: e.target.value === "yes" ? r.section4.canProvideRcrProof : false
+                  }
                 }))
               }
             >
@@ -536,42 +570,55 @@ export function AllyOnboardingWizard({
       {((isRegister && step === 5) || (!isRegister && step === 3)) ? (
         <Card className="space-y-3 p-4">
           <h2 className="text-lg font-semibold text-white">Section 3 - Votre offre de service</h2>
-          <p className="text-sm text-slate-400">Modalités de service offertes</p>
+          <p className="text-sm text-slate-400">{SERVICE_OPTIONS[selectedAllyType].intro}</p>
           <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
-            {[
-              ["repitSoiree", "Soirée"],
-              ["repitNuit", "Nuit"],
-              ["repitWeekend", "Week-end"],
-              ["repitUrgence", "Urgence / dépannage"]
-            ].map(([key, label]) => (
-              <label key={key} className="flex items-center gap-2">
-                {chk(reg.section3[key as keyof typeof reg.section3] as boolean, (v) =>
-                  setReg((r) => ({ ...r, section3: { ...r.section3, [key]: v } }))
-                )}
-                {label}
-              </label>
-            ))}
-          </div>
-          <p className="text-sm text-slate-400">Âges acceptés</p>
-          <div className="flex flex-wrap gap-3 text-sm text-slate-300">
             <label className="flex items-center gap-2">
-              {chk(reg.section3.age0_5, (v) => setReg((r) => ({ ...r, section3: { ...r.section3, age0_5: v } })))}
-              0-5 ans
+              {chk(reg.section3.repitSoiree, (v) =>
+                setReg((r) => ({ ...r, section3: { ...r.section3, repitSoiree: v, dispoSoir: v } }))
+              )}
+              {SERVICE_OPTIONS[selectedAllyType].labels.repitSoiree}
             </label>
             <label className="flex items-center gap-2">
-              {chk(reg.section3.age6_12, (v) => setReg((r) => ({ ...r, section3: { ...r.section3, age6_12: v } })))}
-              6-12 ans
+              {chk(reg.section3.repitNuit, (v) => setReg((r) => ({ ...r, section3: { ...r.section3, repitNuit: v } })))}
+              {SERVICE_OPTIONS[selectedAllyType].labels.repitNuit}
             </label>
             <label className="flex items-center gap-2">
-              {chk(reg.section3.age12p, (v) => setReg((r) => ({ ...r, section3: { ...r.section3, age12p: v } })))}
-              12 ans et +
+              {chk(reg.section3.repitWeekend, (v) =>
+                setReg((r) => ({ ...r, section3: { ...r.section3, repitWeekend: v, dispoWeekend: v } }))
+              )}
+              {SERVICE_OPTIONS[selectedAllyType].labels.repitWeekend}
+            </label>
+            <label className="flex items-center gap-2">
+              {chk(reg.section3.repitUrgence, (v) =>
+                setReg((r) => ({ ...r, section3: { ...r.section3, repitUrgence: v } }))
+              )}
+              {SERVICE_OPTIONS[selectedAllyType].labels.repitUrgence}
             </label>
           </div>
-          <Input
-            placeholder="Nombre maximal d'enfants à la fois"
-            value={reg.section3.maxChildren}
-            onChange={(e) => setReg((r) => ({ ...r, section3: { ...r.section3, maxChildren: e.target.value } }))}
-          />
+          {isChildCareOffer ? (
+            <>
+              <p className="text-sm text-slate-400">Âges acceptés</p>
+              <div className="flex flex-wrap gap-3 text-sm text-slate-300">
+                <label className="flex items-center gap-2">
+                  {chk(reg.section3.age0_5, (v) => setReg((r) => ({ ...r, section3: { ...r.section3, age0_5: v } })))}
+                  0-5 ans
+                </label>
+                <label className="flex items-center gap-2">
+                  {chk(reg.section3.age6_12, (v) => setReg((r) => ({ ...r, section3: { ...r.section3, age6_12: v } })))}
+                  6-12 ans
+                </label>
+                <label className="flex items-center gap-2">
+                  {chk(reg.section3.age12p, (v) => setReg((r) => ({ ...r, section3: { ...r.section3, age12p: v } })))}
+                  12 ans et +
+                </label>
+              </div>
+              <Input
+                placeholder="Nombre maximal d'enfants à la fois"
+                value={reg.section3.maxChildren}
+                onChange={(e) => setReg((r) => ({ ...r, section3: { ...r.section3, maxChildren: e.target.value } }))}
+              />
+            </>
+          ) : null}
           <div className="space-y-2">
             <p className="text-sm text-slate-300">Secteur desservi (distance)</p>
             <select
@@ -591,17 +638,15 @@ export function AllyOnboardingWizard({
             </select>
           </div>
           <Input
-            placeholder="Taux horaire suggéré ($)"
+            placeholder={selectedAllyType === "MENAGE" ? "Tarif suggéré ($/h ou forfait)" : "Taux horaire suggéré ($)"}
             value={reg.section3.hourlyRateSuggested}
             onChange={(e) => setReg((r) => ({ ...r, section3: { ...r.section3, hourlyRateSuggested: e.target.value } }))}
           />
-          <p className="text-sm text-slate-400">Disponibilités générales</p>
+          <p className="text-sm text-slate-400">Autres disponibilités utiles</p>
           <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
             {[
-              ["dispoSemaine", "Semaine"],
-              ["dispoSoir", "Soir"],
-              ["dispoWeekend", "Fin de semaine"],
-              ["dispoFlexible", "Flexible"]
+              ["dispoSemaine", "Disponible en semaine, de jour"],
+              ["dispoFlexible", "Horaire flexible"]
             ].map(([key, label]) => (
               <label key={key} className="flex items-center gap-2">
                 {chk(reg.section3[key as keyof typeof reg.section3] as boolean, (v) =>
@@ -641,9 +686,15 @@ export function AllyOnboardingWizard({
           </label>
           <label className="flex items-start gap-2 text-sm text-slate-300">
             {chk(reg.section4.canProvideRcrProof, (v) =>
-              setReg((r) => ({ ...r, section4: { ...r.section4, canProvideRcrProof: v } }))
+              setReg((r) => ({ ...r, section4: { ...r.section4, canProvideRcrProof: v } })),
+              reg.section2.rcrValid !== "yes"
             )}
-            Preuve de certification RCR
+            <span>
+              Preuve de certification RCR
+              {reg.section2.rcrValid !== "yes" ? (
+                <span className="block text-xs text-slate-500">Disponible seulement si la certification RCR est valide.</span>
+              ) : null}
+            </span>
           </label>
           <p className="pt-2 text-sm font-medium text-white">Déclarations obligatoires</p>
           {(
