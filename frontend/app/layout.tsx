@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../lib/auth-context";
@@ -22,6 +23,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr" className={outfit.variable} data-scroll-behavior="smooth">
       <body className="min-h-screen font-sans">
+        <Script
+          id="hs-script-loader"
+          src="//js-na2.hs-scripts.com/246205280.js"
+          strategy="afterInteractive"
+        />
         <AuthProvider>
           <MaintenanceProvider>
             <DevModeProvider>
