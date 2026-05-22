@@ -21,6 +21,7 @@ import {
 } from "@prisma/client";
 import * as argon2 from "argon2";
 import { randomBytes } from "crypto";
+import { AllyWebhooksService } from "../ally-webhooks/ally-webhooks.service";
 import {
   buildAllyWelcomeEmail,
   buildPasswordResetEmail,
@@ -53,6 +54,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
+    private readonly allyWebhooksService: AllyWebhooksService,
     private readonly maintenanceService: MaintenanceService
   ) {}
 
@@ -137,11 +139,20 @@ export class AuthService {
               }
             : undefined,
         resourceProfile
+      },
+      include: {
+        resourceProfile: true
       }
     });
 
     const tokens = await this.generateAndPersistTokens(created);
     if (input.role === Role.RESOURCE && resourceProfile) {
+      if (created.resourceProfile) {
+        void this.allyWebhooksService.sendApplicationEvent("ally.application.created", {
+          ...created.resourceProfile,
+          user: { email: created.email }
+        });
+      }
       void this.sendAllyWelcomeEmail({
         to: input.email.toLowerCase(),
         displayName: input.displayName,

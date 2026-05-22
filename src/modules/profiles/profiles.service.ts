@@ -8,6 +8,7 @@ import {
   ResourceVerificationStatus,
   Role
 } from "@prisma/client";
+import { AllyWebhooksService } from "../ally-webhooks/ally-webhooks.service";
 import {
   buildAvailabilityFromRegistration,
   buildSkillsTagsFromRegistration,
@@ -34,6 +35,7 @@ export class ProfilesService {
     private readonly subscriptionAccessService: SubscriptionAccessService,
     private readonly usersService: UsersService,
     private readonly emailService: EmailService,
+    private readonly allyWebhooksService: AllyWebhooksService,
     private readonly configService: ConfigService
   ) {}
 
@@ -146,6 +148,10 @@ export class ProfilesService {
         ...(allyRegRaw !== undefined ? derivedFromAlly : {})
       }
     });
+    void this.allyWebhooksService.sendApplicationEvent("ally.application.updated", {
+      ...updated,
+      user: { email: existing.user.email }
+    });
     void this.sendAllyProfileUpdatedEmail({
       to: existing.user.email,
       displayName: updated.displayName
@@ -212,6 +218,10 @@ export class ProfilesService {
         ...dto
       });
     }
+    void this.allyWebhooksService.sendApplicationEvent("ally.application.moderated", {
+      ...updated,
+      user: { email: existing.user.email }
+    });
     void this.sendAllyAdminStatusEmail({
       to: existing.user.email,
       displayName: updated.displayName,
@@ -250,6 +260,13 @@ export class ProfilesService {
         verificationStatus: dto.verificationStatus ?? resource.verificationStatus,
         publishStatus: dto.publishStatus ?? resource.publishStatus,
         onboardingState: dto.onboardingState ?? resource.onboardingState
+      });
+      void this.allyWebhooksService.sendApplicationEvent("ally.application.moderated", {
+        ...resource,
+        verificationStatus: dto.verificationStatus ?? resource.verificationStatus,
+        publishStatus: dto.publishStatus ?? resource.publishStatus,
+        onboardingState: dto.onboardingState ?? resource.onboardingState,
+        backgroundCheckStatus: dto.backgroundCheckStatus ?? resource.backgroundCheckStatus
       });
     }
     return { updatedCount: result.count };

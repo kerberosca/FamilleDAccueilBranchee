@@ -39,7 +39,9 @@ const isProduction = process.env.NODE_ENV === "production";
         STRIPE_WEBHOOK_SECRET: Joi.string().allow("").optional(),
         RESEND_API_KEY: Joi.string().allow("").optional(),
         EMAIL_FROM: Joi.string().allow("").optional(),
-        NOTIFICATION_EMAIL: Joi.string().allow("").optional()
+        NOTIFICATION_EMAIL: Joi.string().allow("").optional(),
+        N8N_ALLY_WEBHOOK_URL: Joi.string().uri().allow("").optional(),
+        N8N_ALLY_WEBHOOK_SECRET: Joi.string().allow("").optional()
       })
     }),
     ThrottlerModule.forRoot({

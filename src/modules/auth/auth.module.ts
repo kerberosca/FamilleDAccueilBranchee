@@ -4,6 +4,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
+import { AllyWebhooksModule } from "../ally-webhooks/ally-webhooks.module";
 import { EmailModule } from "../email/email.module";
 import { MaintenanceModule } from "../maintenance/maintenance.module";
 import { AuthController } from "./auth.controller";
@@ -14,6 +15,7 @@ import { JwtStrategy } from "./jwt.strategy";
   imports: [
     PassportModule.register({ defaultStrategy: "jwt" }),
     JwtModule.register({}),
+    AllyWebhooksModule,
     EmailModule,
     MaintenanceModule
   ],
