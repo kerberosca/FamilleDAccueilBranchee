@@ -61,6 +61,16 @@ function asBool(v: unknown): boolean {
   return v === true;
 }
 
+function isPositiveIntegerString(v: unknown): v is string {
+  return typeof v === "string" && /^[1-9]\d*$/.test(v.trim());
+}
+
+function isPositiveDecimalString(v: unknown): v is string {
+  if (typeof v !== "string") return false;
+  const normalized = v.trim().replace(",", ".");
+  return /^(?:[1-9]\d*|0)(?:\.\d{1,2})?$/.test(normalized) && Number(normalized) > 0;
+}
+
 export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyType = AllyType.GARDIENS): AllyRegistrationPayload {
   if (raw === null || typeof raw !== "object") {
     throw new BadRequestException("allyRegistration : objet requis.");
@@ -123,6 +133,9 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
   if (allyType === AllyType.GARDIENS && !isNonEmptyString(s3.maxChildren)) {
     throw new BadRequestException("Section 3 : nombre maximal d'enfants requis.");
   }
+  if (allyType === AllyType.GARDIENS && !isPositiveIntegerString(s3.maxChildren)) {
+    throw new BadRequestException("Section 3 : nombre maximal d'enfants doit être un nombre entier positif.");
+  }
   const radius = s3.serviceRadius;
   if (radius !== "10" && radius !== "25" && radius !== "50" && radius !== "more") {
     throw new BadRequestException("Section 3 : secteur desservi (distance) invalide.");
@@ -130,9 +143,8 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
   if (!isNonEmptyString(s3.hourlyRateSuggested)) {
     throw new BadRequestException("Section 3 : taux horaire suggéré requis.");
   }
-  const rateNum = parseFloat(String(s3.hourlyRateSuggested).replace(",", "."));
-  if (Number.isNaN(rateNum) || rateNum < 0) {
-    throw new BadRequestException("Section 3 : taux horaire suggéré doit être un nombre valide.");
+  if (!isPositiveDecimalString(s3.hourlyRateSuggested)) {
+    throw new BadRequestException("Section 3 : taux horaire suggéré doit être un montant numérique positif.");
   }
   const s4keys = [
     "canProvideBackgroundCheck",

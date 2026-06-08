@@ -64,6 +64,22 @@ const ALLY_OPTIONS: { value: AllyType; label: string }[] = [
   { value: "AUTRES", label: ALLY_TYPE_LABELS.AUTRES }
 ];
 
+const onlyDigits = (value: string) => value.replace(/\D/g, "");
+
+const sanitizeDecimal = (value: string) => {
+  const cleaned = value.replace(/[^\d.,]/g, "").replace(",", ".");
+  const [integer = "", ...decimalParts] = cleaned.split(".");
+  const decimal = decimalParts.join("");
+  return decimalParts.length > 0 ? `${integer}.${decimal.slice(0, 2)}` : integer;
+};
+
+const isPositiveInteger = (value: string) => /^[1-9]\d*$/.test(value.trim());
+
+const isPositiveDecimal = (value: string) => {
+  const normalized = value.trim().replace(",", ".");
+  return /^(?:[1-9]\d*|0)(?:\.\d{1,2})?$/.test(normalized) && Number(normalized) > 0;
+};
+
 const SERVICE_OPTIONS: Record<AllyType, { intro: string; labels: Record<"repitSoiree" | "repitNuit" | "repitWeekend" | "repitUrgence", string> }> = {
   GARDIENS: {
     intro:
@@ -218,7 +234,13 @@ export function AllyOnboardingWizard({
       const ageAny = reg.section3.age0_5 || reg.section3.age6_12 || reg.section3.age12p;
       if (isChildCareOffer && !ageAny) return "Cochez au moins une tranche d'âge.";
       if (isChildCareOffer && !reg.section3.maxChildren.trim()) return "Nombre maximal d'enfants requis.";
+      if (isChildCareOffer && !isPositiveInteger(reg.section3.maxChildren)) {
+        return "Le nombre maximal d'enfants doit être un nombre entier positif.";
+      }
       if (!reg.section3.hourlyRateSuggested.trim()) return "Taux horaire suggéré requis.";
+      if (!isPositiveDecimal(reg.section3.hourlyRateSuggested)) {
+        return "Le taux horaire suggéré doit être un montant numérique positif.";
+      }
     }
     if (step === sec4Step) {
       const s4 = reg.section4;
@@ -614,8 +636,10 @@ export function AllyOnboardingWizard({
               </div>
               <Input
                 placeholder="Nombre maximal d'enfants à la fois"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={reg.section3.maxChildren}
-                onChange={(e) => setReg((r) => ({ ...r, section3: { ...r.section3, maxChildren: e.target.value } }))}
+                onChange={(e) => setReg((r) => ({ ...r, section3: { ...r.section3, maxChildren: onlyDigits(e.target.value) } }))}
               />
             </>
           ) : null}
@@ -639,8 +663,11 @@ export function AllyOnboardingWizard({
           </div>
           <Input
             placeholder={selectedAllyType === "MENAGE" ? "Tarif suggéré ($/h ou forfait)" : "Taux horaire suggéré ($)"}
+            inputMode="decimal"
             value={reg.section3.hourlyRateSuggested}
-            onChange={(e) => setReg((r) => ({ ...r, section3: { ...r.section3, hourlyRateSuggested: e.target.value } }))}
+            onChange={(e) =>
+              setReg((r) => ({ ...r, section3: { ...r.section3, hourlyRateSuggested: sanitizeDecimal(e.target.value) } }))
+            }
           />
           <p className="text-sm text-slate-400">Autres disponibilités utiles</p>
           <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
@@ -676,7 +703,17 @@ export function AllyOnboardingWizard({
             {chk(reg.section4.canProvideBackgroundCheck, (v) =>
               setReg((r) => ({ ...r, section4: { ...r.section4, canProvideBackgroundCheck: v } }))
             )}
-            Vérification d&apos;antécédents judiciaires valide
+            <span>
+              Vérification d&apos;antécédents judiciaires valide
+              <a
+                href="https://request.idqc.ca/"
+                target="_blank"
+                rel="noreferrer"
+                className="block text-xs text-[#b9ccff] underline hover:text-white"
+              >
+                Lien suggéré pour demander une attestation de vérification de casier judiciaire
+              </a>
+            </span>
           </label>
           <label className="flex items-start gap-2 text-sm text-slate-300">
             {chk(reg.section4.canProvideTwoRefs, (v) =>

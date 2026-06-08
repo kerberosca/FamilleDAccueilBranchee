@@ -48,7 +48,13 @@ export default function FormulaireAllieRepitPage() {
       <section className="space-y-2 border-t border-slate-700 pt-6">
         <h2 className="text-xl font-semibold text-white">Section 4 — Vérifications et engagement</h2>
         <ul className="list-inside list-disc text-sm">
-          <li>Antécédents judiciaires, références professionnelles, preuve RCR</li>
+          <li>
+            Antécédents judiciaires, références professionnelles, preuve RCR. Lien suggéré pour l&apos;attestation de
+            vérification de casier judiciaire :{" "}
+            <a href="https://request.idqc.ca/" target="_blank" rel="noreferrer" className="text-cyan-300 underline hover:text-cyan-200">
+              request.idqc.ca
+            </a>
+          </li>
           <li>Déclarations sur l&apos;exactitude des informations, le rôle d&apos;intermédiaire de FAB, l&apos;entente financière directe avec la famille, et la visibilité du profil</li>
         </ul>
       </section>

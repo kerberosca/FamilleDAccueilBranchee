@@ -101,7 +101,7 @@ ______________________________________________________________________________
 
 **Je suis en mesure de fournir (sur demande) :**
 
-- ☐ Vérification d’antécédents judiciaires valide (lien)  
+- ☐ Vérification d’antécédents judiciaires valide - lien suggéré pour l'attestation de vérification de casier judiciaire : https://request.idqc.ca/  
 - ☐ Deux références professionnelles  
 - ☐ Preuve de certification RCR  
 
