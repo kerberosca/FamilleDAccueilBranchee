@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
+import { ResourceDocumentsPanel } from "../../components/resource-documents-panel";
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 import { useMaintenance } from "../../lib/maintenance-context";
@@ -37,6 +38,7 @@ type ResourceItem = {
   onboardingState: string;
   backgroundCheckStatus?: string;
   allyRegistration?: unknown;
+  documentRequirements?: { required: string[]; missing: string[]; complete: boolean };
   allyDeclarationsAcceptedAt?: string | null;
   user: { id: string; email: string; status: string; role?: string };
 };
@@ -59,6 +61,54 @@ type MaintenanceStatus = { enabled: boolean; updatedAt: string; updatedBy: strin
 const SELECT_CLASS = "min-w-0 max-w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2";
 const ADMIN_CARD_CLASS = "min-w-0 overflow-hidden";
 const ADMIN_TEXT_CLASS = "min-w-0 break-words";
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Administrateur",
+  FAMILY: "Famille",
+  RESOURCE: "Allié"
+};
+const ACCOUNT_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Actif",
+  BANNED: "Banni"
+};
+const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Actif",
+  INACTIVE: "Inactif",
+  PAST_DUE: "Paiement en retard",
+  CANCELED: "Annulé"
+};
+const VERIFICATION_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Brouillon",
+  PENDING_VERIFICATION: "En attente de vérification",
+  VERIFIED: "Vérifié",
+  REJECTED: "Rejeté"
+};
+const PUBLISH_STATUS_LABELS: Record<string, string> = {
+  HIDDEN: "Masqué",
+  PUBLISHED: "Publié",
+  SUSPENDED: "Suspendu"
+};
+const ONBOARDING_STATE_LABELS: Record<string, string> = {
+  DRAFT: "Brouillon",
+  PENDING_VERIFICATION: "En attente de vérification",
+  PUBLISHED: "Publié",
+  SUSPENDED: "Suspendu"
+};
+const BACKGROUND_CHECK_STATUS_LABELS: Record<string, string> = {
+  NOT_REQUESTED: "Non demandé",
+  REQUESTED: "Demandé",
+  PENDING: "En attente",
+  RECEIVED: "Reçu"
+};
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  BACKGROUND_CHECK: "Antécédents",
+  RCR_PROOF: "Preuve RCR",
+  CV: "CV"
+};
+
+function formatLabel(labels: Record<string, string>, value: string | null | undefined): string {
+  if (!value) return "-";
+  return labels[value] ?? value;
+}
 
 export default function AdminPage() {
   const { accessToken } = useAuth();
@@ -94,6 +144,9 @@ export default function AdminPage() {
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
 
   const isAdmin = me?.role === "ADMIN";
+  const selectedResourcesComplete = selectedResourceIds.every(
+    (id) => resources.find((resource) => resource.id === id)?.documentRequirements?.complete
+  );
 
   const familiesUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -407,11 +460,11 @@ export default function AdminPage() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-4 overflow-x-hidden px-4 py-6 sm:p-6">
-      <h1 className="text-2xl font-semibold">Console Admin</h1>
+      <h1 className="text-2xl font-semibold">Console d’administration</h1>
       <RequireAuth>
         {loadingMe ? <Alert tone="info">Vérification du rôle administrateur…</Alert> : null}
         {error ? <Alert tone="error">{error}</Alert> : null}
-        {me && !isAdmin ? <Alert tone="error">Accès refusé : ce compte n&apos;est pas ADMIN.</Alert> : null}
+        {me && !isAdmin ? <Alert tone="error">Accès refusé : ce compte n&apos;est pas administrateur.</Alert> : null}
 
         {isAdmin ? (
           <>
@@ -460,11 +513,11 @@ export default function AdminPage() {
             {tab === "families" ? (
               <Card className={`space-y-3 ${ADMIN_CARD_CLASS}`}>
                 <div className="grid min-w-0 gap-2 md:grid-cols-5">
-                  <Input placeholder="Recherche email, nom, ville, code postal" value={familyQuery} onChange={(e) => setFamilyQuery(e.target.value)} />
+                  <Input placeholder="Recherche courriel, nom, ville, code postal" value={familyQuery} onChange={(e) => setFamilyQuery(e.target.value)} />
                   <select className={SELECT_CLASS} value={familyStatus} onChange={(e) => setFamilyStatus(e.target.value)}>
                     <option value="">Tous les statuts</option>
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="BANNED">BANNED</option>
+                    <option value="ACTIVE">Actif</option>
+                    <option value="BANNED">Banni</option>
                   </select>
                   <select className={SELECT_CLASS} value={familySortBy} onChange={(e) => setFamilySortBy(e.target.value)}>
                     <option value="createdAt">Tri : création</option>
@@ -507,7 +560,8 @@ export default function AdminPage() {
                             <strong>{family.profile?.displayName ?? "(sans profil)"}</strong> - {family.email}
                           </p>
                           <p>
-                            Statut du compte : {family.status} | Abonnement : {family.subscription?.status ?? "INACTIVE"}
+                            Statut du compte : {formatLabel(ACCOUNT_STATUS_LABELS, family.status)} | Abonnement :{" "}
+                            {formatLabel(SUBSCRIPTION_STATUS_LABELS, family.subscription?.status ?? "INACTIVE")}
                           </p>
                           <p>
                             Localisation: {family.profile?.city ?? "-"}, {family.profile?.region ?? "-"} ({family.profile?.postalCode ?? "-"})
@@ -522,9 +576,9 @@ export default function AdminPage() {
                           disabled={busyId === `role-${family.id}`}
                           onChange={(e) => void updateUserRole(family.id, e.target.value as RoleValue)}
                         >
-                          <option value="FAMILY">FAMILY</option>
-                          <option value="RESOURCE">RESOURCE</option>
-                          <option value="ADMIN">ADMIN</option>
+                          <option value="FAMILY">Famille</option>
+                          <option value="RESOURCE">Allié</option>
+                          <option value="ADMIN">Administrateur</option>
                         </select>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -568,19 +622,19 @@ export default function AdminPage() {
             {tab === "resources" ? (
               <Card className={`space-y-3 ${ADMIN_CARD_CLASS}`}>
                 <div className="grid min-w-0 gap-2 md:grid-cols-6">
-                  <Input placeholder="Recherche nom, email, ville, code postal" value={resourceQuery} onChange={(e) => setResourceQuery(e.target.value)} />
+                  <Input placeholder="Recherche nom, courriel, ville, code postal" value={resourceQuery} onChange={(e) => setResourceQuery(e.target.value)} />
                   <select className={SELECT_CLASS} value={verificationStatus} onChange={(e) => setVerificationStatus(e.target.value)}>
                     <option value="">Vérification : toutes</option>
-                    <option value="DRAFT">DRAFT</option>
-                    <option value="PENDING_VERIFICATION">PENDING_VERIFICATION</option>
-                    <option value="VERIFIED">VERIFIED</option>
-                    <option value="REJECTED">REJECTED</option>
+                    <option value="DRAFT">Brouillon</option>
+                    <option value="PENDING_VERIFICATION">En attente de vérification</option>
+                    <option value="VERIFIED">Vérifié</option>
+                    <option value="REJECTED">Rejeté</option>
                   </select>
                   <select className={SELECT_CLASS} value={publishStatus} onChange={(e) => setPublishStatus(e.target.value)}>
                     <option value="">Publication : toutes</option>
-                    <option value="HIDDEN">HIDDEN</option>
-                    <option value="PUBLISHED">PUBLISHED</option>
-                    <option value="SUSPENDED">SUSPENDED</option>
+                    <option value="HIDDEN">Masqué</option>
+                    <option value="PUBLISHED">Publié</option>
+                    <option value="SUSPENDED">Suspendu</option>
                   </select>
                   <select className={SELECT_CLASS} value={resourceSortBy} onChange={(e) => setResourceSortBy(e.target.value)}>
                     <option value="updatedAt">Tri : mise à jour</option>
@@ -600,7 +654,7 @@ export default function AdminPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="secondary"
-                    disabled={busyId === "bulk-resource" || selectedResourceIds.length === 0}
+                    disabled={busyId === "bulk-resource" || selectedResourceIds.length === 0 || !selectedResourcesComplete}
                     onClick={() =>
                       void bulkModerateResources({
                         verificationStatus: "VERIFIED",
@@ -636,8 +690,12 @@ export default function AdminPage() {
                             <strong>{resource.displayName}</strong> - {resource.user.email}
                           </p>
                           <p>
-                            États: {resource.verificationStatus} / {resource.publishStatus} / {resource.onboardingState}
-                            {resource.backgroundCheckStatus ? ` · Antécédents: ${resource.backgroundCheckStatus}` : null}
+                            États: {formatLabel(VERIFICATION_STATUS_LABELS, resource.verificationStatus)} /{" "}
+                            {formatLabel(PUBLISH_STATUS_LABELS, resource.publishStatus)} /{" "}
+                            {formatLabel(ONBOARDING_STATE_LABELS, resource.onboardingState)}
+                            {resource.backgroundCheckStatus
+                              ? ` · Antécédents: ${formatLabel(BACKGROUND_CHECK_STATUS_LABELS, resource.backgroundCheckStatus)}`
+                              : null}
                           </p>
                           <p>
                             Localisation: {resource.city}, {resource.region} ({resource.postalCode})
@@ -651,6 +709,18 @@ export default function AdminPage() {
                               {new Date(resource.allyDeclarationsAcceptedAt).toLocaleString("fr-CA")}
                             </p>
                           ) : null}
+                          <p className={resource.documentRequirements?.complete ? "text-xs text-emerald-300" : "text-xs text-amber-200"}>
+                            Documents : {resource.documentRequirements?.complete ? "complets" : "incomplets"}
+                            {resource.documentRequirements?.missing?.length
+                              ? ` - manquants: ${resource.documentRequirements.missing.map((type) => formatLabel(DOCUMENT_TYPE_LABELS, type)).join(", ")}`
+                              : null}
+                          </p>
+                          <details className="mt-1 text-xs">
+                            <summary className="cursor-pointer text-cyan-400">Documents privés</summary>
+                            <div className="mt-2">
+                              <ResourceDocumentsPanel token={accessToken} resourceId={resource.id} admin compact />
+                            </div>
+                          </details>
                           {resource.allyRegistration ? (
                             <details className="mt-1 text-xs">
                               <summary className="cursor-pointer text-cyan-400">Dossier candidature allié (JSON)</summary>
@@ -669,9 +739,9 @@ export default function AdminPage() {
                           disabled={busyId === `role-${resource.user.id}`}
                           onChange={(e) => void updateUserRole(resource.user.id, e.target.value as RoleValue)}
                         >
-                          <option value="FAMILY">FAMILY</option>
-                          <option value="RESOURCE">RESOURCE</option>
-                          <option value="ADMIN">ADMIN</option>
+                          <option value="FAMILY">Famille</option>
+                          <option value="RESOURCE">Allié</option>
+                          <option value="ADMIN">Administrateur</option>
                         </select>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -698,7 +768,7 @@ export default function AdminPage() {
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="secondary"
-                          disabled={busyId === resource.id}
+                          disabled={busyId === resource.id || !resource.documentRequirements?.complete}
                           onClick={() =>
                             void moderateResource(resource.id, {
                               verificationStatus: "VERIFIED",

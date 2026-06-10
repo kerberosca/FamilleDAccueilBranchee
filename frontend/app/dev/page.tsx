@@ -17,6 +17,11 @@ type DevLoginResponse = {
 };
 
 const ENABLED = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true";
+const DEV_ROLE_LABELS: Record<DevRole, string> = {
+  ADMIN: "administrateur",
+  FAMILLE: "famille",
+  RESSOURCE: "allié"
+};
 
 export default function DevPage() {
   const router = useRouter();
@@ -50,14 +55,14 @@ export default function DevPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">Login dev rapide</h1>
+      <h1 className="text-2xl font-semibold">Connexion dev rapide</h1>
       <Card>
         <p className="text-sm text-slate-300">Choisis un rôle pour appeler `POST /dev/login-as`.</p>
 
         <div className="mt-3 flex flex-wrap gap-3">
           {(["ADMIN", "FAMILLE", "RESSOURCE"] as DevRole[]).map((role) => (
             <Button key={role} onClick={() => loginAs(role)} disabled={loadingRole !== null}>
-              {loadingRole === role ? `Connexion ${role}...` : `Login ${role}`}
+              {loadingRole === role ? `Connexion ${DEV_ROLE_LABELS[role]}...` : `Connexion ${DEV_ROLE_LABELS[role]}`}
             </Button>
           ))}
         </div>

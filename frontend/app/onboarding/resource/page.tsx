@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { AllyOnboardingWizard, AllyRegisterSubmitPayload } from "../../../components/ally-onboarding-wizard";
+import { ResourceDocumentsPanel } from "../../../components/resource-documents-panel";
 import { Alert } from "../../../components/ui/alert";
 import { apiPost } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
@@ -16,6 +17,7 @@ type RegisterResponse = {
 export default function ResourceOnboardingPage() {
   const { setTokens } = useAuth();
   const [success, setSuccess] = useState<string | null>(null);
+  const [documentToken, setDocumentToken] = useState<string | null>(null);
 
   const handleRegister = async (p: AllyRegisterSubmitPayload) => {
     const response = await apiPost<RegisterResponse>("/auth/register", {
@@ -33,6 +35,7 @@ export default function ResourceOnboardingPage() {
       },
     });
     setTokens(response.accessToken, response.refreshToken ?? null);
+    setDocumentToken(response.accessToken);
     setSuccess(
       "Candidature enregistrée. Votre profil est en attente de validation. Vous pouvez ensuite le modifier dans Mon profil."
     );
@@ -67,12 +70,15 @@ export default function ResourceOnboardingPage() {
         </section>
 
         {success ? (
-          <Alert tone="info">
-            {success}{" "}
-            <Link href="/me" className="font-medium text-[#b9ccff] underline hover:text-[#d3dfff]">
-              Ouvrir mon profil
-            </Link>
-          </Alert>
+          <div className="space-y-4">
+            <Alert tone="info">
+              Compte allié créé. Ajoutez maintenant les documents requis pour compléter votre dossier de validation.{" "}
+              <Link href="/me" className="font-medium text-[#b9ccff] underline hover:text-[#d3dfff]">
+                Ouvrir mon profil
+              </Link>
+            </Alert>
+            <ResourceDocumentsPanel token={documentToken} />
+          </div>
         ) : (
           <AllyOnboardingWizard
             mode="register"

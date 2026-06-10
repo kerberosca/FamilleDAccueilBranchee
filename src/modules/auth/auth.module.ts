@@ -7,6 +7,7 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 import { AllyWebhooksModule } from "../ally-webhooks/ally-webhooks.module";
 import { EmailModule } from "../email/email.module";
 import { MaintenanceModule } from "../maintenance/maintenance.module";
+import { ResourceDocumentsModule } from "../resource-documents/resource-documents.module";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { JwtStrategy } from "./jwt.strategy";
@@ -17,7 +18,8 @@ import { JwtStrategy } from "./jwt.strategy";
     JwtModule.register({}),
     AllyWebhooksModule,
     EmailModule,
-    MaintenanceModule
+    MaintenanceModule,
+    ResourceDocumentsModule
   ],
   controllers: [AuthController],
   providers: [

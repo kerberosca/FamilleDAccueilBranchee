@@ -20,6 +20,7 @@ import { EmailService } from "../email/email.service";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
+import { ResourceDocumentsService } from "../resource-documents/resource-documents.service";
 import { UsersService } from "../users/users.service";
 import { BulkModerateResourceDto } from "./dto/bulk-moderate-resource.dto";
 import { ModerateResourceDto } from "./dto/moderate-resource.dto";
@@ -34,6 +35,7 @@ export class ProfilesService {
     private readonly prisma: PrismaService,
     private readonly subscriptionAccessService: SubscriptionAccessService,
     private readonly usersService: UsersService,
+    private readonly resourceDocumentsService: ResourceDocumentsService,
     private readonly emailService: EmailService,
     private readonly allyWebhooksService: AllyWebhooksService,
     private readonly configService: ConfigService
@@ -192,6 +194,7 @@ export class ProfilesService {
       displayName,
       email: profile.user.email
     });
+    await this.resourceDocumentsService.deleteFilesForResourceProfile(resourceId);
     await this.prisma.user.delete({ where: { id: userId } });
     return { success: true };
   }
@@ -203,6 +206,9 @@ export class ProfilesService {
     });
     if (!existing) {
       throw new NotFoundException("Profil allié introuvable.");
+    }
+    if (isPublishing(dto)) {
+      await this.resourceDocumentsService.assertResourceDocumentsComplete([resourceId]);
     }
     const updated = await this.prisma.resourceProfile.update({
       where: { id: resourceId },
@@ -233,6 +239,9 @@ export class ProfilesService {
   }
 
   async bulkModerateResources(resourceIds: string[], dto: BulkModerateResourceDto, actorUserId: string) {
+    if (isPublishing(dto)) {
+      await this.resourceDocumentsService.assertResourceDocumentsComplete(resourceIds);
+    }
     const existingResources = await this.prisma.resourceProfile.findMany({
       where: { id: { in: resourceIds } },
       include: { user: true }
@@ -348,6 +357,9 @@ export class ProfilesService {
       this.prisma.resourceProfile.findMany({
         where,
         include: {
+          documents: {
+            where: { deletedAt: null }
+          },
           user: {
             select: {
               id: true,
@@ -387,6 +399,10 @@ export class ProfilesService {
         contactPhone: resource.contactPhone,
         allyRegistration: resource.allyRegistration ?? undefined,
         allyDeclarationsAcceptedAt: resource.allyDeclarationsAcceptedAt ?? undefined,
+        documentRequirements: this.resourceDocumentsService.buildRequirements(
+          resource.documents,
+          resource.allyRegistration
+        ),
         updatedAt: resource.updatedAt,
         user: resource.user
       }))
@@ -537,6 +553,18 @@ function isPublishStatus(value: string): value is ResourcePublishStatus {
 
 function isOnboardingState(value: string): value is ResourceOnboardingState {
   return Object.values(ResourceOnboardingState).includes(value as ResourceOnboardingState);
+}
+
+function isPublishing(dto: {
+  verificationStatus?: ResourceVerificationStatus;
+  publishStatus?: ResourcePublishStatus;
+  onboardingState?: ResourceOnboardingState;
+}) {
+  return (
+    dto.verificationStatus === ResourceVerificationStatus.VERIFIED ||
+    dto.publishStatus === ResourcePublishStatus.PUBLISHED ||
+    dto.onboardingState === ResourceOnboardingState.PUBLISHED
+  );
 }
 
 function clamp(value: number | undefined, min: number, max: number, fallback: number): number {

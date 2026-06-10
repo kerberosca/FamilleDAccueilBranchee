@@ -30,7 +30,7 @@ export default function AdminOnboardingPage() {
         body: { role: "ADMIN" },
       });
       setTokens(response.accessToken, response.refreshToken ?? null);
-      setSuccess("Session ADMIN ouverte. Allez sur /me ou commencez la modération.");
+      setSuccess("Session administrateur ouverte. Allez sur /me ou commencez la modération.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
@@ -53,9 +53,9 @@ export default function AdminOnboardingPage() {
 
       <div className="mx-auto max-w-3xl space-y-4">
         <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
-          <h1 className="text-2xl font-semibold sm:text-3xl">Admin - Premiers pas</h1>
+          <h1 className="text-2xl font-semibold sm:text-3xl">Administration - Premiers pas</h1>
           <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
-            L’inscription publique ADMIN est désactivée. Utilisez un compte provisionné ou le contournement dev.
+            L’inscription publique administrateur est désactivée. Utilisez un compte provisionné ou le contournement dev.
           </p>
         </section>
 
@@ -66,7 +66,7 @@ export default function AdminOnboardingPage() {
               disabled={loading}
               className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
             >
-              {loading ? "Connexion…" : "Connexion ADMIN (contournement dev)"}
+              {loading ? "Connexion…" : "Connexion administrateur (contournement dev)"}
             </Button>
           ) : (
             <Alert tone="info">

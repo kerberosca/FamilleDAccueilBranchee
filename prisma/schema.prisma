@@ -60,6 +60,12 @@ enum BackgroundCheckStatus {
   RECEIVED
 }
 
+enum ResourceDocumentType {
+  CV
+  BACKGROUND_CHECK
+  RCR_PROOF
+}
+
 model User {
   id               String   @id @default(cuid())
   email            String   @unique
@@ -142,6 +148,24 @@ model ResourceProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   conversations Conversation[] @relation("ConversationResource")
+  documents     ResourceDocument[]
+}
+
+model ResourceDocument {
+  id                String   @id @default(cuid())
+  resourceProfileId String
+  type              ResourceDocumentType
+  originalName      String
+  storedName        String
+  mimeType          String
+  sizeBytes         Int
+  uploadedAt        DateTime @default(now())
+  deletedAt         DateTime?
+
+  resourceProfile ResourceProfile @relation(fields: [resourceProfileId], references: [id], onDelete: Cascade)
+
+  @@index([resourceProfileId])
+  @@index([type])
 }
 
 model Subscription {

@@ -13,6 +13,8 @@ ngrok-demo-policy.yml
 # Dump base (données sensibles)
 backup_fab.sql
 backups/
+private/
+local-data/
 
 # Documentation cybersécurité (exclue du dépôt)
 docs/cybersecurite/

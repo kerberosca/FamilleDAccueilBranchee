@@ -32,6 +32,13 @@ docker compose up -d
 - API : http://localhost:3000  
 - Frontend : http://localhost:3002  
 - Postgres : dans le conteneur
+- Documents alliés déposés en test : `local-data/uploads/` sur ton PC, monté dans l'API à `/app/private/uploads`.
+
+Après un changement Prisma, applique les migrations dans le conteneur API :
+
+```powershell
+docker compose exec api npx prisma migrate deploy
+```
 
 Tu codes, tu testes. Les conteneurs tournent sous **Linux** (Docker Desktop), donc le comportement est proche du VPS.
 

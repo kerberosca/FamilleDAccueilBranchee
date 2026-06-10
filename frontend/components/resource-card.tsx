@@ -35,13 +35,13 @@ export function ResourceCard({
         {resource.city ?? "Ville inconnue"} - {resource.region ?? "Region inconnue"}
       </p>
       <p className="mt-2 text-sm text-slate-300">
-        Tags: {resource.skillsTags?.length ? resource.skillsTags.join(", ") : "Aucun"}
+        Étiquettes : {resource.skillsTags?.length ? resource.skillsTags.join(", ") : "Aucune"}
       </p>
       <p className="mt-2 text-sm text-slate-200">
-        Email: <span className="text-white">{resource.contactEmail ?? contactPlaceholder}</span>
+        Courriel : <span className="text-white">{resource.contactEmail ?? contactPlaceholder}</span>
       </p>
       <p className="text-sm text-slate-200">
-        Tel: <span className="text-white">{resource.contactPhone ?? contactPlaceholder}</span>
+        Téléphone : <span className="text-white">{resource.contactPhone ?? contactPlaceholder}</span>
       </p>
     </Card>
   );

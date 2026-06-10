@@ -1,6 +1,17 @@
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import { AllyType, ResourceOnboardingState, ResourcePublishStatus, ResourceVerificationStatus, Role, SubscriptionStatus, UserStatus } from "@prisma/client";
+import {
+  AllyType,
+  BackgroundCheckStatus,
+  ResourceDocumentType,
+  ResourceOnboardingState,
+  ResourcePublishStatus,
+  ResourceVerificationStatus,
+  Role,
+  SubscriptionStatus,
+  UserStatus
+} from "@prisma/client";
+import * as argon2 from "argon2";
 import { execSync } from "node:child_process";
 import request from "supertest";
 import { setupApp } from "../src/app.setup";
@@ -388,6 +399,26 @@ describe("Smoke e2e", () => {
     const resource = await prisma.resourceProfile.findFirstOrThrow({
       where: { displayName: "Ressource Locale" }
     });
+    await prisma.resourceDocument.createMany({
+      data: [
+        {
+          resourceProfileId: resource.id,
+          type: ResourceDocumentType.BACKGROUND_CHECK,
+          originalName: "antecedents-test.pdf",
+          storedName: "antecedents-test.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 1000
+        },
+        {
+          resourceProfileId: resource.id,
+          type: ResourceDocumentType.RCR_PROOF,
+          originalName: "rcr-test.pdf",
+          storedName: "rcr-test.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 1000
+        }
+      ]
+    });
 
     await request(app.getHttpServer())
       .patch(`/api/v1/profiles/resource/${resource.id}/moderation`)
@@ -645,6 +676,593 @@ describe("Smoke e2e", () => {
     expect(res.body.message).toBeDefined();
   });
 
+  it("POST /api/v1/auth/login authentifie puis logout invalide le refresh token", async () => {
+    const password = "Bienvenue123!";
+    const user = await prisma.user.create({
+      data: {
+        email: "e2e_login@local.test",
+        passwordHash: await argon2.hash(password),
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille login e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            needsTags: ["repit"]
+          }
+        }
+      }
+    });
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: "e2e_login@local.test", password: "Mauvais123!" })
+      .expect(401);
+
+    const login = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: "E2E_LOGIN@LOCAL.TEST", password })
+      .expect(201);
+
+    expect(login.body.accessToken).toBeDefined();
+    expect(login.body.user.email).toBe("e2e_login@local.test");
+    expect(login.body.user.passwordHash).toBeUndefined();
+    expect(refreshTokenFromSetCookie(login)).toBeTruthy();
+    await expect(
+      prisma.user.findUnique({ where: { id: user.id } }).then((saved) => saved?.refreshTokenHash ?? null)
+    ).resolves.toBeTruthy();
+
+    const logout = await request(app.getHttpServer())
+      .post("/api/v1/auth/logout")
+      .set("Authorization", `Bearer ${login.body.accessToken}`)
+      .expect(200);
+
+    expect(logout.body).toEqual({ success: true });
+    await expect(
+      prisma.user.findUnique({ where: { id: user.id } }).then((saved) => saved?.refreshTokenHash ?? null)
+    ).resolves.toBeNull();
+  });
+
+  it("POST /api/v1/auth/request-password-reset puis reset-password changent le mot de passe", async () => {
+    emailSendMock.mockClear();
+    const user = await prisma.user.create({
+      data: {
+        email: "e2e_reset@local.test",
+        passwordHash: await argon2.hash("Ancien123!"),
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille reset e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            needsTags: []
+          }
+        }
+      }
+    });
+
+    const requestReset = await request(app.getHttpServer())
+      .post("/api/v1/auth/request-password-reset")
+      .send({ email: "E2E_RESET@LOCAL.TEST" })
+      .expect(201);
+
+    expect(requestReset.body.message).toBeDefined();
+    expect(emailSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "e2e_reset@local.test",
+        subject: expect.stringContaining("mot de passe")
+      })
+    );
+
+    const token = await prisma.passwordResetToken.findFirstOrThrow({ where: { userId: user.id } });
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/reset-password")
+      .send({ token: token.token, newPassword: "Nouveau123!" })
+      .expect(201);
+
+    await expect(prisma.passwordResetToken.count({ where: { userId: user.id } })).resolves.toBe(0);
+
+    const login = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: "e2e_reset@local.test", password: "Nouveau123!" })
+      .expect(201);
+    expect(login.body.accessToken).toBeDefined();
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/reset-password")
+      .send({ token: token.token, newPassword: "Encore123!" })
+      .expect(400);
+  });
+
+  it("POST /api/v1/auth/refresh refuse un jeton manquant", async () => {
+    const res = await request(app.getHttpServer()).post("/api/v1/auth/refresh").send({}).expect(401);
+
+    expect(res.body.message).toBeDefined();
+  });
+
+  it("DELETE /api/v1/auth/me supprime le compte connecte", async () => {
+    const authService = app.get(AuthService);
+    const user = await prisma.user.create({
+      data: {
+        email: "e2e_delete_me@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille delete me e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            needsTags: []
+          }
+        }
+      }
+    });
+    const { accessToken } = await authService.issueTokensForUser(user.id);
+
+    await request(app.getHttpServer())
+      .delete("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+
+    await expect(prisma.user.findUnique({ where: { id: user.id } })).resolves.toBeNull();
+  });
+
+  it("GET/PATCH /api/v1/profiles/me couvre les profils famille, ressource et admin", async () => {
+    const familyToken = await loginAs("FAMILLE");
+    const resourceToken = await loginAs("RESSOURCE");
+    const adminToken = await loginAs("ADMIN");
+
+    const familyProfile = await request(app.getHttpServer())
+      .get("/api/v1/profiles/me")
+      .set("Authorization", `Bearer ${familyToken}`)
+      .expect(200);
+    expect(familyProfile.body.displayName).toBe("Famille Locale");
+
+    const updatedFamily = await request(app.getHttpServer())
+      .patch("/api/v1/profiles/family/me")
+      .set("Authorization", `Bearer ${familyToken}`)
+      .send({
+        displayName: "Famille Locale MAJ",
+        postalCode: "h2x 1y4",
+        needsTags: ["repit", "transport"],
+        availability: { soir: true }
+      })
+      .expect(200);
+    expect(updatedFamily.body.displayName).toBe("Famille Locale MAJ");
+    expect(updatedFamily.body.postalCode).toBe("H2X1Y4");
+    expect(updatedFamily.body.availability).toEqual({ soir: true });
+
+    const resourceProfile = await request(app.getHttpServer())
+      .get("/api/v1/profiles/me")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(200);
+    expect(resourceProfile.body.displayName).toBe("Ressource Locale");
+    expect(resourceProfile.body.contactEmail).toBeDefined();
+
+    const adminProfile = await request(app.getHttpServer())
+      .get("/api/v1/profiles/me")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(adminProfile.body).toEqual({ userRole: Role.ADMIN });
+  });
+
+  it("GET/PATCH /api/v1/profiles/resources/admin protege et modere en lot", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const familyToken = await loginAs("FAMILLE");
+    const created = await prisma.user.create({
+      data: {
+        email: "e2e_bulk_resource@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        resourceProfile: {
+          create: {
+            displayName: "Ressource Bulk e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            skillsTags: ["repit"],
+            hourlyRate: 28,
+            verificationStatus: ResourceVerificationStatus.PENDING_VERIFICATION,
+            publishStatus: ResourcePublishStatus.HIDDEN,
+            onboardingState: ResourceOnboardingState.PENDING_VERIFICATION,
+            contactEmail: "bulk-resource@local.test",
+            contactPhone: "514-555-4141",
+            backgroundCheckStatus: BackgroundCheckStatus.REQUESTED
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+    const resourceId = created.resourceProfile!.id;
+
+    await request(app.getHttpServer())
+      .get("/api/v1/profiles/resources/admin")
+      .set("Authorization", `Bearer ${familyToken}`)
+      .expect(403);
+
+    const list = await request(app.getHttpServer())
+      .get("/api/v1/profiles/resources/admin?query=Bulk&pageSize=5")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(list.body.total).toBe(1);
+    expect(list.body.items[0].id).toBe(resourceId);
+    expect(list.body.items[0].documentRequirements.missing).toContain(ResourceDocumentType.BACKGROUND_CHECK);
+
+    const bulk = await request(app.getHttpServer())
+      .patch("/api/v1/profiles/resources/moderation/bulk")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        resourceIds: [resourceId],
+        verificationStatus: ResourceVerificationStatus.REJECTED,
+        publishStatus: ResourcePublishStatus.SUSPENDED,
+        onboardingState: ResourceOnboardingState.SUSPENDED,
+        backgroundCheckStatus: BackgroundCheckStatus.RECEIVED
+      })
+      .expect(200);
+
+    expect(bulk.body.updatedCount).toBe(1);
+    const updated = await prisma.resourceProfile.findUniqueOrThrow({ where: { id: resourceId } });
+    expect(updated.verificationStatus).toBe(ResourceVerificationStatus.REJECTED);
+    expect(updated.publishStatus).toBe(ResourcePublishStatus.SUSPENDED);
+    expect(updated.backgroundCheckStatus).toBe(BackgroundCheckStatus.RECEIVED);
+  });
+
+  it("GET/PATCH /api/v1/users admin liste familles, statuts et audit", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const family = await prisma.user.create({
+      data: {
+        email: "e2e_admin_family@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille admin e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            needsTags: []
+          }
+        }
+      }
+    });
+
+    const list = await request(app.getHttpServer())
+      .get("/api/v1/users/families?query=admin&pageSize=5")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(list.body.items.some((item: { id: string }) => item.id === family.id)).toBe(true);
+
+    const banned = await request(app.getHttpServer())
+      .patch(`/api/v1/users/${family.id}/status`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ status: UserStatus.BANNED })
+      .expect(200);
+    expect(banned.body.status).toBe(UserStatus.BANNED);
+
+    const bulk = await request(app.getHttpServer())
+      .patch("/api/v1/users/status/bulk")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ userIds: [family.id], status: UserStatus.ACTIVE })
+      .expect(200);
+    expect(bulk.body.updatedCount).toBe(1);
+
+    const adminMe = await request(app.getHttpServer())
+      .get("/api/v1/users/me")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/users/${adminMe.body.id}/role`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ role: Role.FAMILY })
+      .expect(400);
+
+    const audit = await request(app.getHttpServer())
+      .get("/api/v1/users/admin/audit?pageSize=10")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(audit.body.items.some((item: { action: string }) => item.action === "USER_STATUS_UPDATED")).toBe(true);
+    expect(audit.body.items.some((item: { action: string }) => item.action === "USER_STATUS_BULK_UPDATED")).toBe(true);
+  });
+
+  it("POST/GET /api/v1/messaging couvre conversation famille-ressource", async () => {
+    const authService = app.get(AuthService);
+    const adminToken = await loginAs("ADMIN");
+    const familyUser = await prisma.user.create({
+      data: {
+        email: "e2e_message_family@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille message e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            needsTags: []
+          }
+        },
+        subscriptions: {
+          create: {
+            status: SubscriptionStatus.ACTIVE,
+            stripeCustomerId: "cus_message_family",
+            stripeSubscriptionId: "sub_message_family"
+          }
+        }
+      }
+    });
+    const resourceUser = await prisma.user.create({
+      data: {
+        email: "e2e_message_resource@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        resourceProfile: {
+          create: {
+            displayName: "Ressource Message e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            skillsTags: ["repit"],
+            hourlyRate: 30,
+            verificationStatus: ResourceVerificationStatus.VERIFIED,
+            publishStatus: ResourcePublishStatus.PUBLISHED,
+            onboardingState: ResourceOnboardingState.PUBLISHED,
+            contactEmail: "message-resource@local.test",
+            contactPhone: "514-555-4242"
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+    const { accessToken: familyToken } = await authService.issueTokensForUser(familyUser.id);
+    const { accessToken: resourceToken } = await authService.issueTokensForUser(resourceUser.id);
+    const resource = resourceUser.resourceProfile!;
+
+    const created = await request(app.getHttpServer())
+      .post("/api/v1/messaging/conversations")
+      .set("Authorization", `Bearer ${familyToken}`)
+      .send({
+        resourceProfileId: resource.id,
+        initialMessage: "Bonjour, etes-vous disponible samedi?"
+      })
+      .expect(201);
+
+    expect(created.body.resource.id).toBe(resource.id);
+    expect(created.body.messages).toHaveLength(1);
+    expect(created.body.messages[0].content).toContain("samedi");
+    const conversationId = created.body.id as string;
+
+    const familyList = await request(app.getHttpServer())
+      .get("/api/v1/messaging/conversations")
+      .set("Authorization", `Bearer ${familyToken}`)
+      .expect(200);
+    expect(familyList.body.some((conversation: { id: string }) => conversation.id === conversationId)).toBe(true);
+
+    const reply = await request(app.getHttpServer())
+      .post(`/api/v1/messaging/conversations/${conversationId}/messages`)
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .send({ content: "Oui, je suis disponible." })
+      .expect(201);
+    expect(reply.body.messages).toHaveLength(2);
+
+    const adminRead = await request(app.getHttpServer())
+      .get(`/api/v1/messaging/conversations/${conversationId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(adminRead.body.messages).toHaveLength(2);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/messaging/conversations/${conversationId}/messages`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ content: "Message admin interdit" })
+      .expect(403);
+
+    const noSubFamily = await prisma.user.create({
+      data: {
+        email: "e2e_message_no_sub@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille message sans abo e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            needsTags: []
+          }
+        }
+      }
+    });
+    const { accessToken: noSubToken } = await authService.issueTokensForUser(noSubFamily.id);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/messaging/conversations")
+      .set("Authorization", `Bearer ${noSubToken}`)
+      .send({
+        resourceProfileId: resource.id,
+        initialMessage: "Tentative sans abonnement"
+      })
+      .expect(403);
+  });
+
+  it("GET/POST/DELETE /api/v1/resource-documents couvre upload, download et audit admin", async () => {
+    const authService = app.get(AuthService);
+    const created = await prisma.user.create({
+      data: {
+        email: "e2e_docs_resource@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        resourceProfile: {
+          create: {
+            displayName: "Ressource Docs e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            bio: "e2e",
+            skillsTags: ["repit"],
+            hourlyRate: 31,
+            verificationStatus: ResourceVerificationStatus.PENDING_VERIFICATION,
+            publishStatus: ResourcePublishStatus.HIDDEN,
+            onboardingState: ResourceOnboardingState.PENDING_VERIFICATION,
+            contactEmail: "docs-resource@local.test",
+            contactPhone: "514-555-3131",
+            allyRegistration: validAllyRegistration(),
+            backgroundCheckStatus: BackgroundCheckStatus.REQUESTED
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+    const resourceId = created.resourceProfile!.id;
+    const { accessToken: resourceToken } = await authService.issueTokensForUser(created.id);
+    const adminToken = await loginAs("ADMIN");
+    const familyToken = await loginAs("FAMILLE");
+
+    const initial = await request(app.getHttpServer())
+      .get("/api/v1/resource-documents/me")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(200);
+    expect(initial.body.requirements.missing).toEqual(
+      expect.arrayContaining([ResourceDocumentType.BACKGROUND_CHECK, ResourceDocumentType.RCR_PROOF])
+    );
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/resource-documents/me?type=${ResourceDocumentType.BACKGROUND_CHECK}`)
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(400);
+
+    const background = await request(app.getHttpServer())
+      .post(`/api/v1/resource-documents/me?type=${ResourceDocumentType.BACKGROUND_CHECK}`)
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .attach("file", Buffer.from("fake pdf background"), {
+        filename: "antecedents.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(201);
+    expect(background.body.requirements.complete).toBe(false);
+    expect(background.body.documents).toHaveLength(1);
+
+    const rcr = await request(app.getHttpServer())
+      .post(`/api/v1/resource-documents/me?type=${ResourceDocumentType.RCR_PROOF}`)
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .attach("file", Buffer.from("fake pdf rcr"), {
+        filename: "rcr.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(201);
+    expect(rcr.body.requirements.complete).toBe(true);
+    expect(rcr.body.documents).toHaveLength(2);
+
+    const documentId = rcr.body.documents.find(
+      (document: { type: ResourceDocumentType }) => document.type === ResourceDocumentType.BACKGROUND_CHECK
+    ).id as string;
+    const rcrDocumentId = rcr.body.documents.find(
+      (document: { type: ResourceDocumentType }) => document.type === ResourceDocumentType.RCR_PROOF
+    ).id as string;
+
+    const ownerDownload = await request(app.getHttpServer())
+      .get(`/api/v1/resource-documents/${documentId}/download`)
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(200);
+    expect(ownerDownload.headers["content-type"]).toContain("application/pdf");
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/resource-documents/${documentId}/download`)
+      .set("Authorization", `Bearer ${familyToken}`)
+      .expect(403);
+
+    const adminList = await request(app.getHttpServer())
+      .get(`/api/v1/resource-documents/admin/resource/${resourceId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(adminList.body.requirements.complete).toBe(true);
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/resource-documents/${documentId}/download`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/resource-documents/${documentId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+
+    const afterDelete = await request(app.getHttpServer())
+      .get(`/api/v1/resource-documents/admin/resource/${resourceId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(afterDelete.body.requirements.missing).toContain(ResourceDocumentType.BACKGROUND_CHECK);
+
+    const audit = await prisma.adminAuditLog.findFirst({
+      where: { action: "RESOURCE_DOCUMENT_DELETED", targetId: documentId }
+    });
+    expect(audit).toBeTruthy();
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/resource-documents/${rcrDocumentId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+  });
+
+  it("POST /api/v1/maintenance est reserve aux admins et met a jour le statut public", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const familyToken = await loginAs("FAMILLE");
+
+    await request(app.getHttpServer())
+      .post("/api/v1/maintenance")
+      .set("Authorization", `Bearer ${familyToken}`)
+      .send({ enabled: true })
+      .expect(403);
+
+    const enabled = await request(app.getHttpServer())
+      .post("/api/v1/maintenance")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ enabled: true })
+      .expect(201);
+    expect(enabled.body.enabled).toBe(true);
+
+    const status = await request(app.getHttpServer()).get("/api/v1/maintenance/status").expect(200);
+    expect(status.body.enabled).toBe(true);
+
+    const disabled = await request(app.getHttpServer())
+      .post("/api/v1/maintenance")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ enabled: false })
+      .expect(201);
+    expect(disabled.body.enabled).toBe(false);
+  });
+
+  it("GET /api/v1/dev/email-preview rend les templates connus et refuse les inconnus", async () => {
+    const preview = await request(app.getHttpServer())
+      .get("/api/v1/dev/email-preview/password-reset")
+      .expect(200);
+
+    expect(preview.headers["content-type"]).toContain("text/html");
+    expect(preview.text).toContain("reset-password");
+
+    await request(app.getHttpServer()).get("/api/v1/dev/email-preview/inconnu").expect(404);
+  });
+
   async function loginAs(role: "ADMIN" | "FAMILLE" | "RESSOURCE") {
     const res = await request(app.getHttpServer()).post("/api/v1/dev/login-as").send({ role }).expect(201);
     expect(res.body.accessToken).toBeDefined();
@@ -763,12 +1381,16 @@ function validAllyRegistration(overrides: { hourlyRateSuggested?: string } = {})
 }
 
 async function cleanDatabase(prisma: PrismaService) {
+  await prisma.resourceDocument.deleteMany();
   await prisma.message.deleteMany();
   await prisma.conversation.deleteMany();
   await prisma.subscription.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
+  await prisma.adminAuditLog.deleteMany();
   await prisma.familyProfile.deleteMany();
   await prisma.resourceProfile.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.maintenanceState.deleteMany();
 }
 
 async function seedDevUsers(prisma: PrismaService) {

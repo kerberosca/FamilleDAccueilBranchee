@@ -10,6 +10,7 @@ import { HealthModule } from "./modules/health/health.module";
 import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { MessagingModule } from "./modules/messaging/messaging.module";
 import { ProfilesModule } from "./modules/profiles/profiles.module";
+import { ResourceDocumentsModule } from "./modules/resource-documents/resource-documents.module";
 import { SearchModule } from "./modules/search/search.module";
 import { UsersModule } from "./modules/users/users.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -41,7 +42,9 @@ const isProduction = process.env.NODE_ENV === "production";
         EMAIL_FROM: Joi.string().allow("").optional(),
         NOTIFICATION_EMAIL: Joi.string().allow("").optional(),
         N8N_ALLY_WEBHOOK_URL: Joi.string().uri().allow("").optional(),
-        N8N_ALLY_WEBHOOK_SECRET: Joi.string().allow("").optional()
+        N8N_ALLY_WEBHOOK_SECRET: Joi.string().allow("").optional(),
+        RESOURCE_DOCUMENTS_DIR: Joi.string().default("/app/private/uploads/resource-documents"),
+        RESOURCE_DOCUMENT_MAX_MB: Joi.number().default(10)
       })
     }),
     ThrottlerModule.forRoot({
@@ -51,6 +54,7 @@ const isProduction = process.env.NODE_ENV === "production";
     EmailModule,
     MaintenanceModule,
     AuthModule,
+    ResourceDocumentsModule,
     ProfilesModule,
     SearchModule,
     BillingModule,

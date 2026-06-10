@@ -9,6 +9,7 @@ services:
         npm install --legacy-peer-deps;
       fi;
       npm run prisma:generate;
+      npx prisma migrate deploy;
       npm run start:dev
       "
   frontend:

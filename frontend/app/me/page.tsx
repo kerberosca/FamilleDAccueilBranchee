@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
+import { ResourceDocumentsPanel } from "../../components/resource-documents-panel";
 import { apiDelete, apiGet, apiPatch } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 
@@ -519,7 +520,7 @@ export default function MePage() {
           </Card>
         ) : null}
 
-        {me?.role === "ADMIN" ? <Alert tone="info">Le rôle ADMIN n&apos;a pas de profil éditable dans cette version.</Alert> : null}
+        {me?.role === "ADMIN" ? <Alert tone="info">Le rôle administrateur n&apos;a pas de profil éditable dans cette version.</Alert> : null}
 
         {me?.role === "FAMILY" ? (
           <Card className="space-y-5 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
@@ -849,6 +850,7 @@ export default function MePage() {
               Pour être validé comme allié, une vérification d&apos;antécédents judiciaires est requise. Vous devrez fournir
               les documents demandés selon les modalités communiquées.
             </p>
+            <ResourceDocumentsPanel token={accessToken} compact />
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"

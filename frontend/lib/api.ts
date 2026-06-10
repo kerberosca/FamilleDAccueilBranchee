@@ -36,6 +36,28 @@ export async function apiDelete<T = void>(path: string, options: RequestOptions 
   return requestJson<T>(path, { ...options, method: "DELETE" });
 }
 
+export async function apiPostForm<T>(path: string, formData: FormData, options: { token?: string | null } = {}): Promise<T> {
+  const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+  const headers: Record<string, string> = {};
+  if (options.token) {
+    headers.Authorization = `Bearer ${options.token}`;
+  }
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: formData
+  });
+  const json = await readJson(response);
+  if (!response.ok) {
+    const message =
+      (json as { message?: string | string[] } | null)?.message ??
+      `Erreur ${response.status} sur ${path}`;
+    throw new ApiError(Array.isArray(message) ? message.join(", ") : message, response.status, json);
+  }
+  return json as T;
+}
+
 async function tryRefresh(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   const url = `${API_BASE}/auth/refresh`;
@@ -84,15 +106,7 @@ async function requestJson<T>(
     body: options.method === "GET" ? undefined : (typeof options.body === "undefined" ? undefined : JSON.stringify(options.body))
   });
 
-  let json: unknown = null;
-  try {
-    const text = await response.text();
-    if (text.length > 0) {
-      json = JSON.parse(text);
-    }
-  } catch {
-    // Ignore non-json responses.
-  }
+  const json = await readJson(response);
 
   if (!response.ok) {
     if (response.status === 503 && typeof window !== "undefined") {
@@ -111,14 +125,23 @@ async function requestJson<T>(
       redirectToLogin();
       const message =
         (json as { message?: string | string[] } | null)?.message ??
-        `HTTP ${response.status} on ${path}`;
+        `Erreur ${response.status} sur ${path}`;
       throw new ApiError(Array.isArray(message) ? message.join(", ") : message, response.status, json);
     }
     const message =
       (json as { message?: string | string[] } | null)?.message ??
-      `HTTP ${response.status} on ${path}`;
+      `Erreur ${response.status} sur ${path}`;
     throw new ApiError(Array.isArray(message) ? message.join(", ") : message, response.status, json);
   }
 
   return json as T;
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  try {
+    const text = await response.text();
+    return text.length > 0 ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
 }

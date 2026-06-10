@@ -11,6 +11,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/famille_accueil?schema=public}
     ports:
       - "3000:3000"
+    volumes:
+      - /root/fab-data/uploads:/app/private/uploads
     depends_on:
       postgres:
         condition: service_healthy

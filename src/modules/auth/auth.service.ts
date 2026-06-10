@@ -31,6 +31,7 @@ import {
 import { EmailService } from "../email/email.service";
 import { MaintenanceService } from "../maintenance/maintenance.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import { ResourceDocumentsService } from "../resource-documents/resource-documents.service";
 import {
   buildAvailabilityFromRegistration,
   buildSkillsTagsFromRegistration,
@@ -55,7 +56,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
     private readonly allyWebhooksService: AllyWebhooksService,
-    private readonly maintenanceService: MaintenanceService
+    private readonly maintenanceService: MaintenanceService,
+    private readonly resourceDocumentsService: ResourceDocumentsService
   ) {}
 
   async register(input: RegisterDto) {
@@ -244,6 +246,10 @@ export class AuthService {
 
   /** Supprime définitivement le compte de l'utilisateur connecté (cascade: profil, messages, abonnements, etc.). */
   async deleteMyAccount(userId: string) {
+    const resourceProfile = await this.prisma.resourceProfile.findUnique({ where: { userId } });
+    if (resourceProfile) {
+      await this.resourceDocumentsService.deleteFilesForResourceProfile(resourceProfile.id);
+    }
     await this.prisma.user.delete({ where: { id: userId } });
     return { success: true };
   }

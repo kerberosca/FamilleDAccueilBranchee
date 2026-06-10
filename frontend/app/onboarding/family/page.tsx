@@ -64,7 +64,7 @@ export default function FamilyOnboardingPage() {
         },
       });
       setTokens(response.accessToken, response.refreshToken ?? null);
-      setSuccess("Compte FAMILY créé. Vous pouvez maintenant lancer le paiement d’abonnement.");
+      setSuccess("Compte famille créé. Vous pouvez maintenant lancer le paiement d’abonnement.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
@@ -199,20 +199,20 @@ export default function FamilyOnboardingPage() {
               disabled={loadingRegister || !acceptPolicy}
               className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
             >
-              {loadingRegister ? "Création…" : "Créer mon compte FAMILY"}
+              {loadingRegister ? "Création…" : "Créer mon compte famille"}
             </Button>
           </form>
         </Card>
 
         <Card className="space-y-2 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
-          <p className="text-sm text-slate-300">Étape suivante : activer l’abonnement FAMILY via Stripe.</p>
+          <p className="text-sm text-slate-300">Étape suivante : activer l’abonnement famille via Stripe.</p>
           <Button
             type="button"
             onClick={onCheckout}
             disabled={loadingCheckout || !accessToken}
             className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
           >
-            {loadingCheckout ? "Redirection…" : "Activer l’abonnement FAMILY"}
+            {loadingCheckout ? "Redirection…" : "Activer l’abonnement famille"}
           </Button>
         </Card>
 
