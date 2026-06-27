@@ -95,6 +95,30 @@ describe("Smoke e2e", () => {
     expect(me.body.passwordHash).toBeUndefined();
   });
 
+  it("GET /api/v1/system-status est reserve aux admins", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const familyToken = await loginAs("FAMILLE");
+
+    const anonymous = await request(app.getHttpServer()).get("/api/v1/system-status");
+    expect([401, 403]).toContain(anonymous.status);
+
+    await request(app.getHttpServer())
+      .get("/api/v1/system-status")
+      .set("Authorization", `Bearer ${familyToken}`)
+      .expect(403);
+
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/system-status")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(res.body.generatedAt).toBeDefined();
+    expect(res.body.host.uptimeSeconds).toEqual(expect.any(Number));
+    expect(res.body.cpu.cores).toBeGreaterThan(0);
+    expect(res.body.memory.totalBytes).toBeGreaterThan(0);
+    expect(res.body.scope).toBe("os-visible-from-api-container");
+  });
+
   it("GET /api/v1/search/resources retourne preview sans contact en public", async () => {
     const res = await request(app.getHttpServer()).get("/api/v1/search/resources?postalCode=H2X1Y4").expect(200);
 

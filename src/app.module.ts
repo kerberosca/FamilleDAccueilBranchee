@@ -12,6 +12,7 @@ import { MessagingModule } from "./modules/messaging/messaging.module";
 import { ProfilesModule } from "./modules/profiles/profiles.module";
 import { ResourceDocumentsModule } from "./modules/resource-documents/resource-documents.module";
 import { SearchModule } from "./modules/search/search.module";
+import { SystemStatusModule } from "./modules/system-status/system-status.module";
 import { UsersModule } from "./modules/users/users.module";
 import { PrismaModule } from "./prisma/prisma.module";
 
@@ -60,6 +61,7 @@ const isProduction = process.env.NODE_ENV === "production";
     BillingModule,
     HealthModule,
     MessagingModule,
+    SystemStatusModule,
     UsersModule,
     ...(!isProduction ? [DevModule] : [])
   ]
