@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -57,6 +57,46 @@ type AuditItem = {
 type AuditResponse = PageMeta & { items: AuditItem[] };
 
 type MaintenanceStatus = { enabled: boolean; updatedAt: string; updatedBy: string | null };
+type DiskStatus = {
+  path: string;
+  totalBytes: number;
+  freeBytes: number;
+  usedBytes: number;
+  usedPercent: number;
+} | null;
+type SystemStatus = {
+  generatedAt: string;
+  host: {
+    hostname: string;
+    platform: string;
+    release: string;
+    arch: string;
+    uptimeSeconds: number;
+  };
+  process: {
+    uptimeSeconds: number;
+    nodeVersion: string;
+    pid: number;
+    memory: { rss: number; heapTotal: number; heapUsed: number; external: number; arrayBuffers: number };
+  };
+  cpu: {
+    cores: number;
+    model: string;
+    loadAverage: number[];
+    usagePercent: number;
+  };
+  memory: {
+    totalBytes: number;
+    freeBytes: number;
+    usedBytes: number;
+    usedPercent: number;
+  };
+  disk: {
+    root: DiskStatus;
+    uploads: DiskStatus;
+  };
+  scope: string;
+};
 
 const SELECT_CLASS = "min-w-0 max-w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2";
 const ADMIN_CARD_CLASS = "min-w-0 overflow-hidden";
@@ -110,6 +150,35 @@ function formatLabel(labels: Record<string, string>, value: string | null | unde
   return labels[value] ?? value;
 }
 
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0 o";
+  const units = ["o", "Ko", "Mo", "Go", "To"];
+  const exponent = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+  const amount = value / 1024 ** exponent;
+  return `${amount >= 10 || exponent === 0 ? amount.toFixed(0) : amount.toFixed(1)} ${units[exponent]}`;
+}
+
+function formatDuration(totalSeconds: number): string {
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (days > 0) return `${days} j ${hours} h`;
+  if (hours > 0) return `${hours} h ${minutes} min`;
+  return `${minutes} min`;
+}
+
+function formatPercent(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
+  return `${value.toFixed(1)} %`;
+}
+
+function statusToneClass(percent: number | null | undefined): string {
+  if (typeof percent !== "number") return "bg-slate-700";
+  if (percent >= 90) return "bg-rose-500";
+  if (percent >= 75) return "bg-amber-400";
+  return "bg-emerald-400";
+}
+
 export default function AdminPage() {
   const { accessToken } = useAuth();
   const { updateMaintenance } = useMaintenance();
@@ -142,6 +211,9 @@ export default function AdminPage() {
   const [selectedResourceIds, setSelectedResourceIds] = useState<string[]>([]);
   const [maintenanceStatus, setMaintenanceStatus] = useState<MaintenanceStatus | null>(null);
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [systemLoading, setSystemLoading] = useState(false);
+  const [systemError, setSystemError] = useState<string | null>(null);
 
   const isAdmin = me?.role === "ADMIN";
   const selectedResourcesComplete = selectedResourceIds.every(
@@ -196,6 +268,22 @@ export default function AdminPage() {
     return `/users/admin/audit?${params.toString()}`;
   }, [auditMeta.page, auditMeta.pageSize]);
 
+  const refreshSystemStatus = useCallback(async () => {
+    if (!accessToken || !isAdmin) {
+      return;
+    }
+    setSystemLoading(true);
+    setSystemError(null);
+    try {
+      const data = await apiGet<SystemStatus>("/system-status", { token: accessToken });
+      setSystemStatus(data);
+    } catch (e) {
+      setSystemError(e instanceof Error ? e.message : "Etat VPS indisponible");
+    } finally {
+      setSystemLoading(false);
+    }
+  }, [accessToken, isAdmin]);
+
   useEffect(() => {
     if (!accessToken) {
       return;
@@ -229,6 +317,10 @@ export default function AdminPage() {
     };
     void fetchMaintenance();
   }, [accessToken, isAdmin]);
+
+  useEffect(() => {
+    void refreshSystemStatus();
+  }, [refreshSystemStatus]);
 
   useEffect(() => {
     if (!accessToken || !isAdmin) {
@@ -497,6 +589,13 @@ export default function AdminPage() {
                 </p>
               ) : null}
             </Card>
+
+            <SystemStatusPanel
+              status={systemStatus}
+              loading={systemLoading}
+              error={systemError}
+              onRefresh={() => void refreshSystemStatus()}
+            />
 
             <div className="flex flex-wrap gap-2">
               <Button variant={tab === "families" ? "primary" : "secondary"} onClick={() => setTab("families")}>
@@ -856,6 +955,103 @@ export default function AdminPage() {
         ) : null}
       </RequireAuth>
     </main>
+  );
+}
+
+function SystemStatusPanel({
+  status,
+  loading,
+  error,
+  onRefresh
+}: {
+  status: SystemStatus | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}) {
+  return (
+    <Card className={`mb-4 space-y-4 ${ADMIN_CARD_CLASS}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-medium">Etat VPS</h2>
+          <p className="text-xs text-slate-500">
+            {status ? `Derniere lecture : ${new Date(status.generatedAt).toLocaleString("fr-CA")}` : "Lecture non disponible"}
+          </p>
+        </div>
+        <Button variant="secondary" disabled={loading} onClick={onRefresh}>
+          {loading ? "Chargement..." : "Rafraichir"}
+        </Button>
+      </div>
+
+      {error ? <Alert tone="error">{error}</Alert> : null}
+      {!status && !loading && !error ? <Alert tone="info">Aucune mesure chargee.</Alert> : null}
+
+      {status ? (
+        <>
+          <div className="grid min-w-0 gap-4 md:grid-cols-3">
+            <MetricBar label="CPU" valueText={formatPercent(status.cpu.usagePercent)} percent={status.cpu.usagePercent} />
+            <MetricBar
+              label="Memoire"
+              valueText={`${formatBytes(status.memory.usedBytes)} / ${formatBytes(status.memory.totalBytes)}`}
+              percent={status.memory.usedPercent}
+            />
+            <MetricBar
+              label="Disque racine"
+              valueText={status.disk.root ? `${formatBytes(status.disk.root.usedBytes)} / ${formatBytes(status.disk.root.totalBytes)}` : "-"}
+              percent={status.disk.root?.usedPercent ?? null}
+            />
+          </div>
+
+          <div className="grid min-w-0 gap-3 text-sm md:grid-cols-2">
+            <div className="min-w-0 space-y-1">
+              <InfoRow label="Serveur" value={`${status.host.hostname} (${status.host.platform} ${status.host.release})`} />
+              <InfoRow label="Uptime VPS" value={formatDuration(status.host.uptimeSeconds)} />
+              <InfoRow label="CPU" value={`${status.cpu.cores} coeurs - ${status.cpu.model}`} />
+              <InfoRow label="Charge" value={status.cpu.loadAverage.map((value) => value.toFixed(2)).join(" / ")} />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <InfoRow label="Process API" value={`PID ${status.process.pid}, Node ${status.process.nodeVersion}`} />
+              <InfoRow label="Uptime API" value={formatDuration(status.process.uptimeSeconds)} />
+              <InfoRow label="Memoire API" value={`${formatBytes(status.process.memory.rss)} RSS`} />
+              <InfoRow
+                label="Uploads"
+                value={
+                  status.disk.uploads
+                    ? `${formatBytes(status.disk.uploads.usedBytes)} / ${formatBytes(status.disk.uploads.totalBytes)} (${formatPercent(status.disk.uploads.usedPercent)})`
+                    : "-"
+                }
+              />
+            </div>
+          </div>
+          <p className="text-xs text-slate-500">Portee : {status.scope}</p>
+        </>
+      ) : null}
+    </Card>
+  );
+}
+
+function MetricBar({ label, valueText, percent }: { label: string; valueText: string; percent: number | null }) {
+  const normalizedPercent = typeof percent === "number" && Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
+  return (
+    <div className="min-w-0 space-y-2">
+      <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+        <span className="font-medium">{label}</span>
+        <span className="min-w-0 break-words text-right text-slate-300">{valueText}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+        <div className={`h-full ${statusToneClass(percent)}`} style={{ width: `${normalizedPercent}%` }} />
+      </div>
+      <p className="text-xs text-slate-500">{formatPercent(percent)}</p>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="grid min-w-0 gap-1 sm:grid-cols-[8rem_1fr]">
+      <span className="text-slate-500">{label}</span>
+      <span className="min-w-0 break-words text-slate-200">{value}</span>
+    </p>
   );
 }
 

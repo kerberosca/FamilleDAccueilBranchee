@@ -6,6 +6,8 @@ coverage
 *.log
 /.idea
 /.vscode
+backups-vps/
+output/
 
 # Fichier ngrok avec identifiants de démo (ne pas committer)
 ngrok-demo-policy.yml
