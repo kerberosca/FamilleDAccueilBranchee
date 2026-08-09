@@ -10,7 +10,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/famille_accueil?schema=public}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - /root/fab-data/uploads:/app/private/uploads
     depends_on:
@@ -48,7 +48,7 @@ services:
     environment:
       NODE_ENV: production
     ports:
-      - "3002:3002"
+      - "127.0.0.1:3002:3002"
     depends_on:
       api:
         condition: service_healthy

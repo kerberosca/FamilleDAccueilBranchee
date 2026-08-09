@@ -9,6 +9,28 @@ Procédure unique pour mettre `familledaccueilbranchee.ca` à jour sans écraser
 - Garder `.env` local au VPS. Il ne doit pas être versionné.
 - Si un fichier suivi par Git est modifié localement sur le VPS, le stasher avant le pull.
 
+## Exposition réseau et Caddy
+
+Les ports applicatifs ne doivent jamais être publiés sur l'interface publique du VPS. Le fichier
+`docker-compose.prod.yml` les rend accessibles uniquement depuis la boucle locale :
+
+- API : `127.0.0.1:3000` vers le port `3000` du conteneur;
+- frontend : `127.0.0.1:3002` vers le port `3002` du conteneur.
+
+Dans `/etc/caddy/Caddyfile`, conserver les matchers et les routes existants, mais utiliser ces
+upstreams explicites :
+
+- routes API : `127.0.0.1:3000`;
+- frontend : `127.0.0.1:3002`.
+
+Ne pas remplacer `127.0.0.1` par l'adresse publique, `0.0.0.0` ou un mapping Docker sans adresse.
+Après toute modification de Caddy, valider puis recharger sa configuration :
+
+```bash
+caddy validate --config /etc/caddy/Caddyfile
+systemctl reload caddy
+```
+
 ## Variables `.env` minimales
 
 ```bash
