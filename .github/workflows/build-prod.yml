@@ -17,6 +17,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate production Compose port bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # The production file requires .env. CI uses an empty, short-lived file
+          # so validation never needs production secrets.
+          test ! -e .env
+          touch .env
+          trap 'rm -f .env' EXIT
+
+          docker compose -f docker-compose.prod.yml config --quiet
+          compose_json="$(docker compose -f docker-compose.prod.yml config --format json)"
+
+          assert_loopback_port() {
+            local service="$1"
+            local published="$2"
+            local target="$3"
+
+            if ! jq -e \
+              --arg service "$service" \
+              --arg published "$published" \
+              --arg target "$target" \
+              '(.services[$service].ports // []) as $ports
+               | (($ports | length) == 1)
+                 and ($ports[0].host_ip == "127.0.0.1")
+                 and (($ports[0].published | tostring) == $published)
+                 and (($ports[0].target | tostring) == $target)' \
+              <<<"$compose_json" >/dev/null; then
+              echo "::error title=Unsafe Docker port binding::${service} must expose only 127.0.0.1:${published}:${target}"
+              exit 1
+            fi
+
+            echo "OK: ${service} exposes only 127.0.0.1:${published}:${target}"
+          }
+
+          assert_loopback_port api 3000 3000
+          assert_loopback_port frontend 3002 3002
+
       - name: Build API
         run: docker build -f Dockerfile.api.prod -t fab-api:latest .
 
