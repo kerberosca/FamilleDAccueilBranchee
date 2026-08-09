@@ -17,6 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate backup and deployment guard contract
+        run: npm run test:backup-contract
+
       - name: Validate production Compose port bindings
         shell: bash
         run: |

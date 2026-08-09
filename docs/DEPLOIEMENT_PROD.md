@@ -49,13 +49,17 @@ cd ~/fab
 
 git status
 git fetch origin main
-git pull --ff-only origin main
-
-docker compose -f docker-compose.prod.yml down
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
+bash scripts/deploy-vps.sh
 docker compose -f docker-compose.prod.yml ps
 ```
+
+Le script effectue d'abord un `git pull --ff-only`, synchronisation non
+destructive, puis appelle le garde avant tout build, arrêt/recréation ou
+migration. Le garde fait
+valider par le helper root GestionVPS un marqueur signé attestant une archive
+hors site vérifiée et âgée d'au plus 26 heures. La gestion de l'archive `age`,
+du stockage objet et des secrets reste hors de ce dépôt; voir
+[`SAUVEGARDES-VPS.md`](./SAUVEGARDES-VPS.md).
 
 ## Vérifications
 
