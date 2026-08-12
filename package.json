@@ -9,6 +9,7 @@
     "dev:backend": "npm run start:dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:backup-contract": "bash scripts/backup-contract.test.sh",
     "test:watch": "jest --config ./test/jest-e2e.json --watch",
     "lint": "eslint \"src/**/*.ts\" \"prisma/**/*.ts\"",
     "prisma:generate": "prisma generate",

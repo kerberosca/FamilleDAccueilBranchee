@@ -116,15 +116,12 @@ Sur le VPS :
 
 ```bash
 cd ~/fab
-git pull origin main
-docker compose -f docker-compose.prod.yml up -d --build
+bash scripts/deploy-vps.sh
 ```
 
-Si tu as des migrations Prisma :
-
-```bash
-docker compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
-```
+Le script synchronise `main` en avance rapide, puis exige une attestation de
+sauvegarde GestionVPS récente, signée et vérifiée hors site avant tout build ou
+migration. Voir [`SAUVEGARDES-VPS.md`](./SAUVEGARDES-VPS.md).
 
 ---
 

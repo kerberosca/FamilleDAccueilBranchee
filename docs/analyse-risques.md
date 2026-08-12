@@ -46,7 +46,7 @@ Document d’analyse des risques pour l’application FAB (Famille d’accueil b
 
 | Risque | Gravité | Description | Mitigation |
 |--------|---------|-------------|------------|
-| Perte de données (DB) | Haute | Panne disque, corruption, mauvaise manipulation. | Sauvegardes régulières (scripts backup, voir `scripts/backup-db.sh`) ; tester la restauration. |
+| Perte de données (DB ou documents) | Haute | Panne disque, corruption, mauvaise manipulation. | Service root GestionVPS : archives `age` autonomes, stockage objet verrouillé, attestation signée avant déploiement et restauration isolée trimestrielle ; voir `docs/SAUVEGARDES-VPS.md`. |
 | Données sensibles en clair | Haute | Mots de passe, tokens stockés en clair. | Mots de passe hashés (bcrypt) ; secrets en variables d’environnement, jamais en repo. |
 | Exposition de données (autre utilisateur) | Haute | Un utilisateur voit ou modifie les données d’un autre. | Vérification systématique des droits par ressource (ownership, rôle) dans les services. |
 

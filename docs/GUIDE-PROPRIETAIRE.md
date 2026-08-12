@@ -240,34 +240,37 @@ Commandes typiques sur le VPS :
 
 ```bash
 cd ~/fab
-git pull origin main
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
+bash scripts/deploy-vps.sh
 ```
 
-La commande de migration est nécessaire lorsqu'une mise à jour modifie la structure de la base de données.
+Le script synchronise en avance rapide, valide d'abord l'attestation de
+sauvegarde GestionVPS, puis seulement construit, recrée et migre les services.
 
 ## 10. Sauvegardes
 
-Un script de sauvegarde existe :
+Les sauvegardes sont gérées par le service root GestionVPS. Le point d'entrée
+manuel est :
 
 ```text
 scripts/backup-db.sh
 ```
 
-Il crée une sauvegarde PostgreSQL compressée dans un dossier `backups/` et garde seulement les sauvegardes récentes.
-
 Sur le VPS, depuis le dossier du projet :
 
 ```bash
-./scripts/backup-db.sh
+bash scripts/backup-db.sh
 ```
 
-Recommandation propriétaire :
+Il déclenche une archive autonome chiffrée avec `age`, vérifiée sur le stockage
+objet verrouillé, puis contrôle un marqueur de succès signé. Il ne crée plus de
+dumps non chiffrés dans le dépôt. La procédure complète se trouve dans
+[`SAUVEGARDES-VPS.md`](./SAUVEGARDES-VPS.md).
 
-- faire une sauvegarde avant une mise à jour importante;
-- vérifier régulièrement qu'une sauvegarde récente existe;
-- conserver parfois une copie hors du VPS, surtout avant des opérations sensibles.
+Règles propriétaire :
+
+- ne jamais contourner le garde avant un build ou une migration;
+- surveiller le timer et les attestations GestionVPS;
+- réaliser une restauration isolée au moins chaque trimestre.
 
 ## 11. Variables importantes
 
