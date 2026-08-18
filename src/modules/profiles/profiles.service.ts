@@ -26,6 +26,7 @@ import { BulkModerateResourceDto } from "./dto/bulk-moderate-resource.dto";
 import { ModerateResourceDto } from "./dto/moderate-resource.dto";
 import { UpdateFamilyProfileDto } from "./dto/update-family-profile.dto";
 import { UpdateResourceProfileDto } from "./dto/update-resource-profile.dto";
+import { TrainingService } from "../training/training.service";
 
 @Injectable()
 export class ProfilesService {
@@ -38,7 +39,8 @@ export class ProfilesService {
     private readonly resourceDocumentsService: ResourceDocumentsService,
     private readonly emailService: EmailService,
     private readonly allyWebhooksService: AllyWebhooksService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly trainingService: TrainingService
   ) {}
 
   async getMyProfile(user: JwtPayload) {
@@ -150,6 +152,9 @@ export class ProfilesService {
         ...(allyRegRaw !== undefined ? derivedFromAlly : {})
       }
     });
+    if (updated.allyDeclarationsAcceptedAt) {
+      await this.trainingService.ensureEnrollment(updated.id);
+    }
     void this.allyWebhooksService.sendApplicationEvent("ally.application.updated", {
       ...updated,
       user: { email: existing.user.email }
@@ -209,6 +214,7 @@ export class ProfilesService {
     }
     if (isPublishing(dto)) {
       await this.resourceDocumentsService.assertResourceDocumentsComplete([resourceId]);
+      await this.trainingService.assertTrainingPassedForPublication(resourceId, existing.publishStatus);
     }
     const updated = await this.prisma.resourceProfile.update({
       where: { id: resourceId },
@@ -241,6 +247,7 @@ export class ProfilesService {
   async bulkModerateResources(resourceIds: string[], dto: BulkModerateResourceDto, actorUserId: string) {
     if (isPublishing(dto)) {
       await this.resourceDocumentsService.assertResourceDocumentsComplete(resourceIds);
+      await this.trainingService.assertTrainingsPassedForPublication(resourceIds);
     }
     const existingResources = await this.prisma.resourceProfile.findMany({
       where: { id: { in: resourceIds } },
@@ -360,6 +367,11 @@ export class ProfilesService {
           documents: {
             where: { deletedAt: null }
           },
+          trainingEnrollments: {
+            where: { courseVersion: "faba-v1" },
+            select: { status: true, lastActivityAt: true, completedAt: true },
+            take: 1
+          },
           user: {
             select: {
               id: true,
@@ -395,6 +407,9 @@ export class ProfilesService {
         publishStatus: resource.publishStatus,
         onboardingState: resource.onboardingState,
         backgroundCheckStatus: resource.backgroundCheckStatus,
+        trainingStatus: resource.trainingEnrollments[0]?.status ?? "NOT_STARTED",
+        trainingLastActivityAt: resource.trainingEnrollments[0]?.lastActivityAt ?? undefined,
+        trainingCompletedAt: resource.trainingEnrollments[0]?.completedAt ?? undefined,
         contactEmail: resource.contactEmail,
         contactPhone: resource.contactPhone,
         allyRegistration: resource.allyRegistration ?? undefined,

@@ -9,6 +9,7 @@ import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
 import { ResourceDocumentsPanel } from "../../components/resource-documents-panel";
+import { TrainingSummaryCard } from "../../components/training-summary-card";
 import { apiDelete, apiGet, apiPatch } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 
@@ -521,6 +522,8 @@ export default function MePage() {
         ) : null}
 
         {me?.role === "ADMIN" ? <Alert tone="info">Le rôle administrateur n&apos;a pas de profil éditable dans cette version.</Alert> : null}
+
+        {me?.role === "RESOURCE" ? <TrainingSummaryCard /> : null}
 
         {me?.role === "FAMILY" ? (
           <Card className="space-y-5 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">

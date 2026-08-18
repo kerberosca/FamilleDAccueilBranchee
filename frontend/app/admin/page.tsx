@@ -7,11 +7,12 @@ import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
 import { ResourceDocumentsPanel } from "../../components/resource-documents-panel";
+import { TrainingAdminPanel } from "../../components/training-admin-panel";
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 import { useMaintenance } from "../../lib/maintenance-context";
 
-type Tab = "families" | "resources" | "audit";
+type Tab = "families" | "resources" | "training" | "audit";
 
 type MeResponse = { id: string; email: string; role: string; status: string };
 type PageMeta = { total: number; page: number; pageSize: number; totalPages: number };
@@ -37,6 +38,9 @@ type ResourceItem = {
   publishStatus: string;
   onboardingState: string;
   backgroundCheckStatus?: string;
+  trainingStatus?: string;
+  trainingLastActivityAt?: string;
+  trainingCompletedAt?: string;
   allyRegistration?: unknown;
   documentRequirements?: { required: string[]; missing: string[]; complete: boolean };
   allyDeclarationsAcceptedAt?: string | null;
@@ -216,9 +220,13 @@ export default function AdminPage() {
   const [systemError, setSystemError] = useState<string | null>(null);
 
   const isAdmin = me?.role === "ADMIN";
-  const selectedResourcesComplete = selectedResourceIds.every(
-    (id) => resources.find((resource) => resource.id === id)?.documentRequirements?.complete
-  );
+  const selectedResourcesComplete = selectedResourceIds.every((id) => {
+    const resource = resources.find((item) => item.id === id);
+    return Boolean(
+      resource?.documentRequirements?.complete &&
+      (resource.publishStatus === "PUBLISHED" || resource.trainingStatus === "PASSED")
+    );
+  });
 
   const familiesUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -604,6 +612,9 @@ export default function AdminPage() {
               <Button variant={tab === "resources" ? "primary" : "secondary"} onClick={() => setTab("resources")}>
                 Alliés
               </Button>
+              <Button variant={tab === "training" ? "primary" : "secondary"} onClick={() => setTab("training")}>
+                Parcours alliés
+              </Button>
               <Button variant={tab === "audit" ? "primary" : "secondary"} onClick={() => setTab("audit")}>
                 Audit
               </Button>
@@ -795,6 +806,7 @@ export default function AdminPage() {
                             {resource.backgroundCheckStatus
                               ? ` · Antécédents: ${formatLabel(BACKGROUND_CHECK_STATUS_LABELS, resource.backgroundCheckStatus)}`
                               : null}
+                            {` · Formation: ${resource.trainingStatus === "PASSED" ? "réussie" : resource.trainingStatus === "EXAM_AVAILABLE" ? "examen disponible" : resource.trainingStatus === "IN_PROGRESS" ? "en cours" : resource.trainingStatus === "ATTENTION_REQUIRED" ? "attention requise" : "non commencée"}`}
                           </p>
                           <p>
                             Localisation: {resource.city}, {resource.region} ({resource.postalCode})
@@ -867,7 +879,11 @@ export default function AdminPage() {
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="secondary"
-                          disabled={busyId === resource.id || !resource.documentRequirements?.complete}
+                          disabled={
+                            busyId === resource.id ||
+                            !resource.documentRequirements?.complete ||
+                            (resource.publishStatus !== "PUBLISHED" && resource.trainingStatus !== "PASSED")
+                          }
                           onClick={() =>
                             void moderateResource(resource.id, {
                               verificationStatus: "VERIFIED",
@@ -918,6 +934,8 @@ export default function AdminPage() {
                 />
               </Card>
             ) : null}
+
+            {tab === "training" ? <TrainingAdminPanel /> : null}
 
             {tab === "audit" ? (
               <Card className={`space-y-3 ${ADMIN_CARD_CLASS}`}>

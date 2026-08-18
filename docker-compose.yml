@@ -12,6 +12,10 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/famille_accueil?schema=public}
       RESOURCE_DOCUMENTS_DIR: /app/private/uploads/resource-documents
       RESOURCE_DOCUMENT_MAX_MB: ${RESOURCE_DOCUMENT_MAX_MB:-10}
+      EMAIL_DELIVERY_MODE: log
+      ALLY_TRAINING_ENABLED: "true"
+      ALLY_TRAINING_EMAILS_ENABLED: "false"
+      ALLY_TRAINING_EMAILS_START_AT: ""
     ports:
       - "3000:3000"
     volumes:
@@ -59,7 +63,7 @@ services:
     container_name: fab-frontend-dev
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: http://localhost:3000/api/v1
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3000/api/v1
       NEXT_PUBLIC_DEV_BYPASS_AUTH: "true"
     ports:
       - "3002:3002"

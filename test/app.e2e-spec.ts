@@ -1,4 +1,5 @@
 import { INestApplication } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 import {
   AllyType,
@@ -9,15 +10,20 @@ import {
   ResourceVerificationStatus,
   Role,
   SubscriptionStatus,
+  TrainingEmailStatus,
+  TrainingReminderType,
+  TrainingStatus,
   UserStatus
 } from "@prisma/client";
 import * as argon2 from "argon2";
 import { execSync } from "node:child_process";
+import { join } from "node:path";
 import request from "supertest";
 import { setupApp } from "../src/app.setup";
 import { AuthService } from "../src/modules/auth/auth.service";
 import { StripeService } from "../src/modules/billing/stripe.service";
 import { EmailService } from "../src/modules/email/email.service";
+import { TrainingService } from "../src/modules/training/training.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 
 const E2E_SCHEMA = "e2e_tests";
@@ -365,6 +371,35 @@ describe("Smoke e2e", () => {
         subject: "Nouvel allié à approuver sur FAB",
         html: expect.stringContaining("Un nouvel allié attend une approbation")
       })
+    );
+  });
+
+  it("assigne automatiquement la formation apres une candidature allie complete", async () => {
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/register")
+      .send({
+        email: "formation.assignment@local.test",
+        password: "Bienvenue123!",
+        role: Role.RESOURCE,
+        displayName: "Allie Formation Assignee",
+        postalCode: "H2X1Y4",
+        city: "Montreal",
+        region: "QC",
+        allyType: AllyType.GARDIENS,
+        contactPhone: "514-555-1212",
+        allyRegistration: validAllyRegistration()
+      })
+      .expect(201);
+
+    const enrollment = await prisma.trainingEnrollment.findFirst({
+      where: { resourceProfile: { user: { email: "formation.assignment@local.test" } }, courseVersion: "faba-v1" },
+      include: { emailLogs: true }
+    });
+
+    expect(enrollment).toBeTruthy();
+    expect(enrollment?.status).toBe("NOT_STARTED");
+    expect(enrollment?.emailLogs.map((log) => log.type).sort()).toEqual(
+      ["ASSIGNMENT", "DAY_3", "DAY_7", "DAY_14"].sort()
     );
   });
 
@@ -1248,6 +1283,525 @@ describe("Smoke e2e", () => {
       .expect(200);
   });
 
+  it("parcours formation: 8 modules, quiz, 3 essais, reset admin, réussite et certificat PDF", async () => {
+    const resourceToken = await loginAs("RESSOURCE");
+    const adminToken = await loginAs("ADMIN");
+
+    const overview = await request(app.getHttpServer())
+      .get("/api/v1/training/me")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(200);
+    expect(overview.body.status).toBe("NOT_STARTED");
+    expect(overview.body.lessons).toHaveLength(8);
+    expect(overview.body.formativeQuestions).toHaveLength(12);
+    expect(overview.body.formativeQuestions[0].correctIndex).toBeUndefined();
+    const reminders = await prisma.trainingEmailLog.findMany({
+      where: { enrollmentId: overview.body.id },
+      orderBy: { scheduledFor: "asc" }
+    });
+    expect(reminders.map((item) => item.type)).toEqual(["ASSIGNMENT", "DAY_3", "DAY_7", "DAY_14"]);
+    expect(
+      reminders.map((item) => Math.round((item.scheduledFor.getTime() - reminders[0].scheduledFor.getTime()) / 86_400_000))
+    ).toEqual([0, 3, 7, 14]);
+
+    await request(app.getHttpServer())
+      .get("/api/v1/training/me/exam")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(403);
+
+    for (const lesson of overview.body.lessons as { key: string }[]) {
+      await request(app.getHttpServer())
+        .get(`/api/v1/training/me/lessons/${lesson.key}`)
+        .set("Authorization", `Bearer ${resourceToken}`)
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch(`/api/v1/training/me/lessons/${lesson.key}/complete`)
+        .set("Authorization", `Bearer ${resourceToken}`)
+        .expect(200);
+    }
+
+    const formativeAnswers = {
+      "3261": 1,
+      "3262": 2,
+      "3263": 2,
+      "3265": 2,
+      "3266": 3,
+      "3267": 2,
+      "3268": 1,
+      "3269": 2,
+      "3270": 1,
+      "3271": 2,
+      "3272": 1,
+      "3273": 2
+    };
+    const formative = await request(app.getHttpServer())
+      .post("/api/v1/training/me/formative/submit")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .send({ answers: formativeAnswers })
+      .expect(201);
+    expect(formative.body.scorePercent).toBe(100);
+
+    const exam = await request(app.getHttpServer())
+      .get("/api/v1/training/me/exam")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(200);
+    expect(exam.body.attemptsRemaining).toBe(3);
+    expect(exam.body.question.correctIndex).toBeUndefined();
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await request(app.getHttpServer())
+        .post("/api/v1/training/me/exam/submit")
+        .set("Authorization", `Bearer ${resourceToken}`)
+        .send({ answers: { "3264": 1 } })
+        .expect(201);
+    }
+    const blocked = await request(app.getHttpServer())
+      .get("/api/v1/training/me")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(200);
+    expect(blocked.body.status).toBe("ATTENTION_REQUIRED");
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/training/admin/enrollments/${blocked.body.id}/reset-attempts`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(201);
+
+    const passed = await request(app.getHttpServer())
+      .post("/api/v1/training/me/exam/submit")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .send({ answers: { "3264": 0 } })
+      .expect(201);
+    expect(passed.body.passed).toBe(true);
+    expect(passed.body.scorePercent).toBe(100);
+
+    const certificate = await request(app.getHttpServer())
+      .get("/api/v1/training/me/certificate")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .buffer(true)
+      .expect(200);
+    expect(certificate.headers["content-type"]).toContain("application/pdf");
+    const certificateBuffer = Buffer.from(certificate.body);
+    expect(certificateBuffer.subarray(0, 4).toString()).toBe("%PDF");
+    const certificateSource = certificateBuffer.toString("latin1");
+    expect(certificateSource).toContain("1 1 1 rg 0 0 792 612 re f");
+    expect(certificateSource).not.toContain("0.05 0.04 0.12 rg 0 0 792 612 re f");
+
+    const stored = await prisma.trainingCertificate.count({ where: { enrollmentId: blocked.body.id } });
+    const successEmails = await prisma.trainingEmailLog.count({
+      where: { enrollmentId: blocked.body.id, type: "SUCCESS" }
+    });
+    const activeReminders = await prisma.trainingEmailLog.count({
+      where: {
+        enrollmentId: blocked.body.id,
+        type: { in: ["DAY_3", "DAY_7", "DAY_14"] },
+        status: { in: ["PENDING", "PROCESSING"] }
+      }
+    });
+    expect(stored).toBe(1);
+    expect(successEmails).toBe(1);
+    expect(activeReminders).toBe(0);
+  });
+
+  it("bloque une nouvelle publication tant que la formation n'est pas réussie", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const user = await prisma.user.create({
+      data: {
+        email: "formation-gate@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        resourceProfile: {
+          create: {
+            displayName: "Allié Formation Requise",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            skillsTags: ["repit"],
+            verificationStatus: ResourceVerificationStatus.PENDING_VERIFICATION,
+            publishStatus: ResourcePublishStatus.HIDDEN,
+            onboardingState: ResourceOnboardingState.PENDING_VERIFICATION,
+            contactEmail: "formation-gate@local.test",
+            contactPhone: "514-555-1212",
+            documents: {
+              create: {
+                type: ResourceDocumentType.BACKGROUND_CHECK,
+                originalName: "background.pdf",
+                storedName: "background-test.pdf",
+                mimeType: "application/pdf",
+                sizeBytes: 12
+              }
+            },
+            trainingEnrollments: { create: { courseVersion: "faba-v1" } }
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+
+    const response = await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${user.resourceProfile!.id}/moderation`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        verificationStatus: "VERIFIED",
+        publishStatus: "PUBLISHED",
+        onboardingState: "PUBLISHED"
+      })
+      .expect(400);
+    expect(response.body.message).toContain("formation allié");
+  });
+
+  it("rattrape les allies existants une seule fois et sans dupliquer les relances", async () => {
+    const trainingService = app.get(TrainingService);
+    const legacyUser = await prisma.user.create({
+      data: {
+        email: "allie-rattrapage@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        resourceProfile: {
+          create: {
+            displayName: "Allie a rattraper",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            skillsTags: ["repit"],
+            contactEmail: "allie-rattrapage@local.test"
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+
+    expect(
+      await prisma.trainingEnrollment.count({ where: { resourceProfileId: legacyUser.resourceProfile!.id } })
+    ).toBe(0);
+
+    await trainingService.backfillExistingAllies();
+    const firstEnrollment = await prisma.trainingEnrollment.findFirstOrThrow({
+      where: { resourceProfileId: legacyUser.resourceProfile!.id },
+      include: { emailLogs: true }
+    });
+    expect(firstEnrollment.emailLogs).toHaveLength(4);
+
+    const secondRun = await trainingService.backfillExistingAllies();
+    expect(secondRun.created).toBe(0);
+    expect(
+      await prisma.trainingEnrollment.count({ where: { resourceProfileId: legacyUser.resourceProfile!.id } })
+    ).toBe(1);
+    expect(await prisma.trainingEmailLog.count({ where: { enrollmentId: firstEnrollment.id } })).toBe(4);
+  });
+
+  it("traite J0, J3, J7 et J14 en mode simule sans doublon et ignore J3 apres le debut", async () => {
+    const trainingService = app.get(TrainingService);
+    await prisma.trainingEmailLog.updateMany({
+      where: { status: TrainingEmailStatus.PENDING },
+      data: { scheduledFor: new Date(Date.now() + 30 * 24 * 60 * 60_000) }
+    });
+
+    const reminderUser = await prisma.user.create({
+      data: {
+        email: "allie-relances@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        resourceProfile: {
+          create: {
+            displayName: "Allie Relances",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            skillsTags: ["repit"],
+            contactEmail: "allie-relances@local.test"
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+    const { enrollment } = await trainingService.ensureEnrollment(reminderUser.resourceProfile!.id);
+    await prisma.trainingEmailLog.updateMany({
+      where: { enrollmentId: enrollment.id },
+      data: { scheduledFor: new Date(Date.now() - 60_000) }
+    });
+
+    emailSendMock.mockClear();
+    await trainingService.processDueEmails();
+    expect(emailSendMock).toHaveBeenCalledTimes(4);
+    const sentMessages = emailSendMock.mock.calls as unknown as Array<[{ to: string }]>;
+    expect(sentMessages.map(([message]) => message.to)).toEqual([
+      "allie-relances@local.test",
+      "allie-relances@local.test",
+      "allie-relances@local.test",
+      "allie-relances@local.test"
+    ]);
+    expect(
+      await prisma.trainingEmailLog.count({
+        where: { enrollmentId: enrollment.id, status: TrainingEmailStatus.SENT }
+      })
+    ).toBe(4);
+
+    await trainingService.processDueEmails();
+    expect(emailSendMock).toHaveBeenCalledTimes(4);
+
+    const startedUser = await prisma.user.create({
+      data: {
+        email: "allie-deja-commence@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        resourceProfile: {
+          create: {
+            displayName: "Allie Deja Commence",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            skillsTags: ["repit"],
+            contactEmail: "allie-deja-commence@local.test"
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+    const started = await trainingService.ensureEnrollment(startedUser.resourceProfile!.id);
+    const startedCourse = await trainingService.getMyCourse(startedUser.id);
+    await trainingService.openLesson(startedUser.id, startedCourse.lessons[0].key);
+    await prisma.trainingEmailLog.updateMany({
+      where: { enrollmentId: started.enrollment.id },
+      data: { scheduledFor: new Date(Date.now() + 30 * 24 * 60 * 60_000) }
+    });
+    await prisma.trainingEmailLog.update({
+      where: {
+        enrollmentId_type: {
+          enrollmentId: started.enrollment.id,
+          type: TrainingReminderType.DAY_3
+        }
+      },
+      data: { scheduledFor: new Date(Date.now() - 60_000) }
+    });
+
+    await trainingService.processDueEmails();
+    expect(emailSendMock).toHaveBeenCalledTimes(4);
+    const day3 = await prisma.trainingEmailLog.findUniqueOrThrow({
+      where: {
+        enrollmentId_type: {
+          enrollmentId: started.enrollment.id,
+          type: TrainingReminderType.DAY_3
+        }
+      }
+    });
+    expect(day3.status).toBe(TrainingEmailStatus.SKIPPED);
+  });
+
+  it("bloque toutes les relances de formation sans bloquer les autres courriels FAB", async () => {
+    const trainingService = app.get(TrainingService);
+    const configService = app.get(ConfigService);
+    const previousEnabled = configService.get<string>("ALLY_TRAINING_EMAILS_ENABLED", "false");
+    const previousStartAt = configService.get<string>("ALLY_TRAINING_EMAILS_START_AT", "");
+    configService.set("ALLY_TRAINING_EMAILS_ENABLED", "false");
+    configService.set("ALLY_TRAINING_EMAILS_START_AT", "");
+
+    try {
+      await prisma.trainingEmailLog.updateMany({
+        where: { status: TrainingEmailStatus.PENDING },
+        data: { scheduledFor: new Date(Date.now() + 30 * 24 * 60 * 60_000) }
+      });
+      emailSendMock.mockClear();
+
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/register")
+        .send({
+          email: "allie-courriels-pauses@local.test",
+          password: "Bienvenue123!",
+          role: Role.RESOURCE,
+          displayName: "Allie Courriels Pauses",
+          postalCode: "H2X1Y4",
+          city: "Montreal",
+          region: "QC",
+          allyType: AllyType.GARDIENS,
+          contactPhone: "514-555-1212",
+          allyRegistration: validAllyRegistration()
+        })
+        .expect(201);
+
+      // Les courriels transactionnels normaux (bienvenue et avis équipe) restent actifs.
+      expect(emailSendMock).toHaveBeenCalledTimes(2);
+      const enrollment = await prisma.trainingEnrollment.findFirstOrThrow({
+        where: { resourceProfile: { user: { email: "allie-courriels-pauses@local.test" } } }
+      });
+      await prisma.trainingEmailLog.updateMany({
+        where: { enrollmentId: enrollment.id },
+        data: { scheduledFor: new Date(Date.now() - 60_000) }
+      });
+
+      await trainingService.processDueEmails();
+      expect(emailSendMock).toHaveBeenCalledTimes(2);
+      expect(
+        await prisma.trainingEmailLog.count({
+          where: { enrollmentId: enrollment.id, status: TrainingEmailStatus.PENDING, providerMessageId: null }
+        })
+      ).toBe(4);
+
+      // Même une demande d'activation reste fail-closed sans date ISO valide.
+      configService.set("ALLY_TRAINING_EMAILS_ENABLED", "true");
+      configService.set("ALLY_TRAINING_EMAILS_START_AT", "");
+      await trainingService.processDueEmails();
+      expect(emailSendMock).toHaveBeenCalledTimes(2);
+      expect(
+        await prisma.trainingEmailLog.count({
+          where: { enrollmentId: enrollment.id, status: TrainingEmailStatus.PENDING }
+        })
+      ).toBe(4);
+    } finally {
+      configService.set("ALLY_TRAINING_EMAILS_ENABLED", previousEnabled);
+      configService.set("ALLY_TRAINING_EMAILS_START_AT", previousStartAt);
+    }
+  });
+
+  it("recale les relances en attente depuis la date d'activation de facon idempotente", async () => {
+    const trainingService = app.get(TrainingService);
+    const configService = app.get(ConfigService);
+    const previousEnabled = configService.get<string>("ALLY_TRAINING_EMAILS_ENABLED", "false");
+    const previousStartAt = configService.get<string>("ALLY_TRAINING_EMAILS_START_AT", "");
+    configService.set("ALLY_TRAINING_EMAILS_ENABLED", "false");
+    configService.set("ALLY_TRAINING_EMAILS_START_AT", "");
+
+    try {
+      const user = await prisma.user.create({
+        data: {
+          email: "allie-activation@local.test",
+          passwordHash: "hash",
+          role: Role.RESOURCE,
+          status: UserStatus.ACTIVE,
+          resourceProfile: {
+            create: {
+              displayName: "Allie Activation",
+              postalCode: "H2X1Y4",
+              city: "Montreal",
+              region: "QC",
+              skillsTags: ["repit"],
+              contactEmail: "allie-activation@local.test"
+            }
+          }
+        },
+        include: { resourceProfile: true }
+      });
+      const { enrollment } = await trainingService.ensureEnrollment(user.resourceProfile!.id);
+      const startAt = new Date("2035-01-15T14:00:00.000Z");
+      configService.set("ALLY_TRAINING_EMAILS_START_AT", startAt.toISOString());
+
+      const first = await trainingService.prepareEmailAutomation();
+      expect(first.rescheduled).toBeGreaterThanOrEqual(4);
+      const logs = await prisma.trainingEmailLog.findMany({
+        where: { enrollmentId: enrollment.id },
+        orderBy: { scheduledFor: "asc" }
+      });
+      expect(logs.map((log) => log.scheduledFor.toISOString())).toEqual([
+        "2035-01-15T14:00:00.000Z",
+        "2035-01-18T14:00:00.000Z",
+        "2035-01-22T14:00:00.000Z",
+        "2035-01-29T14:00:00.000Z"
+      ]);
+
+      const second = await trainingService.prepareEmailAutomation();
+      expect(second.rescheduled).toBe(0);
+      expect(await prisma.trainingEmailLog.count({ where: { enrollmentId: enrollment.id } })).toBe(4);
+    } finally {
+      configService.set("ALLY_TRAINING_EMAILS_ENABLED", previousEnabled);
+      configService.set("ALLY_TRAINING_EMAILS_START_AT", previousStartAt);
+    }
+  });
+
+  it("ne relance pas les parcours reussis ou en attention requise", async () => {
+    const trainingService = app.get(TrainingService);
+    await prisma.trainingEmailLog.updateMany({
+      where: { status: TrainingEmailStatus.PENDING },
+      data: { scheduledFor: new Date(Date.now() + 30 * 24 * 60 * 60_000) }
+    });
+    const users = await Promise.all(
+      [
+        ["allie-passed-sans-relance@local.test", "Allie Passed Sans Relance", TrainingStatus.PASSED],
+        ["allie-attention-sans-relance@local.test", "Allie Attention Sans Relance", TrainingStatus.ATTENTION_REQUIRED]
+      ].map(async ([email, displayName, status]) => {
+        const user = await prisma.user.create({
+          data: {
+            email,
+            passwordHash: "hash",
+            role: Role.RESOURCE,
+            status: UserStatus.ACTIVE,
+            resourceProfile: {
+              create: { displayName, postalCode: "H2X1Y4", city: "Montreal", region: "QC", skillsTags: ["repit"], contactEmail: email }
+            }
+          },
+          include: { resourceProfile: true }
+        });
+        const result = await trainingService.ensureEnrollment(user.resourceProfile!.id);
+        await prisma.trainingEnrollment.update({
+          where: { id: result.enrollment.id },
+          data: { status: status as TrainingStatus }
+        });
+        await prisma.trainingEmailLog.updateMany({
+          where: { enrollmentId: result.enrollment.id },
+          data: { scheduledFor: new Date(Date.now() - 60_000) }
+        });
+        return result.enrollment.id;
+      })
+    );
+
+    emailSendMock.mockClear();
+    await trainingService.processDueEmails();
+    expect(emailSendMock).not.toHaveBeenCalled();
+    expect(
+      await prisma.trainingEmailLog.count({
+        where: { enrollmentId: { in: users }, status: TrainingEmailStatus.SKIPPED }
+      })
+    ).toBe(8);
+  });
+
+  it("protege les parcours personnels et reserve le tableau de bord aux administrateurs", async () => {
+    const resourceToken = await loginAs("RESSOURCE");
+    const familyToken = await loginAs("FAMILLE");
+    const adminToken = await loginAs("ADMIN");
+
+    const anonymous = await request(app.getHttpServer()).get("/api/v1/training/me");
+    expect([401, 403]).toContain(anonymous.status);
+    await request(app.getHttpServer())
+      .get("/api/v1/training/me")
+      .set("Authorization", `Bearer ${familyToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get("/api/v1/training/admin/enrollments")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get("/api/v1/training/admin/enrollments")
+      .set("Authorization", `Bearer ${familyToken}`)
+      .expect(403);
+
+    const ownCourse = await request(app.getHttpServer())
+      .get("/api/v1/training/me")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(200);
+    const dashboard = await request(app.getHttpServer())
+      .get("/api/v1/training/admin/enrollments?status=PASSED&page=1&pageSize=5")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(dashboard.body.stats).toEqual(
+      expect.objectContaining({ NOT_STARTED: expect.any(Number), IN_PROGRESS: expect.any(Number), PASSED: expect.any(Number) })
+    );
+    expect(dashboard.body.emailAutomation).toEqual(
+      expect.objectContaining({ enabled: true, status: "ACTIVE", startAt: expect.any(String) })
+    );
+    expect(dashboard.body.items.some((item: { id: string }) => item.id === ownCourse.body.id)).toBe(true);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/training/admin/enrollments/${ownCourse.body.id}/reset-attempts`)
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`/api/v1/training/admin/enrollments/${ownCourse.body.id}/certificate`)
+      .set("Authorization", `Bearer ${familyToken}`)
+      .expect(403);
+  });
+
   it("POST /api/v1/maintenance est reserve aux admins et met a jour le statut public", async () => {
     const adminToken = await loginAs("ADMIN");
     const familyToken = await loginAs("FAMILLE");
@@ -1322,6 +1876,9 @@ function configureTestEnv() {
   process.env.ADMIN_EMAIL = "admin@fab.local";
   process.env.ADMIN_PASSWORD = "ChangeMe123!";
   process.env.NOTIFICATION_EMAIL = "notifications@local.test";
+  process.env.ALLY_TRAINING_EMAILS_ENABLED = "true";
+  process.env.ALLY_TRAINING_EMAILS_START_AT = "2020-01-01T00:00:00.000Z";
+  process.env.RESOURCE_DOCUMENTS_DIR = join(process.cwd(), "tmp", "e2e-resource-documents");
   process.env.DATABASE_URL = withSchema(
     process.env.E2E_DATABASE_URL ??
       normalizeHostDatabaseUrl(

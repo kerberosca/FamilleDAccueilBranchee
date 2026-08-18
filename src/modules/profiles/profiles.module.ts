@@ -4,11 +4,12 @@ import { BillingModule } from "../billing/billing.module";
 import { EmailModule } from "../email/email.module";
 import { ResourceDocumentsModule } from "../resource-documents/resource-documents.module";
 import { UsersModule } from "../users/users.module";
+import { TrainingModule } from "../training/training.module";
 import { ProfilesController } from "./profiles.controller";
 import { ProfilesService } from "./profiles.service";
 
 @Module({
-  imports: [AllyWebhooksModule, BillingModule, EmailModule, ResourceDocumentsModule, UsersModule],
+  imports: [AllyWebhooksModule, BillingModule, EmailModule, ResourceDocumentsModule, TrainingModule, UsersModule],
   controllers: [ProfilesController],
   providers: [ProfilesService],
   exports: [ProfilesService]

@@ -32,6 +32,7 @@ import { EmailService } from "../email/email.service";
 import { MaintenanceService } from "../maintenance/maintenance.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { ResourceDocumentsService } from "../resource-documents/resource-documents.service";
+import { TrainingService } from "../training/training.service";
 import {
   buildAvailabilityFromRegistration,
   buildSkillsTagsFromRegistration,
@@ -57,7 +58,8 @@ export class AuthService {
     private readonly emailService: EmailService,
     private readonly allyWebhooksService: AllyWebhooksService,
     private readonly maintenanceService: MaintenanceService,
-    private readonly resourceDocumentsService: ResourceDocumentsService
+    private readonly resourceDocumentsService: ResourceDocumentsService,
+    private readonly trainingService: TrainingService
   ) {}
 
   async register(input: RegisterDto) {
@@ -150,6 +152,7 @@ export class AuthService {
     const tokens = await this.generateAndPersistTokens(created);
     if (input.role === Role.RESOURCE && resourceProfile) {
       if (created.resourceProfile) {
+        await this.trainingService.ensureEnrollment(created.resourceProfile.id);
         void this.allyWebhooksService.sendApplicationEvent("ally.application.created", {
           ...created.resourceProfile,
           user: { email: created.email }

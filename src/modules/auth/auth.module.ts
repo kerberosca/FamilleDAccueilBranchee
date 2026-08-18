@@ -8,6 +8,7 @@ import { AllyWebhooksModule } from "../ally-webhooks/ally-webhooks.module";
 import { EmailModule } from "../email/email.module";
 import { MaintenanceModule } from "../maintenance/maintenance.module";
 import { ResourceDocumentsModule } from "../resource-documents/resource-documents.module";
+import { TrainingModule } from "../training/training.module";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { JwtStrategy } from "./jwt.strategy";
@@ -19,7 +20,8 @@ import { JwtStrategy } from "./jwt.strategy";
     AllyWebhooksModule,
     EmailModule,
     MaintenanceModule,
-    ResourceDocumentsModule
+    ResourceDocumentsModule,
+    TrainingModule
   ],
   controllers: [AuthController],
   providers: [

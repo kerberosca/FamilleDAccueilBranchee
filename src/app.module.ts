@@ -15,6 +15,7 @@ import { SearchModule } from "./modules/search/search.module";
 import { SystemStatusModule } from "./modules/system-status/system-status.module";
 import { UsersModule } from "./modules/users/users.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { TrainingModule } from "./modules/training/training.module";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -42,6 +43,18 @@ const isProduction = process.env.NODE_ENV === "production";
         RESEND_API_KEY: Joi.string().allow("").optional(),
         EMAIL_FROM: Joi.string().allow("").optional(),
         NOTIFICATION_EMAIL: Joi.string().allow("").optional(),
+        EMAIL_DELIVERY_MODE: Joi.string().valid("live", "log", "allowlist").default(isProduction ? "live" : "log"),
+        EMAIL_ALLOWLIST: Joi.string().allow("").optional(),
+        ALLY_TRAINING_ENABLED: Joi.string().valid("true", "false").default("true"),
+        ALLY_TRAINING_EMAILS_ENABLED: Joi.string().valid("true", "false").default("false"),
+        ALLY_TRAINING_EMAILS_START_AT: Joi.string()
+          .allow("")
+          .custom((value, helpers) => {
+            if (!value || !Number.isNaN(Date.parse(value))) return value;
+            return helpers.error("string.isoDate");
+          }, "ISO date validation")
+          .default(""),
+        TRAINING_EMAIL_POLL_INTERVAL_MS: Joi.number().min(10000).default(60000),
         N8N_ALLY_WEBHOOK_URL: Joi.string().uri().allow("").optional(),
         N8N_ALLY_WEBHOOK_SECRET: Joi.string().allow("").optional(),
         RESOURCE_DOCUMENTS_DIR: Joi.string().default("/app/private/uploads/resource-documents"),
@@ -63,6 +76,7 @@ const isProduction = process.env.NODE_ENV === "production";
     MessagingModule,
     SystemStatusModule,
     UsersModule,
+    TrainingModule,
     ...(!isProduction ? [DevModule] : [])
   ]
 })

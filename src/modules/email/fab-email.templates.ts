@@ -171,6 +171,82 @@ export function buildAllyProfileUpdatedEmail(params: {
   });
 }
 
+export function buildAllyTrainingEmail(params: {
+  displayName: string;
+  kind: "ASSIGNMENT" | "DAY_3" | "DAY_7" | "DAY_14" | "SUCCESS";
+  progressPercent: number;
+  frontendUrl: string;
+}): string {
+  const progress = Math.max(0, Math.min(100, Math.round(params.progressPercent)));
+  const copy = {
+    ASSIGNMENT: {
+      eyebrow: "Votre formation allié FAB",
+      title: "Votre formation est prête",
+      intro: `Bonjour ${params.displayName}, votre candidature est complétée. Vous pouvez maintenant commencer la formation des alliés directement dans FAB.`,
+      note: "Votre progression est sauvegardée automatiquement; vous pourrez reprendre là où vous vous êtes arrêté."
+    },
+    DAY_3: {
+      eyebrow: "Rappel formation FAB",
+      title: "Prêt à commencer votre formation?",
+      intro: `Bonjour ${params.displayName}, votre formation allié n'a pas encore été commencée. Elle demeure accessible dans votre compte FAB.`,
+      note: "La formation vous prépare à offrir un soutien sécurisant, concret et respectueux aux familles d'accueil."
+    },
+    DAY_7: {
+      eyebrow: "Votre progression FAB",
+      title: "Continuez sur votre belle lancée",
+      intro: `Bonjour ${params.displayName}, votre formation allié est complétée à ${progress} %. Quelques étapes vous séparent encore de l'examen final.`,
+      note: "Même une courte séance suffit : FAB vous ramènera automatiquement à votre prochaine étape."
+    },
+    DAY_14: {
+      eyebrow: "Dernier rappel formation FAB",
+      title: "Votre parcours allié vous attend",
+      intro: `Bonjour ${params.displayName}, votre formation est toujours disponible et votre progression de ${progress} % a été conservée.`,
+      note: "Si vous avez besoin d'aide pour poursuivre, répondez à ce courriel pour joindre l'équipe FAB."
+    },
+    SUCCESS: {
+      eyebrow: "Formation réussie",
+      title: "Félicitations, votre formation est réussie!",
+      intro: `Bonjour ${params.displayName}, vous avez réussi la Formation des Alliés FAB. Les relances sont maintenant terminées et votre certificat est disponible.`,
+      note: "L'équipe FAB poursuivra la validation de vos documents et de votre candidature avant la publication finale."
+    }
+  }[params.kind];
+  return buildFabEmail({
+    frontendUrl: params.frontendUrl,
+    eyebrow: copy.eyebrow,
+    title: copy.title,
+    intro: copy.intro,
+    sections:
+      params.kind === "SUCCESS"
+        ? [{ title: "Prochaine étape", body: "Téléchargez votre certificat et vérifiez que vos documents sont à jour dans votre profil." }]
+        : [{ title: "Progression", body: `${progress} % de la formation complétée` }],
+    action: {
+      label: params.kind === "SUCCESS" ? "Voir mon certificat" : "Continuer ma formation",
+      href: absoluteUrl(params.frontendUrl, "/me/formation")
+    },
+    note: copy.note
+  });
+}
+
+export function buildTeamTrainingAttentionEmail(params: {
+  displayName: string;
+  email: string;
+  frontendUrl: string;
+}): string {
+  return buildFabEmail({
+    frontendUrl: params.frontendUrl,
+    eyebrow: "Parcours allié - intervention requise",
+    title: "Trois tentatives d'examen échouées",
+    intro: `${params.displayName} (${params.email}) a utilisé ses trois tentatives à l'examen final.`,
+    sections: [
+      {
+        title: "Action suggérée",
+        body: "Communiquez avec l'allié, puis réinitialisez ses essais depuis le tableau de bord si une nouvelle tentative est appropriée."
+      }
+    ],
+    action: { label: "Ouvrir le suivi des alliés", href: absoluteUrl(params.frontendUrl, "/admin") }
+  });
+}
+
 export function buildPasswordResetEmail(params: { resetUrl: string; frontendUrl: string }): string {
   return buildFabEmail({
     frontendUrl: params.frontendUrl,

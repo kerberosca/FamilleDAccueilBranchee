@@ -126,6 +126,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
               {!isAuthenticated && <NavLink href="/login" onClick={handleNavClick}>Connexion</NavLink>}
               {isDevMode && <NavLink href="/dev" onClick={handleNavClick}>Dev</NavLink>}
               {canUseProfile && <NavLink href="/me" onClick={handleNavClick}>Mon profil</NavLink>}
+              {userRole === "RESOURCE" && <NavLink href="/me/formation" onClick={handleNavClick}>Formation</NavLink>}
               {canUseSearch && <NavLink href="/search" onClick={handleNavClick}>Recherche</NavLink>}
               {canUseMessages && <NavLink href="/messages" onClick={handleNavClick}>Messages</NavLink>}
               {canUseAdmin && <NavLink href="/admin" onClick={handleNavClick}>Admin</NavLink>}

@@ -3,6 +3,8 @@ dist
 .env
 .DS_Store
 coverage
+playwright-report/
+test-results/
 *.log
 /.idea
 /.vscode

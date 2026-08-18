@@ -8,6 +8,8 @@ Procédure unique pour mettre `familledaccueilbranchee.ca` à jour sans écraser
 - Ne pas utiliser `docker compose up` sans `-f docker-compose.prod.yml` sur le VPS.
 - Garder `.env` local au VPS. Il ne doit pas être versionné.
 - Si un fichier suivi par Git est modifié localement sur le VPS, le stasher avant le pull.
+- Utiliser le compte `linuxuser` et l'accès Plink/Pageant documenté par GestionVPS; ne pas ouvrir une session directe comme `root`.
+- Déclencher et valider une sauvegarde GestionVPS avant toute construction ou migration.
 
 ## Exposition réseau et Caddy
 
@@ -40,7 +42,13 @@ CORS_ORIGINS=https://familledaccueilbranchee.ca,https://www.familledaccueilbranc
 APP_FRONTEND_URL=https://familledaccueilbranchee.ca
 DEV_BYPASS_AUTH=false
 NEXT_PUBLIC_DEV_BYPASS_AUTH=false
+EMAIL_DELIVERY_MODE=live
+ALLY_TRAINING_ENABLED=true
+ALLY_TRAINING_EMAILS_ENABLED=false
+ALLY_TRAINING_EMAILS_START_AT=
 ```
+
+`ALLY_TRAINING_EMAILS_ENABLED=false` laisse la formation accessible, mais bloque uniquement ses courriels. Une date ISO valide dans `ALLY_TRAINING_EMAILS_START_AT` est également obligatoire avant toute activation.
 
 ## Déploiement
 
@@ -51,11 +59,12 @@ git status
 git fetch origin main
 git pull --ff-only origin main
 
-docker compose -f docker-compose.prod.yml down
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
+bash scripts/backup-db.sh
+bash scripts/deploy-vps.sh
 docker compose -f docker-compose.prod.yml ps
 ```
+
+Le script refuse de construire ou migrer sans attestation récente, signée et vérifiée hors site. Il construit les images, exécute `prisma migrate deploy` dans un conteneur ponctuel, puis démarre la nouvelle API.
 
 ## Vérifications
 
@@ -97,6 +106,8 @@ docker compose -f docker-compose.prod.yml up -d frontend
 docker compose -f docker-compose.prod.yml logs --tail=120 api
 docker compose -f docker-compose.prod.yml logs --tail=120 frontend
 ```
+
+Après un déploiement de la formation avec les relances en pause, vérifier également que les journaux de formation restent `PENDING`, avec `providerMessageId` vide. Le tableau de bord d'administration doit afficher « Relances par courriel : en pause ».
 
 Pour tester le login sans navigateur :
 

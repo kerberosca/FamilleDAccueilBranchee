@@ -66,20 +66,50 @@ enum ResourceDocumentType {
   RCR_PROOF
 }
 
+enum TrainingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  EXAM_AVAILABLE
+  PASSED
+  ATTENTION_REQUIRED
+}
+
+enum TrainingAssessmentType {
+  FORMATIVE
+  FINAL
+}
+
+enum TrainingReminderType {
+  ASSIGNMENT
+  DAY_3
+  DAY_7
+  DAY_14
+  SUCCESS
+  ATTENTION
+}
+
+enum TrainingEmailStatus {
+  PENDING
+  PROCESSING
+  SENT
+  SKIPPED
+  FAILED
+}
+
 model User {
-  id               String   @id @default(cuid())
-  email            String   @unique
+  id               String     @id @default(cuid())
+  email            String     @unique
   passwordHash     String
   refreshTokenHash String?
   role             Role
   status           UserStatus @default(ACTIVE)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
-  familyProfile   FamilyProfile?
-  resourceProfile ResourceProfile?
-  subscriptions   Subscription[]
-  adminAuditLogs  AdminAuditLog[] @relation("AdminActor")
+  familyProfile       FamilyProfile?
+  resourceProfile     ResourceProfile?
+  subscriptions       Subscription[]
+  adminAuditLogs      AdminAuditLog[]      @relation("AdminActor")
   passwordResetTokens PasswordResetToken[]
 
   sentMessages Message[] @relation("MessageSender")
@@ -117,49 +147,138 @@ model FamilyProfile {
 }
 
 model ResourceProfile {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  allyType           AllyType?
-  displayName        String
-  postalCode         String
-  city               String
-  region             String
+  id                         String                     @id @default(cuid())
+  userId                     String                     @unique
+  allyType                   AllyType?
+  displayName                String
+  postalCode                 String
+  city                       String
+  region                     String
   // Adresse postale (formulaire allié section 1)
-  streetAddress      String?
-  bio                String?
-  skillsTags         String[]
-  hourlyRate         Decimal? @db.Decimal(10, 2)
-  availability       Json?
-  verificationStatus ResourceVerificationStatus @default(DRAFT)
-  publishStatus      ResourcePublishStatus @default(HIDDEN)
-  onboardingState    ResourceOnboardingState @default(DRAFT)
-  contactEmail       String?
-  contactPhone       String?
-  averageRating      Decimal? @db.Decimal(3, 2)
-  questionnaireAnswers Json?
+  streetAddress              String?
+  bio                        String?
+  skillsTags                 String[]
+  hourlyRate                 Decimal?                   @db.Decimal(10, 2)
+  availability               Json?
+  verificationStatus         ResourceVerificationStatus @default(DRAFT)
+  publishStatus              ResourcePublishStatus      @default(HIDDEN)
+  onboardingState            ResourceOnboardingState    @default(DRAFT)
+  contactEmail               String?
+  contactPhone               String?
+  averageRating              Decimal?                   @db.Decimal(3, 2)
+  questionnaireAnswers       Json?
   // Formulaire Devenir allié FAB (sections 1-4), JSON
-  allyRegistration   Json?
+  allyRegistration           Json?
   // Acceptation des déclarations obligatoires (section 4)
   allyDeclarationsAcceptedAt DateTime?
-  backgroundCheckStatus BackgroundCheckStatus @default(NOT_REQUESTED)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  backgroundCheckStatus      BackgroundCheckStatus      @default(NOT_REQUESTED)
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  conversations Conversation[] @relation("ConversationResource")
-  documents     ResourceDocument[]
+  conversations       Conversation[]       @relation("ConversationResource")
+  documents           ResourceDocument[]
+  trainingEnrollments TrainingEnrollment[]
+}
+
+model TrainingEnrollment {
+  id                String         @id @default(cuid())
+  resourceProfileId String
+  courseVersion     String         @default("faba-v1")
+  status            TrainingStatus @default(NOT_STARTED)
+  currentLessonKey  String?
+  assignedAt        DateTime       @default(now())
+  startedAt         DateTime?
+  lastActivityAt    DateTime?
+  completedAt       DateTime?
+  attemptsResetAt   DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  resourceProfile ResourceProfile             @relation(fields: [resourceProfileId], references: [id], onDelete: Cascade)
+  lessonProgress  TrainingLessonProgress[]
+  attempts        TrainingAssessmentAttempt[]
+  certificate     TrainingCertificate?
+  emailLogs       TrainingEmailLog[]
+
+  @@unique([resourceProfileId, courseVersion])
+  @@index([status, assignedAt])
+  @@index([lastActivityAt])
+}
+
+model TrainingLessonProgress {
+  id           String    @id @default(cuid())
+  enrollmentId String
+  lessonKey    String
+  visitedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  enrollment TrainingEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonKey])
+  @@index([enrollmentId, completedAt])
+}
+
+model TrainingAssessmentAttempt {
+  id            String                 @id @default(cuid())
+  enrollmentId  String
+  type          TrainingAssessmentType
+  attemptNumber Int
+  answers       Json
+  scorePercent  Int
+  passed        Boolean
+  submittedAt   DateTime               @default(now())
+
+  enrollment TrainingEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, type, attemptNumber])
+  @@index([enrollmentId, type, submittedAt])
+}
+
+model TrainingCertificate {
+  id              String   @id @default(cuid())
+  enrollmentId    String   @unique
+  certificateCode String   @unique
+  participantName String
+  courseTitle     String
+  courseVersion   String
+  scorePercent    Int
+  issuedAt        DateTime @default(now())
+
+  enrollment TrainingEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model TrainingEmailLog {
+  id                String               @id @default(cuid())
+  enrollmentId      String
+  type              TrainingReminderType
+  status            TrainingEmailStatus  @default(PENDING)
+  scheduledFor      DateTime
+  sentAt            DateTime?
+  processingAt      DateTime?
+  providerMessageId String?
+  retryCount        Int                  @default(0)
+  lastError         String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  enrollment TrainingEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, type])
+  @@index([status, scheduledFor])
 }
 
 model ResourceDocument {
-  id                String   @id @default(cuid())
+  id                String               @id @default(cuid())
   resourceProfileId String
   type              ResourceDocumentType
   originalName      String
   storedName        String
   mimeType          String
   sizeBytes         Int
-  uploadedAt        DateTime @default(now())
+  uploadedAt        DateTime             @default(now())
   deletedAt         DateTime?
 
   resourceProfile ResourceProfile @relation(fields: [resourceProfileId], references: [id], onDelete: Cascade)
@@ -169,14 +288,14 @@ model ResourceDocument {
 }
 
 model Subscription {
-  id                 String   @id @default(cuid())
-  userId             String
-  status             SubscriptionStatus @default(INACTIVE)
-  stripeCustomerId   String?
-  stripeSubscriptionId String? @unique
-  currentPeriodEnd   DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                   String             @id @default(cuid())
+  userId               String
+  status               SubscriptionStatus @default(INACTIVE)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?            @unique
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
