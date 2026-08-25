@@ -1315,8 +1315,12 @@ describe("Smoke e2e", () => {
       .expect(200);
     expect(overview.body.status).toBe("NOT_STARTED");
     expect(overview.body.lessons).toHaveLength(8);
-    expect(overview.body.formativeQuestions).toHaveLength(12);
-    expect(overview.body.formativeQuestions[0].correctIndex).toBeUndefined();
+    expect(overview.body.quizQuestions).toHaveLength(13);
+    expect(overview.body.quizQuestions[0].correctIndex).toBeUndefined();
+    expect(overview.body.quizQuestions[7].answers).toContain(
+      "Ignorer la situation et poursuivre comme si de rien n'était."
+    );
+    expect(overview.body.quizQuestions[7].answers.join(" ")).not.toContain("DPJ");
     const reminders = await prisma.trainingEmailLog.findMany({
       where: { enrollmentId: overview.body.id },
       orderBy: { scheduledFor: "asc" }
@@ -1329,7 +1333,7 @@ describe("Smoke e2e", () => {
     await request(app.getHttpServer())
       .get("/api/v1/training/me/exam")
       .set("Authorization", `Bearer ${resourceToken}`)
-      .expect(403);
+      .expect(404);
 
     for (const lesson of overview.body.lessons as { key: string }[]) {
       await request(app.getHttpServer())
@@ -1342,7 +1346,7 @@ describe("Smoke e2e", () => {
         .expect(200);
     }
 
-    const formativeAnswers = {
+    const correctAnswers = {
       "3261": 1,
       "3262": 2,
       "3263": 2,
@@ -1354,28 +1358,39 @@ describe("Smoke e2e", () => {
       "3270": 1,
       "3271": 2,
       "3272": 1,
-      "3273": 2
+      "3273": 2,
+      "3264": 0
     };
-    const formative = await request(app.getHttpServer())
-      .post("/api/v1/training/me/formative/submit")
+    const { "3264": _missingFinalAnswer, ...incompleteAnswers } = correctAnswers;
+    await request(app.getHttpServer())
+      .post("/api/v1/training/me/quiz/submit")
       .set("Authorization", `Bearer ${resourceToken}`)
-      .send({ answers: formativeAnswers })
-      .expect(201);
-    expect(formative.body.scorePercent).toBe(100);
-
-    const exam = await request(app.getHttpServer())
-      .get("/api/v1/training/me/exam")
+      .send({ answers: incompleteAnswers })
+      .expect(400);
+    expect(
+      await prisma.trainingAssessmentAttempt.count({
+        where: { enrollmentId: overview.body.id, type: "QUIZ" }
+      })
+    ).toBe(0);
+    await request(app.getHttpServer())
+      .get("/api/v1/training/me/certificate")
       .set("Authorization", `Bearer ${resourceToken}`)
-      .expect(200);
-    expect(exam.body.attemptsRemaining).toBe(3);
-    expect(exam.body.question.correctIndex).toBeUndefined();
+      .expect(404);
 
+    const sevenCorrect = answersWithCorrectCount(correctAnswers, 7);
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await request(app.getHttpServer())
-        .post("/api/v1/training/me/exam/submit")
+      const failed = await request(app.getHttpServer())
+        .post("/api/v1/training/me/quiz/submit")
         .set("Authorization", `Bearer ${resourceToken}`)
-        .send({ answers: { "3264": 1 } })
+        .send({ answers: sevenCorrect })
         .expect(201);
+      expect(failed.body.passed).toBe(false);
+      expect(failed.body.scorePercent).toBe(54);
+      expect(failed.body.attemptsRemaining).toBe(2 - attempt);
+      expect(failed.body.feedback).toHaveLength(6);
+      expect(failed.body.feedback[0]).not.toHaveProperty("correctIndex");
+      expect(failed.body.feedback[0]).not.toHaveProperty("correct");
+      expect(failed.body.feedback[0]).not.toHaveProperty("answer");
     }
     const blocked = await request(app.getHttpServer())
       .get("/api/v1/training/me")
@@ -1383,18 +1398,21 @@ describe("Smoke e2e", () => {
       .expect(200);
     expect(blocked.body.status).toBe("ATTENTION_REQUIRED");
 
-    await request(app.getHttpServer())
+    const reset = await request(app.getHttpServer())
       .post(`/api/v1/training/admin/enrollments/${blocked.body.id}/reset-attempts`)
       .set("Authorization", `Bearer ${adminToken}`)
       .expect(201);
+    expect(reset.body.status).toBe("IN_PROGRESS");
 
+    const eightCorrect = answersWithCorrectCount(correctAnswers, 8);
     const passed = await request(app.getHttpServer())
-      .post("/api/v1/training/me/exam/submit")
+      .post("/api/v1/training/me/quiz/submit")
       .set("Authorization", `Bearer ${resourceToken}`)
-      .send({ answers: { "3264": 0 } })
+      .send({ answers: eightCorrect })
       .expect(201);
     expect(passed.body.passed).toBe(true);
-    expect(passed.body.scorePercent).toBe(100);
+    expect(passed.body.scorePercent).toBe(62);
+    expect(passed.body.certificateAvailable).toBe(true);
 
     const certificate = await request(app.getHttpServer())
       .get("/api/v1/training/me/certificate")
@@ -1511,6 +1529,101 @@ describe("Smoke e2e", () => {
       await prisma.trainingEnrollment.count({ where: { resourceProfileId: legacyUser.resourceProfile!.id } })
     ).toBe(1);
     expect(await prisma.trainingEmailLog.count({ where: { enrollmentId: firstEnrollment.id } })).toBe(4);
+  });
+
+  it("remet les anciennes évaluations incomplètes à zéro sans toucher aux certificats existants", async () => {
+    const trainingService = app.get(TrainingService);
+    const legacyProfile = await prisma.resourceProfile.create({
+      data: {
+        user: {
+          create: {
+            email: "ancien-examen@local.test",
+            passwordHash: "hash",
+            role: Role.RESOURCE,
+            status: UserStatus.ACTIVE
+          }
+        },
+        displayName: "Ancien examen",
+        postalCode: "H2X1Y4",
+        city: "Montreal",
+        region: "QC",
+        skillsTags: ["repit"],
+        trainingEnrollments: {
+          create: {
+            courseVersion: "faba-v1",
+            status: TrainingStatus.ATTENTION_REQUIRED,
+            attempts: {
+              create: [
+                { type: "FORMATIVE", attemptNumber: 1, answers: {}, scorePercent: 100, passed: true },
+                { type: "FINAL", attemptNumber: 1, answers: {}, scorePercent: 0, passed: false }
+              ]
+            },
+            emailLogs: {
+              create: {
+                type: TrainingReminderType.ATTENTION,
+                status: TrainingEmailStatus.PENDING,
+                scheduledFor: new Date()
+              }
+            }
+          }
+        }
+      },
+      include: { trainingEnrollments: true }
+    });
+
+    const passedProfile = await prisma.resourceProfile.create({
+      data: {
+        user: {
+          create: {
+            email: "certificat-existant@local.test",
+            passwordHash: "hash",
+            role: Role.RESOURCE,
+            status: UserStatus.ACTIVE
+          }
+        },
+        displayName: "Certificat existant",
+        postalCode: "H2X1Y4",
+        city: "Montreal",
+        region: "QC",
+        skillsTags: ["repit"],
+        trainingEnrollments: {
+          create: {
+            courseVersion: "faba-v1",
+            status: TrainingStatus.PASSED,
+            completedAt: new Date(),
+            certificate: {
+              create: {
+                certificateCode: "FAB-TEST-EXISTANT",
+                participantName: "Certificat existant",
+                courseTitle: "Formation des Alliés FAB",
+                courseVersion: "faba-v1",
+                scorePercent: 100
+              }
+            }
+          }
+        }
+      },
+      include: { trainingEnrollments: true }
+    });
+
+    expect(await trainingService.normalizeLegacyAssessmentStates()).toBeGreaterThanOrEqual(1);
+    const migrated = await prisma.trainingEnrollment.findUniqueOrThrow({
+      where: { id: legacyProfile.trainingEnrollments[0].id },
+      include: { attempts: true, emailLogs: true }
+    });
+    expect(migrated.status).toBe(TrainingStatus.IN_PROGRESS);
+    expect(migrated.attemptsResetAt).toBeTruthy();
+    expect(migrated.attempts).toHaveLength(2);
+    expect(migrated.attempts.some((attempt) => attempt.type === "QUIZ")).toBe(false);
+    expect(migrated.emailLogs[0].status).toBe(TrainingEmailStatus.SKIPPED);
+    expect(await trainingService.normalizeLegacyAssessmentStates()).toBe(0);
+
+    const preserved = await prisma.trainingEnrollment.findUniqueOrThrow({
+      where: { id: passedProfile.trainingEnrollments[0].id },
+      include: { certificate: true }
+    });
+    expect(preserved.status).toBe(TrainingStatus.PASSED);
+    expect(preserved.certificate?.certificateCode).toBe("FAB-TEST-EXISTANT");
   });
 
   it("traite J0, J3, J7 et J14 en mode simule sans doublon et ignore J3 apres le debut", async () => {
@@ -1932,6 +2045,15 @@ function withSchema(databaseUrl: string, schema: string) {
   }
   const separator = databaseUrl.includes("?") ? "&" : "?";
   return `${databaseUrl}${separator}schema=${schema}`;
+}
+
+function answersWithCorrectCount(correctAnswers: Record<string, number>, correctCount: number) {
+  return Object.fromEntries(
+    Object.entries(correctAnswers).map(([questionId, correctIndex], index) => [
+      questionId,
+      index < correctCount ? correctIndex : correctIndex === 0 ? 1 : 0
+    ])
+  );
 }
 
 function validAllyRegistration(

@@ -16,7 +16,7 @@ type TrainingSummary = {
 const STATUS_LABELS: Record<string, string> = {
   NOT_STARTED: "À commencer",
   IN_PROGRESS: "En cours",
-  EXAM_AVAILABLE: "Examen disponible",
+  EXAM_AVAILABLE: "Test à compléter",
   PASSED: "Formation réussie",
   ATTENTION_REQUIRED: "Communiquez avec FAB"
 };
@@ -59,7 +59,7 @@ export function TrainingSummaryCard() {
         >
           {summary.status === "PASSED" ? "Voir mon certificat" : summary.status === "NOT_STARTED" ? "Commencer" : "Continuer"}
         </Link>
-        {summary.status === "EXAM_AVAILABLE" ? <span className="text-sm text-[#aeeaf4]">Examen final débloqué</span> : null}
+        {summary.status === "EXAM_AVAILABLE" ? <span className="text-sm text-[#aeeaf4]">Test officiel prêt</span> : null}
         {summary.status === "ATTENTION_REQUIRED" ? (
           <span className="text-sm text-amber-200">Vos trois essais ont été utilisés.</span>
         ) : null}

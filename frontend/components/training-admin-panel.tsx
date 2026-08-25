@@ -45,9 +45,15 @@ type TrainingAdminResponse = {
 const STATUS_LABELS: Record<TrainingStatus, string> = {
   NOT_STARTED: "Non commencés",
   IN_PROGRESS: "En cours",
-  EXAM_AVAILABLE: "Examen disponible",
+  EXAM_AVAILABLE: "En cours",
   PASSED: "Réussis",
   ATTENTION_REQUIRED: "Attention requise"
+};
+const DISPLAY_STATUSES: TrainingStatus[] = ["NOT_STARTED", "IN_PROGRESS", "PASSED", "ATTENTION_REQUIRED"];
+const ATTEMPT_LABELS: Record<string, string> = {
+  QUIZ: "Test officiel",
+  FORMATIVE: "Ancien quiz formatif",
+  FINAL: "Ancien examen final"
 };
 const EMAIL_LABELS: Record<string, string> = {
   ASSIGNMENT: "Invitation J0",
@@ -143,8 +149,8 @@ export function TrainingAdminPanel() {
           Relances par courriel : {emailAutomationLabel(data.emailAutomation)}
         </Alert>
       ) : null}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {(Object.keys(STATUS_LABELS) as TrainingStatus[]).map((key) => (
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {DISPLAY_STATUSES.map((key) => (
           <button key={key} type="button" onClick={() => { setStatus(status === key ? "" : key); setPage(1); }} className={`rounded-2xl border p-4 text-left transition ${status === key ? "border-cyan-400/60 bg-cyan-950/40" : "border-[#4a4269] bg-[#100c29]/60 hover:border-[#71669b]"}`}>
             <span className="block text-2xl font-bold text-white">{data?.stats[key] ?? 0}</span>
             <span className="mt-1 block text-xs text-slate-400">{STATUS_LABELS[key]}</span>
@@ -155,7 +161,7 @@ export function TrainingAdminPanel() {
         <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Rechercher par nom ou courriel" />
         <select className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
           <option value="">Tous les statuts</option>
-          {(Object.keys(STATUS_LABELS) as TrainingStatus[]).map((key) => <option key={key} value={key}>{STATUS_LABELS[key]}</option>)}
+          {DISPLAY_STATUSES.map((key) => <option key={key} value={key}>{STATUS_LABELS[key]}</option>)}
         </select>
       </div>
       {loading ? <Alert tone="info">Chargement des parcours…</Alert> : null}
@@ -181,7 +187,7 @@ export function TrainingAdminPanel() {
             <details className="mt-4 border-t border-[#3f385b] pt-3">
               <summary className="cursor-pointer text-sm font-medium text-[#a8c3ff]">Voir les tentatives et les relances</summary>
               <div className="mt-3 grid gap-4 lg:grid-cols-2">
-                <div><h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">Tentatives</h4>{item.attempts.length ? <ul className="mt-2 space-y-1 text-sm">{item.attempts.map((attempt) => <li key={attempt.id}>{attempt.type} #{attempt.attemptNumber} · {attempt.scorePercent} % · {attempt.passed ? "réussi" : "échoué"}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">Aucune tentative.</p>}</div>
+                <div><h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">Tentatives</h4>{item.attempts.length ? <ul className="mt-2 space-y-1 text-sm">{item.attempts.map((attempt) => <li key={attempt.id}>{ATTEMPT_LABELS[attempt.type] ?? attempt.type} #{attempt.attemptNumber} · {attempt.scorePercent} % · {attempt.passed ? "réussi" : "échoué"}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">Aucune tentative.</p>}</div>
                 <div><h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">Courriels</h4><ul className="mt-2 space-y-1 text-sm">{item.emailLogs.map((log) => <li key={log.type}>{EMAIL_LABELS[log.type] ?? log.type} · {log.status} · {formatDate(log.sentAt ?? log.scheduledFor)}</li>)}</ul></div>
               </div>
             </details>

@@ -194,7 +194,7 @@ export function buildAllyTrainingEmail(params: {
     DAY_7: {
       eyebrow: "Votre progression FAB",
       title: "Continuez sur votre belle lancée",
-      intro: `Bonjour ${params.displayName}, votre formation allié est complétée à ${progress} %. Quelques étapes vous séparent encore de l'examen final.`,
+      intro: `Bonjour ${params.displayName}, votre formation allié est complétée à ${progress} %. Quelques étapes vous séparent encore du test officiel.`,
       note: "Même une courte séance suffit : FAB vous ramènera automatiquement à votre prochaine étape."
     },
     DAY_14: {
@@ -235,8 +235,8 @@ export function buildTeamTrainingAttentionEmail(params: {
   return buildFabEmail({
     frontendUrl: params.frontendUrl,
     eyebrow: "Parcours allié - intervention requise",
-    title: "Trois tentatives d'examen échouées",
-    intro: `${params.displayName} (${params.email}) a utilisé ses trois tentatives à l'examen final.`,
+    title: "Trois tentatives au test officiel échouées",
+    intro: `${params.displayName} (${params.email}) a utilisé ses trois tentatives au test officiel.`,
     sections: [
       {
         title: "Action suggérée",

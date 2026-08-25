@@ -806,7 +806,7 @@ export default function AdminPage() {
                             {resource.backgroundCheckStatus
                               ? ` · Antécédents: ${formatLabel(BACKGROUND_CHECK_STATUS_LABELS, resource.backgroundCheckStatus)}`
                               : null}
-                            {` · Formation: ${resource.trainingStatus === "PASSED" ? "réussie" : resource.trainingStatus === "EXAM_AVAILABLE" ? "examen disponible" : resource.trainingStatus === "IN_PROGRESS" ? "en cours" : resource.trainingStatus === "ATTENTION_REQUIRED" ? "attention requise" : "non commencée"}`}
+                            {` · Formation: ${resource.trainingStatus === "PASSED" ? "réussie" : resource.trainingStatus === "EXAM_AVAILABLE" || resource.trainingStatus === "IN_PROGRESS" ? "en cours" : resource.trainingStatus === "ATTENTION_REQUIRED" ? "attention requise" : "non commencée"}`}
                           </p>
                           <p>
                             Localisation: {resource.city}, {resource.region} ({resource.postalCode})

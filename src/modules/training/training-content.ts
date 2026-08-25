@@ -270,7 +270,7 @@ export const ALLY_TRAINING_LESSONS: TrainingLesson[] = [
     title: "Finalisation",
     eyebrow: "Vérifier vos acquis",
     estimatedMinutes: 18,
-    summary: "Réviser les notions clés, compléter le quiz formatif et accéder à l'examen final.",
+    summary: "Réviser les notions clés et compléter le test officiel de 13 questions.",
     sections: [
       {
         title: "Avant le quiz",
@@ -285,8 +285,8 @@ export const ALLY_TRAINING_LESSONS: TrainingLesson[] = [
       {
         title: "La suite",
         paragraphs: [
-          "Le quiz formatif comporte 12 mises en situation et vous donne une rétroaction immédiate.",
-          "Lorsque tous les modules et le quiz sont complétés, l'examen final devient disponible. Vous disposez de trois essais."
+          "Le test officiel comporte 13 questions et doit être rempli au complet avant sa soumission.",
+          "Une note minimale de 60 %, soit 8 bonnes réponses, est requise. Vous disposez de trois essais."
         ]
       }
     ]
@@ -301,7 +301,7 @@ export type TrainingQuestion = {
   explanation: string;
 };
 
-export const FORMATIVE_QUESTIONS: TrainingQuestion[] = [
+export const QUIZ_QUESTIONS: TrainingQuestion[] = [
   {
     id: "3261",
     prompt: "Une voisine vous demande pourquoi un enfant a été placé dans sa famille d'accueil. Que faites-vous?",
@@ -354,7 +354,7 @@ export const FORMATIVE_QUESTIONS: TrainingQuestion[] = [
   {
     id: "3269",
     prompt: "Que devez-vous faire si une situation dépasse votre rôle d'allié?",
-    answers: ["Régler la situation seul.", "Publier une question dans un groupe Facebook.", "Demander du soutien à l'équipe FAB.", "Contacter directement la DPJ sans consulter personne."],
+    answers: ["Régler la situation seul.", "Publier une question dans un groupe Facebook.", "Demander du soutien à l'équipe FAB.", "Ignorer la situation et poursuivre comme si de rien n'était."],
     correctIndex: 2,
     explanation: "Lorsqu'une situation dépasse le rôle de l'allié, il faut demander du soutien à l'équipe FAB."
   },
@@ -385,16 +385,15 @@ export const FORMATIVE_QUESTIONS: TrainingQuestion[] = [
     answers: ["Donner rapidement son opinion.", "Poser beaucoup de questions personnelles.", "Écouter, reformuler et communiquer sans jugement.", "Comparer la famille avec d'autres familles."],
     correctIndex: 2,
     explanation: "L'écoute active, la reformulation, l'empathie et l'absence de jugement favorisent une communication respectueuse."
+  },
+  {
+    id: "3264",
+    prompt: "Les alliés peuvent jouer un rôle important en offrant un environnement accueillant, respectueux et sécurisant aux familles d'accueil.",
+    answers: ["Vrai", "Faux"],
+    correctIndex: 0,
+    explanation: "Une présence bienveillante, fiable et respectueuse contribue à créer un réseau sécurisant autour des familles."
   }
 ];
-
-export const FINAL_QUESTION: TrainingQuestion = {
-  id: "3264",
-  prompt: "Les alliés peuvent jouer un rôle important en offrant un environnement accueillant, respectueux et sécurisant aux familles d'accueil.",
-  answers: ["Vrai", "Faux"],
-  correctIndex: 0,
-  explanation: "Une présence bienveillante, fiable et respectueuse contribue à créer un réseau sécurisant autour des familles."
-};
 
 export function publicQuestion(question: TrainingQuestion) {
   return { id: question.id, prompt: question.prompt, answers: question.answers };

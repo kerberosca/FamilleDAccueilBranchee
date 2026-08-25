@@ -30,9 +30,8 @@ type Course = {
   attemptsUsed: number;
   attemptsRemaining: number;
   certificateAvailable: boolean;
-  formativeCompleted: boolean;
   lessons: LessonSummary[];
-  formativeQuestions: PublicQuestion[];
+  quizQuestions: PublicQuestion[];
 };
 
 type Lesson = {
@@ -52,23 +51,20 @@ type Lesson = {
   }[];
 };
 
-type FormativeResult = {
-  scorePercent: number;
-  feedback: { questionId: string; correct: boolean; correctIndex: number; explanation: string }[];
-};
-
-type FinalResult = {
+type QuizResult = {
   passed: boolean;
   scorePercent: number;
   attemptsRemaining: number;
-  explanation: string;
+  feedback: { questionId: string; explanation: string }[];
   attentionRequired?: boolean;
+  certificateAvailable?: boolean;
+  certificateCode?: string;
 };
 
 const STATUS_LABELS: Record<string, string> = {
   NOT_STARTED: "À commencer",
   IN_PROGRESS: "En cours",
-  EXAM_AVAILABLE: "Examen disponible",
+  EXAM_AVAILABLE: "En cours",
   PASSED: "Formation réussie",
   ATTENTION_REQUIRED: "Intervention de l'équipe requise"
 };
@@ -80,11 +76,8 @@ export default function AllyTrainingPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [formativeAnswers, setFormativeAnswers] = useState<Record<string, number>>({});
-  const [formativeResult, setFormativeResult] = useState<FormativeResult | null>(null);
-  const [examQuestion, setExamQuestion] = useState<PublicQuestion | null>(null);
-  const [examAnswer, setExamAnswer] = useState<number | null>(null);
-  const [finalResult, setFinalResult] = useState<FinalResult | null>(null);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
 
   const allLessonsComplete = Boolean(course?.lessons.every((item) => item.completed));
   const currentSummary = useMemo(
@@ -150,54 +143,51 @@ export default function AllyTrainingPage() {
     }
   };
 
-  const submitFormative = async () => {
+  const submitQuiz = async () => {
     if (!accessToken || !course) return;
-    if (Object.keys(formativeAnswers).length !== course.formativeQuestions.length) {
-      setError("Répondez aux 12 questions avant de soumettre le quiz.");
+    if (Object.keys(quizAnswers).length !== course.quizQuestions.length) {
+      setError("Répondez aux 13 questions avant de soumettre le test.");
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const result = await apiPost<FormativeResult>("/training/me/formative/submit", {
+      const result = await apiPost<QuizResult>("/training/me/quiz/submit", {
         token: accessToken,
-        body: { answers: formativeAnswers }
+        body: { answers: quizAnswers }
       });
-      setFormativeResult(result);
-      await loadCourse(false);
-    } catch (caught) {
-      setError(toMessage(caught));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const loadExam = async () => {
-    if (!accessToken) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const data = await apiGet<{ question: PublicQuestion }>("/training/me/exam", { token: accessToken });
-      setExamQuestion(data.question);
-    } catch (caught) {
-      setError(toMessage(caught));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const submitExam = async () => {
-    if (!accessToken || !examQuestion || examAnswer == null) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await apiPost<FinalResult>("/training/me/exam/submit", {
-        token: accessToken,
-        body: { answers: { [examQuestion.id]: examAnswer } }
-      });
-      setFinalResult(result);
-      setExamQuestion(null);
-      setExamAnswer(null);
+      setQuizResult(result);
+      setQuizAnswers({});
+      if (result.passed) {
+        setCourse((current) =>
+          current
+            ? {
+                ...current,
+                status: "PASSED",
+                certificateAvailable: Boolean(result.certificateAvailable),
+                attemptsUsed: current.attemptsUsed + 1,
+                attemptsRemaining: result.attemptsRemaining
+              }
+            : current
+        );
+      } else if (result.attentionRequired) {
+        setCourse((current) =>
+          current
+            ? { ...current, status: "ATTENTION_REQUIRED", attemptsRemaining: 0, attemptsUsed: 3 }
+            : current
+        );
+      } else {
+        setCourse((current) =>
+          current
+            ? {
+                ...current,
+                status: "IN_PROGRESS",
+                attemptsUsed: current.attemptsUsed + 1,
+                attemptsRemaining: result.attemptsRemaining
+              }
+            : current
+        );
+      }
       await loadCourse(false);
     } catch (caught) {
       setError(toMessage(caught));
@@ -322,42 +312,45 @@ export default function AllyTrainingPage() {
                       </article>
                     ) : null}
 
-                    {allLessonsComplete && !course.formativeCompleted ? (
+                    {allLessonsComplete && course.status !== "ATTENTION_REQUIRED" && !quizResult ? (
                       <section className="rounded-[28px] border border-[#7768b5]/45 bg-[#171238]/90 p-6 sm:p-8">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#8ee7f3]">Quiz formatif</p>
-                        <h2 className="mt-2 text-3xl font-bold">12 mises en situation</h2>
-                        <p className="mt-2 text-[#bcb5d8]">Répondez à toutes les questions. Vous recevrez une rétroaction immédiate avant l&apos;examen final.</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#8ee7f3]">Test officiel</p>
+                        <h2 className="mt-2 text-3xl font-bold">13 questions</h2>
+                        <p className="mt-2 text-[#bcb5d8]">
+                          Répondez aux 13 questions avant de soumettre le test. La réussite exige au moins 60 %, soit 8 bonnes réponses. Il vous reste {course.attemptsRemaining} tentative{course.attemptsRemaining > 1 ? "s" : ""}.
+                        </p>
+                        <p className="mt-3 text-sm font-semibold text-[#aeeaf4]">
+                          {Object.keys(quizAnswers).length}/13 questions répondues
+                        </p>
                         <div className="mt-7 space-y-5">
-                          {course.formativeQuestions.map((question, index) => {
-                            const feedback = formativeResult?.feedback.find((item) => item.questionId === question.id);
-                            return (
-                              <fieldset key={question.id} className="rounded-2xl border border-[#4f4772] bg-[#100c29]/65 p-5">
-                                <legend className="px-2 font-semibold text-white">{index + 1}. {question.prompt}</legend>
-                                <div className="mt-3 grid gap-2">{question.answers.map((answer, answerIndex) => <label key={answer} className={`flex cursor-pointer gap-3 rounded-xl border p-3 text-sm ${formativeAnswers[question.id] === answerIndex ? "border-[#8cb2ff] bg-[#29305d]" : "border-[#433b64] bg-[#171333]"}`}><input type="radio" name={`q-${question.id}`} checked={formativeAnswers[question.id] === answerIndex} onChange={() => setFormativeAnswers((previous) => ({ ...previous, [question.id]: answerIndex }))} /><span>{answer}</span></label>)}</div>
-                                {feedback ? <p className={`mt-3 rounded-xl p-3 text-sm ${feedback.correct ? "bg-emerald-950/70 text-emerald-200" : "bg-amber-950/70 text-amber-100"}`}>{feedback.correct ? "Bonne réponse. " : "À revoir. "}{feedback.explanation}</p> : null}
-                              </fieldset>
-                            );
-                          })}
+                          {course.quizQuestions.map((question, index) => (
+                            <fieldset key={question.id} className="rounded-2xl border border-[#4f4772] bg-[#100c29]/65 p-5">
+                              <legend className="px-2 font-semibold text-white">{index + 1}. {question.prompt}</legend>
+                              <div className="mt-3 grid gap-2">{question.answers.map((answer, answerIndex) => <label key={answer} className={`flex cursor-pointer gap-3 rounded-xl border p-3 text-sm ${quizAnswers[question.id] === answerIndex ? "border-[#8cb2ff] bg-[#29305d]" : "border-[#433b64] bg-[#171333]"}`}><input type="radio" name={`q-${question.id}`} checked={quizAnswers[question.id] === answerIndex} onChange={() => setQuizAnswers((previous) => ({ ...previous, [question.id]: answerIndex }))} /><span>{answer}</span></label>)}</div>
+                            </fieldset>
+                          ))}
                         </div>
-                        <Button onClick={submitFormative} disabled={busy || Boolean(formativeResult)} className="mt-6 !rounded-xl !bg-[#f29d52] !px-5 !py-3 !font-bold !text-[#211435] hover:!bg-[#ffb36c]">Soumettre le quiz</Button>
+                        <Button onClick={submitQuiz} disabled={busy || Object.keys(quizAnswers).length !== course.quizQuestions.length} className="mt-6 !rounded-xl !bg-[#f29d52] !px-5 !py-3 !font-bold !text-[#211435] hover:!bg-[#ffb36c]">Soumettre le test complet</Button>
                       </section>
                     ) : null}
 
-                    {formativeResult ? <Alert tone="info">Quiz complété : {formativeResult.scorePercent} %. L&apos;examen final est maintenant disponible.</Alert> : null}
-
-                    {course.status === "EXAM_AVAILABLE" ? (
-                      <section className="rounded-[28px] border border-[#f29d52]/45 bg-gradient-to-br from-[#2b1735] to-[#15123b] p-6 sm:p-8">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#ffc080]">Examen final</p>
-                        <h2 className="mt-2 text-3xl font-bold">Dernière étape</h2>
-                        <p className="mt-2 text-[#d4c5d7]">Seuil de réussite : 60 %. Il vous reste {course.attemptsRemaining} tentative{course.attemptsRemaining > 1 ? "s" : ""}.</p>
-                        {!examQuestion ? <Button onClick={loadExam} disabled={busy} className="mt-5 !rounded-xl !bg-[#f29d52] !font-bold !text-[#211435] hover:!bg-[#ffb36c]">Commencer une tentative</Button> : (
-                          <fieldset className="mt-6 rounded-2xl border border-[#695678] bg-[#130d27]/75 p-5"><legend className="px-2 text-lg font-semibold">{examQuestion.prompt}</legend><div className="mt-4 grid gap-3 sm:grid-cols-2">{examQuestion.answers.map((answer, index) => <label key={answer} className={`cursor-pointer rounded-xl border p-4 text-center font-semibold ${examAnswer === index ? "border-[#f29d52] bg-[#53314c]" : "border-[#4b405e] bg-[#1c1638]"}`}><input className="mr-2" type="radio" name="final-answer" checked={examAnswer === index} onChange={() => setExamAnswer(index)} />{answer}</label>)}</div><Button onClick={submitExam} disabled={busy || examAnswer == null} className="mt-5 !rounded-xl !bg-[#f29d52] !font-bold !text-[#211435] hover:!bg-[#ffb36c]">Soumettre ma réponse</Button></fieldset>
-                        )}
+                    {quizResult && !quizResult.passed ? (
+                      <section className="rounded-[28px] border border-amber-400/35 bg-amber-950/35 p-6 sm:p-8">
+                        <h2 className="text-2xl font-bold text-white">Test à reprendre : {quizResult.scorePercent} %</h2>
+                        <p className="mt-2 text-amber-100">Le seuil de réussite est de 60 %. Il reste {quizResult.attemptsRemaining} tentative{quizResult.attemptsRemaining > 1 ? "s" : ""}.</p>
+                        {quizResult.feedback.length ? (
+                          <div className="mt-5 space-y-3">
+                            <h3 className="font-semibold text-white">Notions à revoir</h3>
+                            {quizResult.feedback.map((feedback) => {
+                              const question = course.quizQuestions.find((item) => item.id === feedback.questionId);
+                              return <div key={feedback.questionId} className="rounded-xl border border-amber-300/20 bg-[#171333] p-4"><p className="font-medium text-white">{question?.prompt}</p><p className="mt-2 text-sm text-amber-100">{feedback.explanation}</p></div>;
+                            })}
+                          </div>
+                        ) : null}
+                        {!quizResult.attentionRequired ? <Button onClick={() => setQuizResult(null)} className="mt-5 !rounded-xl !bg-[#f29d52] !font-bold !text-[#211435] hover:!bg-[#ffb36c]">Reprendre le test au complet</Button> : null}
                       </section>
                     ) : null}
-
-                    {finalResult ? <Alert tone={finalResult.passed ? "info" : "error"}>{finalResult.passed ? "Félicitations, l'examen est réussi!" : finalResult.attentionRequired ? "Les trois tentatives sont utilisées. L'équipe FAB a été avisée." : `Réponse incorrecte. Il reste ${finalResult.attemptsRemaining} tentative(s).`} {finalResult.explanation}</Alert> : null}
-                    {course.status === "ATTENTION_REQUIRED" ? <Alert tone="error">Vos trois tentatives ont été utilisées. L&apos;équipe FAB a été avisée et pourra réinitialiser l&apos;examen après un suivi avec vous.</Alert> : null}
+                    {course.status === "ATTENTION_REQUIRED" ? <Alert tone="error">Vos trois tentatives ont été utilisées. L&apos;équipe FAB a été avisée et pourra réinitialiser le test après un suivi avec vous.</Alert> : null}
                   </div>
                 </div>
               )}

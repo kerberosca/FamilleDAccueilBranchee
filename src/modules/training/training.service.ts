@@ -29,13 +29,13 @@ import {
   ALLY_COURSE_TITLE,
   ALLY_COURSE_VERSION,
   ALLY_TRAINING_LESSONS,
-  FINAL_QUESTION,
-  FORMATIVE_QUESTIONS,
+  QUIZ_QUESTIONS,
   TrainingQuestion,
   publicQuestion
 } from "./training-content";
 
-const MAX_FINAL_ATTEMPTS = 3;
+const MAX_QUIZ_ATTEMPTS = 3;
+const QUIZ_PASS_PERCENT = 60;
 const REMINDER_DELAYS = [
   [TrainingReminderType.ASSIGNMENT, 0],
   [TrainingReminderType.DAY_3, 3],
@@ -46,8 +46,7 @@ const REMINDER_DELAYS = [
 const INITIAL_REMINDER_TYPES = REMINDER_DELAYS.map(([type]) => type);
 const EMAIL_ELIGIBLE_STATUSES = [
   TrainingStatus.NOT_STARTED,
-  TrainingStatus.IN_PROGRESS,
-  TrainingStatus.EXAM_AVAILABLE
+  TrainingStatus.IN_PROGRESS
 ];
 
 type TrainingEmailAutomationStatus = "ACTIVE" | "PAUSED" | "SCHEDULED" | "MISCONFIGURED";
@@ -112,10 +111,46 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
   }
 
   async prepareEmailAutomation() {
+    const migratedAssessments = await this.normalizeLegacyAssessmentStates();
     const backfill = await this.backfillExistingAllies();
     const startAt = this.getConfiguredEmailStartAt();
     const rescheduled = startAt ? await this.rebasePendingInitialReminders(startAt) : 0;
-    return { ...backfill, rescheduled, emailAutomation: this.publicEmailAutomationState() };
+    return { ...backfill, migratedAssessments, rescheduled, emailAutomation: this.publicEmailAutomationState() };
+  }
+
+  async normalizeLegacyAssessmentStates() {
+    const legacy = await this.prisma.trainingEnrollment.findMany({
+      where: {
+        status: { in: [TrainingStatus.EXAM_AVAILABLE, TrainingStatus.ATTENTION_REQUIRED] },
+        certificate: null,
+        attempts: { none: { type: TrainingAssessmentType.QUIZ } }
+      },
+      select: { id: true }
+    });
+    if (!legacy.length) return 0;
+
+    const enrollmentIds = legacy.map((item) => item.id);
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.trainingEnrollment.updateMany({
+        where: { id: { in: enrollmentIds } },
+        data: { status: TrainingStatus.IN_PROGRESS, attemptsResetAt: now, lastActivityAt: now }
+      }),
+      this.prisma.trainingEmailLog.updateMany({
+        where: {
+          enrollmentId: { in: enrollmentIds },
+          type: TrainingReminderType.ATTENTION,
+          status: { in: [TrainingEmailStatus.PENDING, TrainingEmailStatus.PROCESSING] }
+        },
+        data: {
+          status: TrainingEmailStatus.SKIPPED,
+          processingAt: null,
+          lastError: "Ancienne évaluation remplacée par le test officiel de 13 questions"
+        }
+      })
+    ]);
+    this.logger.log(`Anciennes évaluations remises à zéro: ${legacy.length}.`);
+    return legacy.length;
   }
 
   async ensureEnrollment(resourceProfileId: string) {
@@ -182,79 +217,44 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
         }
       })
     ]);
-    await this.refreshExamAvailability(enrollment.id);
     return this.getMyCourse(userId);
   }
 
-  async submitFormative(userId: string, answers: Record<string, number>) {
+  async submitQuiz(userId: string, answers: Record<string, number>) {
     const enrollment = await this.getEnrollmentForUser(userId, true);
     await this.assertAllLessonsComplete(enrollment.id);
-    const graded = gradeQuestions(FORMATIVE_QUESTIONS, answers);
-    const attemptNumber =
-      (await this.prisma.trainingAssessmentAttempt.count({
-        where: { enrollmentId: enrollment.id, type: TrainingAssessmentType.FORMATIVE }
-      })) + 1;
-    await this.prisma.trainingAssessmentAttempt.create({
-      data: {
-        enrollmentId: enrollment.id,
-        type: TrainingAssessmentType.FORMATIVE,
-        attemptNumber,
-        answers,
-        scorePercent: graded.scorePercent,
-        passed: true
-      }
-    });
-    await this.prisma.trainingEnrollment.update({
-      where: { id: enrollment.id },
-      data: { status: TrainingStatus.EXAM_AVAILABLE, lastActivityAt: new Date() }
-    });
-    return { scorePercent: graded.scorePercent, feedback: graded.feedback, examAvailable: true };
-  }
-
-  async getFinalExam(userId: string) {
-    const enrollment = await this.getEnrollmentForUser(userId, true);
-    const attemptsUsed = await this.getActiveFinalAttemptsCount(enrollment);
-    if (enrollment.status === TrainingStatus.ATTENTION_REQUIRED || attemptsUsed >= MAX_FINAL_ATTEMPTS) {
+    if (enrollment.status === TrainingStatus.PASSED) {
+      throw new BadRequestException("La formation est déjà réussie.");
+    }
+    const activeAttempts = await this.getActiveQuizAttemptsCount(enrollment);
+    if (enrollment.status === TrainingStatus.ATTENTION_REQUIRED || activeAttempts >= MAX_QUIZ_ATTEMPTS) {
       throw new ForbiddenException("Les trois tentatives ont été utilisées. Communiquez avec l'équipe FAB.");
     }
-    if (enrollment.status !== TrainingStatus.EXAM_AVAILABLE) {
-      throw new ForbiddenException("Terminez les huit modules et le quiz formatif avant l'examen final.");
-    }
-    return { question: publicQuestion(FINAL_QUESTION), attemptsRemaining: MAX_FINAL_ATTEMPTS - attemptsUsed };
-  }
-
-  async submitFinalExam(userId: string, answers: Record<string, number>) {
-    const enrollment = await this.getEnrollmentForUser(userId, true);
-    if (enrollment.status !== TrainingStatus.EXAM_AVAILABLE) {
-      throw new ForbiddenException("L'examen final n'est pas disponible.");
-    }
-    const activeAttempts = await this.getActiveFinalAttemptsCount(enrollment);
-    if (activeAttempts >= MAX_FINAL_ATTEMPTS) {
-      throw new ForbiddenException("Les trois tentatives ont été utilisées.");
-    }
-    const graded = gradeQuestions([FINAL_QUESTION], answers);
+    const graded = gradeQuestions(QUIZ_QUESTIONS, answers);
     const totalAttempts = await this.prisma.trainingAssessmentAttempt.count({
-      where: { enrollmentId: enrollment.id, type: TrainingAssessmentType.FINAL }
+      where: { enrollmentId: enrollment.id, type: TrainingAssessmentType.QUIZ }
     });
     const attemptNumber = totalAttempts + 1;
-    const pass = graded.scorePercent >= 60;
+    const pass = graded.scorePercent >= QUIZ_PASS_PERCENT;
     const now = new Date();
-
-    await this.prisma.trainingAssessmentAttempt.create({
-      data: {
-        enrollmentId: enrollment.id,
-        type: TrainingAssessmentType.FINAL,
-        attemptNumber,
-        answers,
-        scorePercent: graded.scorePercent,
-        passed: pass,
-        submittedAt: now
-      }
-    });
+    const feedback = graded.feedback
+      .filter((item) => !item.correct)
+      .map((item) => ({ questionId: item.questionId, explanation: item.explanation }));
 
     if (pass) {
       const profile = await this.prisma.resourceProfile.findUniqueOrThrow({ where: { id: enrollment.resourceProfileId } });
       const certificate = await this.prisma.$transaction(async (tx) => {
+        await tx.trainingAssessmentAttempt.create({
+          data: {
+            enrollmentId: enrollment.id,
+            type: TrainingAssessmentType.QUIZ,
+            attemptNumber,
+            answers,
+            scorePercent: graded.scorePercent,
+            passed: true,
+            submittedAt: now
+          }
+        });
         await tx.trainingEnrollment.update({
           where: { id: enrollment.id },
           data: { status: TrainingStatus.PASSED, completedAt: now, lastActivityAt: now }
@@ -287,33 +287,51 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
       return {
         passed: true,
         scorePercent: graded.scorePercent,
-        attemptsRemaining: MAX_FINAL_ATTEMPTS - activeAttempts - 1,
-        explanation: FINAL_QUESTION.explanation,
+        attemptsRemaining: MAX_QUIZ_ATTEMPTS - activeAttempts - 1,
+        feedback,
+        certificateAvailable: true,
         certificateCode: certificate.certificateCode
       };
     }
 
     const attemptsAfter = activeAttempts + 1;
-    if (attemptsAfter >= MAX_FINAL_ATTEMPTS) {
-      await this.prisma.$transaction([
-        this.prisma.trainingEnrollment.update({
-          where: { id: enrollment.id },
-          data: { status: TrainingStatus.ATTENTION_REQUIRED, lastActivityAt: now }
-        }),
-        this.prisma.trainingEmailLog.upsert({
+    const attentionRequired = attemptsAfter >= MAX_QUIZ_ATTEMPTS;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.trainingAssessmentAttempt.create({
+        data: {
+          enrollmentId: enrollment.id,
+          type: TrainingAssessmentType.QUIZ,
+          attemptNumber,
+          answers,
+          scorePercent: graded.scorePercent,
+          passed: false,
+          submittedAt: now
+        }
+      });
+      await tx.trainingEnrollment.update({
+        where: { id: enrollment.id },
+        data: {
+          status: attentionRequired ? TrainingStatus.ATTENTION_REQUIRED : TrainingStatus.IN_PROGRESS,
+          lastActivityAt: now
+        }
+      });
+      if (attentionRequired) {
+        await tx.trainingEmailLog.upsert({
           where: { enrollmentId_type: { enrollmentId: enrollment.id, type: TrainingReminderType.ATTENTION } },
           update: { status: TrainingEmailStatus.PENDING, scheduledFor: now, lastError: null },
           create: { enrollmentId: enrollment.id, type: TrainingReminderType.ATTENTION, scheduledFor: now }
-        })
-      ]);
+        });
+      }
+    });
+    if (attentionRequired) {
       setTimeout(() => void this.processDueEmails(), 0).unref();
     }
     return {
       passed: false,
       scorePercent: graded.scorePercent,
-      attemptsRemaining: Math.max(0, MAX_FINAL_ATTEMPTS - attemptsAfter),
-      explanation: FINAL_QUESTION.explanation,
-      attentionRequired: attemptsAfter >= MAX_FINAL_ATTEMPTS
+      attemptsRemaining: Math.max(0, MAX_QUIZ_ATTEMPTS - attemptsAfter),
+      feedback,
+      attentionRequired
     };
   }
 
@@ -387,6 +405,8 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
     ]);
     const stats: Record<string, number> = Object.fromEntries(Object.values(TrainingStatus).map((value) => [value, 0]));
     grouped.forEach((item) => (stats[item.status] = (item._count as { status: number }).status));
+    stats[TrainingStatus.IN_PROGRESS] += stats[TrainingStatus.EXAM_AVAILABLE];
+    stats[TrainingStatus.EXAM_AVAILABLE] = 0;
     return {
       total,
       page,
@@ -398,7 +418,7 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async resetFinalAttempts(enrollmentId: string, actorUserId: string) {
+  async resetQuizAttempts(enrollmentId: string, actorUserId: string) {
     const enrollment = await this.prisma.trainingEnrollment.findUnique({
       where: { id: enrollmentId },
       include: { resourceProfile: true }
@@ -409,7 +429,7 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
     }
     const updated = await this.prisma.trainingEnrollment.update({
       where: { id: enrollmentId },
-      data: { status: TrainingStatus.EXAM_AVAILABLE, attemptsResetAt: new Date(), lastActivityAt: new Date() }
+      data: { status: TrainingStatus.IN_PROGRESS, attemptsResetAt: new Date(), lastActivityAt: new Date() }
     });
     await this.usersService.logAdminAction(actorUserId, "ALLY_TRAINING_ATTEMPTS_RESET", "TRAINING_ENROLLMENT", enrollmentId, {
       resourceProfileId: enrollment.resourceProfileId,
@@ -551,16 +571,6 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
     return enrollment;
   }
 
-  private async refreshExamAvailability(enrollmentId: string) {
-    const [completed, formative] = await Promise.all([
-      this.prisma.trainingLessonProgress.count({ where: { enrollmentId, completedAt: { not: null } } }),
-      this.prisma.trainingAssessmentAttempt.count({ where: { enrollmentId, type: TrainingAssessmentType.FORMATIVE } })
-    ]);
-    if (completed === ALLY_TRAINING_LESSONS.length && formative > 0) {
-      await this.prisma.trainingEnrollment.update({ where: { id: enrollmentId }, data: { status: TrainingStatus.EXAM_AVAILABLE } });
-    }
-  }
-
   private async assertPreviousLessonsComplete(enrollmentId: string, lessonNumber: number) {
     if (lessonNumber <= 1) return;
     const previousKeys = ALLY_TRAINING_LESSONS.slice(0, lessonNumber - 1).map((lesson) => lesson.key);
@@ -573,7 +583,7 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
   private async assertAllLessonsComplete(enrollmentId: string) {
     const completed = await this.prisma.trainingLessonProgress.count({ where: { enrollmentId, completedAt: { not: null } } });
     if (completed !== ALLY_TRAINING_LESSONS.length) {
-      throw new BadRequestException("Terminez les huit modules avant le quiz formatif.");
+      throw new BadRequestException("Terminez les huit modules avant le test officiel.");
     }
   }
 
@@ -583,11 +593,11 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
     return lesson;
   }
 
-  private async getActiveFinalAttemptsCount(enrollment: { id: string; attemptsResetAt: Date | null }) {
+  private async getActiveQuizAttemptsCount(enrollment: { id: string; attemptsResetAt: Date | null }) {
     return this.prisma.trainingAssessmentAttempt.count({
       where: {
         enrollmentId: enrollment.id,
-        type: TrainingAssessmentType.FINAL,
+        type: TrainingAssessmentType.QUIZ,
         ...(enrollment.attemptsResetAt ? { submittedAt: { gt: enrollment.attemptsResetAt } } : {})
       }
     });
@@ -595,26 +605,28 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
 
   private toCourseView(enrollment: Awaited<ReturnType<TrainingService["getEnrollmentForUser"]>>) {
     const completed = new Set(enrollment.lessonProgress.filter((item) => item.completedAt).map((item) => item.lessonKey));
-    const finalAttempts = enrollment.attempts.filter(
+    const quizAttempts = enrollment.attempts.filter(
       (attempt) =>
-        attempt.type === TrainingAssessmentType.FINAL &&
+        attempt.type === TrainingAssessmentType.QUIZ &&
         (!enrollment.attemptsResetAt || attempt.submittedAt > enrollment.attemptsResetAt)
     );
     return {
       id: enrollment.id,
       courseVersion: enrollment.courseVersion,
       title: ALLY_COURSE_TITLE,
-      status: enrollment.status,
+      status:
+        enrollment.status === TrainingStatus.EXAM_AVAILABLE
+          ? TrainingStatus.IN_PROGRESS
+          : enrollment.status,
       assignedAt: enrollment.assignedAt,
       startedAt: enrollment.startedAt,
       lastActivityAt: enrollment.lastActivityAt,
       completedAt: enrollment.completedAt,
       currentLessonKey: enrollment.currentLessonKey ?? ALLY_TRAINING_LESSONS[0].key,
       progressPercent: progressPercent(enrollment.lessonProgress),
-      attemptsUsed: finalAttempts.length,
-      attemptsRemaining: Math.max(0, MAX_FINAL_ATTEMPTS - finalAttempts.length),
+      attemptsUsed: quizAttempts.length,
+      attemptsRemaining: Math.max(0, MAX_QUIZ_ATTEMPTS - quizAttempts.length),
       certificateAvailable: Boolean(enrollment.certificate),
-      formativeCompleted: enrollment.attempts.some((attempt) => attempt.type === TrainingAssessmentType.FORMATIVE),
       lessons: ALLY_TRAINING_LESSONS.map((lesson) => ({
         key: lesson.key,
         number: lesson.number,
@@ -624,19 +636,24 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
         completed: completed.has(lesson.key),
         locked: ALLY_TRAINING_LESSONS.slice(0, lesson.number - 1).some((previous) => !completed.has(previous.key))
       })),
-      formativeQuestions: FORMATIVE_QUESTIONS.map(publicQuestion)
+      quizQuestions: QUIZ_QUESTIONS.map(publicQuestion),
+      // Compatibilité temporaire avec une interface déjà chargée avant le déploiement.
+      formativeQuestions: QUIZ_QUESTIONS.map(publicQuestion)
     };
   }
 
   private toAdminView(enrollment: any) {
-    const finalAttempts = enrollment.attempts.filter(
+    const quizAttempts = enrollment.attempts.filter(
       (attempt: any) =>
-        attempt.type === TrainingAssessmentType.FINAL &&
+        attempt.type === TrainingAssessmentType.QUIZ &&
         (!enrollment.attemptsResetAt || attempt.submittedAt > enrollment.attemptsResetAt)
     );
     return {
       id: enrollment.id,
-      status: enrollment.status,
+      status:
+        enrollment.status === TrainingStatus.EXAM_AVAILABLE
+          ? TrainingStatus.IN_PROGRESS
+          : enrollment.status,
       displayName: enrollment.resourceProfile.displayName,
       email: enrollment.resourceProfile.user.email,
       resourceProfileId: enrollment.resourceProfileId,
@@ -647,8 +664,8 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
       assignedAt: enrollment.assignedAt,
       lastActivityAt: enrollment.lastActivityAt,
       completedAt: enrollment.completedAt,
-      attemptsUsed: finalAttempts.length,
-      attemptsRemaining: Math.max(0, MAX_FINAL_ATTEMPTS - finalAttempts.length),
+      attemptsUsed: quizAttempts.length,
+      attemptsRemaining: Math.max(0, MAX_QUIZ_ATTEMPTS - quizAttempts.length),
       overdue:
         enrollment.status !== TrainingStatus.PASSED &&
         Date.now() - enrollment.assignedAt.getTime() >= 14 * 24 * 60 * 60_000,

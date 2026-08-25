@@ -36,21 +36,16 @@ export class TrainingController {
   }
 
   @Roles(Role.RESOURCE)
+  @Post("me/quiz/submit")
+  submitQuiz(@CurrentUser() user: JwtPayload, @Body() dto: SubmitAssessmentDto) {
+    return this.trainingService.submitQuiz(user.sub, dto.answers);
+  }
+
+  /** Alias temporaire pour les interfaces chargées avant la mise à jour. */
+  @Roles(Role.RESOURCE)
   @Post("me/formative/submit")
-  submitFormative(@CurrentUser() user: JwtPayload, @Body() dto: SubmitAssessmentDto) {
-    return this.trainingService.submitFormative(user.sub, dto.answers);
-  }
-
-  @Roles(Role.RESOURCE)
-  @Get("me/exam")
-  getExam(@CurrentUser() user: JwtPayload) {
-    return this.trainingService.getFinalExam(user.sub);
-  }
-
-  @Roles(Role.RESOURCE)
-  @Post("me/exam/submit")
-  submitExam(@CurrentUser() user: JwtPayload, @Body() dto: SubmitAssessmentDto) {
-    return this.trainingService.submitFinalExam(user.sub, dto.answers);
+  submitLegacyQuiz(@CurrentUser() user: JwtPayload, @Body() dto: SubmitAssessmentDto) {
+    return this.trainingService.submitQuiz(user.sub, dto.answers);
   }
 
   @Roles(Role.RESOURCE)
@@ -76,7 +71,7 @@ export class TrainingController {
   @Roles(Role.ADMIN)
   @Post("admin/enrollments/:enrollmentId/reset-attempts")
   resetAttempts(@CurrentUser() user: JwtPayload, @Param("enrollmentId") enrollmentId: string) {
-    return this.trainingService.resetFinalAttempts(enrollmentId, user.sub);
+    return this.trainingService.resetQuizAttempts(enrollmentId, user.sub);
   }
 
   @Roles(Role.ADMIN)
