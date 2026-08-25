@@ -241,6 +241,22 @@ export function AllyOnboardingWizard({
       if (!isPositiveDecimal(reg.section3.hourlyRateSuggested)) {
         return "Le taux horaire suggéré doit être un montant numérique positif.";
       }
+      if (
+        isChildCareOffer &&
+        (reg.section3.repitNuit || reg.section3.repitWeekend) &&
+        reg.section3.nightlyRateSuggested?.trim() &&
+        !isPositiveDecimal(reg.section3.nightlyRateSuggested)
+      ) {
+        return "Le tarif par nuit suggéré doit être un montant numérique positif.";
+      }
+      if (
+        isChildCareOffer &&
+        reg.section3.repitWeekend &&
+        reg.section3.dailyRateSuggested?.trim() &&
+        !isPositiveDecimal(reg.section3.dailyRateSuggested)
+      ) {
+        return "Le tarif par jour suggéré doit être un montant numérique positif.";
+      }
     }
     if (step === sec4Step) {
       const s4 = reg.section4;
@@ -480,47 +496,47 @@ export function AllyOnboardingWizard({
         <Card className="space-y-3 p-4">
           <h2 className="text-lg font-semibold text-white">Section 2 - Vos compétences</h2>
           <div className="space-y-2">
-            <p className="text-sm text-slate-300">Certification RCR / premiers secours valide</p>
+            <label htmlFor="rcr-status" className="text-sm text-slate-300">
+              Avez-vous une certification RCR / premiers secours de niveau C valide?
+            </label>
             <select
+              id="rcr-status"
               className="w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
               value={reg.section2.rcrValid}
-              onChange={(e) =>
+              onChange={(e) => {
+                const rcrValid = e.target.value as AllyRegistrationPayload["section2"]["rcrValid"];
                 setReg((r) => ({
                   ...r,
-                  section2: { ...r.section2, rcrValid: e.target.value as AllyRegistrationPayload["section2"]["rcrValid"] },
+                  section2: {
+                    ...r.section2,
+                    rcrValid,
+                    rcrExpiry: rcrValid === "yes" ? r.section2.rcrExpiry : undefined
+                  },
                   section4: {
                     ...r.section4,
-                    canProvideRcrProof: e.target.value === "yes" ? r.section4.canProvideRcrProof : false
+                    canProvideRcrProof: rcrValid === "yes" ? r.section4.canProvideRcrProof : false
                   }
-                }))
-              }
+                }));
+              }}
             >
               <option value="yes">Oui</option>
-              <option value="no">Non</option>
               <option value="in_progress">En cours</option>
-            </select>
-          </div>
-          <Input
-            placeholder="Date d'expiration RCR (si applicable)"
-            value={reg.section2.rcrExpiry ?? ""}
-            onChange={(e) => setReg((r) => ({ ...r, section2: { ...r.section2, rcrExpiry: e.target.value } }))}
-          />
-          <div className="space-y-2">
-            <p className="text-sm text-slate-300">Formation RCR Niveau C</p>
-            <select
-              className="w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
-              value={reg.section2.rcrLevelC}
-              onChange={(e) =>
-                setReg((r) => ({
-                  ...r,
-                  section2: { ...r.section2, rcrLevelC: e.target.value as "yes" | "no" }
-                }))
-              }
-            >
-              <option value="yes">Oui</option>
               <option value="no">Non</option>
             </select>
           </div>
+          {reg.section2.rcrValid === "yes" ? (
+            <div className="space-y-2">
+              <label htmlFor="rcr-expiry" className="text-sm text-slate-300">
+                Date d&apos;expiration de la certification RCR
+              </label>
+              <Input
+                id="rcr-expiry"
+                type="date"
+                value={reg.section2.rcrExpiry ?? ""}
+                onChange={(e) => setReg((r) => ({ ...r, section2: { ...r.section2, rcrExpiry: e.target.value } }))}
+              />
+            </div>
+          ) : null}
           <div className="space-y-2">
             <p className="text-sm text-slate-300">Expérience avec des enfants</p>
             <select
@@ -601,12 +617,32 @@ export function AllyOnboardingWizard({
               {SERVICE_OPTIONS[selectedAllyType].labels.repitSoiree}
             </label>
             <label className="flex items-center gap-2">
-              {chk(reg.section3.repitNuit, (v) => setReg((r) => ({ ...r, section3: { ...r.section3, repitNuit: v } })))}
+              {chk(reg.section3.repitNuit, (v) =>
+                setReg((r) => ({
+                  ...r,
+                  section3: {
+                    ...r.section3,
+                    repitNuit: v,
+                    nightlyRateSuggested:
+                      v || r.section3.repitWeekend ? r.section3.nightlyRateSuggested : undefined
+                  }
+                }))
+              )}
               {SERVICE_OPTIONS[selectedAllyType].labels.repitNuit}
             </label>
             <label className="flex items-center gap-2">
               {chk(reg.section3.repitWeekend, (v) =>
-                setReg((r) => ({ ...r, section3: { ...r.section3, repitWeekend: v, dispoWeekend: v } }))
+                setReg((r) => ({
+                  ...r,
+                  section3: {
+                    ...r.section3,
+                    repitWeekend: v,
+                    dispoWeekend: v,
+                    nightlyRateSuggested:
+                      v || r.section3.repitNuit ? r.section3.nightlyRateSuggested : undefined,
+                    dailyRateSuggested: v ? r.section3.dailyRateSuggested : undefined
+                  }
+                }))
               )}
               {SERVICE_OPTIONS[selectedAllyType].labels.repitWeekend}
             </label>
@@ -661,14 +697,63 @@ export function AllyOnboardingWizard({
               <option value="more">Plus</option>
             </select>
           </div>
-          <Input
-            placeholder={selectedAllyType === "MENAGE" ? "Tarif suggéré ($/h ou forfait)" : "Taux horaire suggéré ($)"}
-            inputMode="decimal"
-            value={reg.section3.hourlyRateSuggested}
-            onChange={(e) =>
-              setReg((r) => ({ ...r, section3: { ...r.section3, hourlyRateSuggested: sanitizeDecimal(e.target.value) } }))
-            }
-          />
+          <div className="space-y-3 rounded-lg border border-[#4f476f] bg-[#0f0b24]/50 p-3">
+            <div>
+              <p className="text-sm font-medium text-slate-200">Vos tarifs suggérés</p>
+              <p className="text-xs text-slate-400">
+                Le tarif horaire reste la référence de votre profil. Ajoutez les autres tarifs qui s&apos;appliquent;
+                l&apos;entente finale se fait directement avec la famille.
+              </p>
+            </div>
+            <label htmlFor="hourly-rate" className="block space-y-1">
+              <span className="text-sm text-slate-300">
+                {selectedAllyType === "MENAGE" ? "Tarif suggéré ($/h ou forfait)" : "Tarif horaire suggéré ($/h)"}
+              </span>
+              <Input
+                id="hourly-rate"
+                inputMode="decimal"
+                value={reg.section3.hourlyRateSuggested}
+                onChange={(e) =>
+                  setReg((r) => ({
+                    ...r,
+                    section3: { ...r.section3, hourlyRateSuggested: sanitizeDecimal(e.target.value) }
+                  }))
+                }
+              />
+            </label>
+            {isChildCareOffer && (reg.section3.repitNuit || reg.section3.repitWeekend) ? (
+              <label htmlFor="nightly-rate" className="block space-y-1">
+                <span className="text-sm text-slate-300">Tarif par nuit suggéré ($) — optionnel</span>
+                <Input
+                  id="nightly-rate"
+                  inputMode="decimal"
+                  value={reg.section3.nightlyRateSuggested ?? ""}
+                  onChange={(e) =>
+                    setReg((r) => ({
+                      ...r,
+                      section3: { ...r.section3, nightlyRateSuggested: sanitizeDecimal(e.target.value) }
+                    }))
+                  }
+                />
+              </label>
+            ) : null}
+            {isChildCareOffer && reg.section3.repitWeekend ? (
+              <label htmlFor="daily-rate" className="block space-y-1">
+                <span className="text-sm text-slate-300">Tarif par jour suggéré ($) — optionnel</span>
+                <Input
+                  id="daily-rate"
+                  inputMode="decimal"
+                  value={reg.section3.dailyRateSuggested ?? ""}
+                  onChange={(e) =>
+                    setReg((r) => ({
+                      ...r,
+                      section3: { ...r.section3, dailyRateSuggested: sanitizeDecimal(e.target.value) }
+                    }))
+                  }
+                />
+              </label>
+            ) : null}
+          </div>
           <p className="text-sm text-slate-400">Autres disponibilités utiles</p>
           <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
             {[
@@ -777,7 +862,13 @@ export function AllyOnboardingWizard({
             </li>
             <li>Téléphone : {contactPhone}</li>
             <li>Contact : {reg.section1.contactEmail}</li>
-            <li>Tarif indicatif : {reg.section3.hourlyRateSuggested} $/h</li>
+            <li>Tarif horaire indicatif : {reg.section3.hourlyRateSuggested} $/h</li>
+            {isChildCareOffer && reg.section3.nightlyRateSuggested ? (
+              <li>Tarif indicatif par nuit : {reg.section3.nightlyRateSuggested} $</li>
+            ) : null}
+            {isChildCareOffer && reg.section3.dailyRateSuggested ? (
+              <li>Tarif indicatif par jour : {reg.section3.dailyRateSuggested} $</li>
+            ) : null}
           </ul>
           <form onSubmit={handleSubmit} className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={goBack}>

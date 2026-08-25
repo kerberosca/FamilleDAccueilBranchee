@@ -12,7 +12,6 @@ export type AllyRegistrationPayload = {
   section2: {
     rcrValid: "yes" | "no" | "in_progress";
     rcrExpiry?: string;
-    rcrLevelC: "yes" | "no";
     experienceChildren: "lt1" | "1_3" | "3_5" | "5p";
     experienceParticularNeeds: boolean;
     experienceFoster: boolean;
@@ -31,6 +30,8 @@ export type AllyRegistrationPayload = {
     maxChildren: string;
     serviceRadius: "10" | "25" | "50" | "more";
     hourlyRateSuggested: string;
+    nightlyRateSuggested?: string;
+    dailyRateSuggested?: string;
     dispoSemaine: boolean;
     dispoSoir: boolean;
     dispoWeekend: boolean;
@@ -61,7 +62,6 @@ export function emptyAllyRegistration(): AllyRegistrationPayload {
     },
     section2: {
       rcrValid: "no",
-      rcrLevelC: "no",
       experienceChildren: "lt1",
       experienceParticularNeeds: false,
       experienceFoster: false,
@@ -79,6 +79,8 @@ export function emptyAllyRegistration(): AllyRegistrationPayload {
       maxChildren: "",
       serviceRadius: "25",
       hourlyRateSuggested: "",
+      nightlyRateSuggested: undefined,
+      dailyRateSuggested: undefined,
       dispoSemaine: false,
       dispoSoir: false,
       dispoWeekend: false,

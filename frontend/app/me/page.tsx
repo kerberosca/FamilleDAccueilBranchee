@@ -87,6 +87,8 @@ type ResourceAvailability = {
   flexible: boolean;
   serviceRadius: string;
   maxChildren: string;
+  nightlyRate: string;
+  dailyRate: string;
 };
 
 type FieldErrors = Partial<
@@ -1005,7 +1007,9 @@ function parseResourceAvailability(value: unknown): ResourceAvailability {
     weekends: false,
     flexible: false,
     serviceRadius: "",
-    maxChildren: ""
+    maxChildren: "",
+    nightlyRate: "",
+    dailyRate: ""
   };
   if (!value) {
     return availability;
@@ -1030,7 +1034,9 @@ function parseResourceAvailability(value: unknown): ResourceAvailability {
     weekends: Boolean(record.finDeSemaine ?? record.weekends ?? record.dispoWeekend),
     flexible: Boolean(record.flexible ?? record.dispoFlexible),
     serviceRadius: record.rayonKm != null ? String(record.rayonKm) : record.serviceRadius != null ? String(record.serviceRadius) : "",
-    maxChildren: record.maxEnfants != null ? String(record.maxEnfants) : record.maxChildren != null ? String(record.maxChildren) : ""
+    maxChildren: record.maxEnfants != null ? String(record.maxEnfants) : record.maxChildren != null ? String(record.maxChildren) : "",
+    nightlyRate: record.tarifParNuit != null ? String(record.tarifParNuit) : "",
+    dailyRate: record.tarifParJour != null ? String(record.tarifParJour) : ""
   };
 }
 
@@ -1041,7 +1047,9 @@ function serializeResourceAvailability(value: ResourceAvailability): string {
     finDeSemaine: value.weekends,
     flexible: value.flexible,
     rayonKm: value.serviceRadius || undefined,
-    maxEnfants: value.maxChildren.trim() || undefined
+    maxEnfants: value.maxChildren.trim() || undefined,
+    tarifParNuit: value.nightlyRate.trim() || undefined,
+    tarifParJour: value.dailyRate.trim() || undefined
   };
   const hasSelection =
     payload.semaine ||
@@ -1049,7 +1057,9 @@ function serializeResourceAvailability(value: ResourceAvailability): string {
     payload.finDeSemaine ||
     payload.flexible ||
     Boolean(payload.rayonKm) ||
-    Boolean(payload.maxEnfants);
+    Boolean(payload.maxEnfants) ||
+    Boolean(payload.tarifParNuit) ||
+    Boolean(payload.tarifParJour);
   return hasSelection ? JSON.stringify(payload) : "";
 }
 

@@ -15,7 +15,6 @@ export type AllyRegistrationPayload = {
   section2: {
     rcrValid: "yes" | "no" | "in_progress";
     rcrExpiry?: string;
-    rcrLevelC: "yes" | "no";
     experienceChildren: "lt1" | "1_3" | "3_5" | "5p";
     experienceParticularNeeds: boolean;
     experienceFoster: boolean;
@@ -34,6 +33,8 @@ export type AllyRegistrationPayload = {
     maxChildren: string;
     serviceRadius: "10" | "25" | "50" | "more";
     hourlyRateSuggested: string;
+    nightlyRateSuggested?: string;
+    dailyRateSuggested?: string;
     dispoSemaine: boolean;
     dispoSoir: boolean;
     dispoWeekend: boolean;
@@ -106,10 +107,6 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
   if (rcrValid !== "yes" && rcrValid !== "no" && rcrValid !== "in_progress") {
     throw new BadRequestException("Section 2 : certification RCR invalide.");
   }
-  const rcrLevelC = s2.rcrLevelC;
-  if (rcrLevelC !== "yes" && rcrLevelC !== "no") {
-    throw new BadRequestException("Section 2 : formation RCR Niveau C invalide.");
-  }
   const exp = s2.experienceChildren;
   if (exp !== "lt1" && exp !== "1_3" && exp !== "3_5" && exp !== "5p") {
     throw new BadRequestException("Section 2 : expérience avec enfants invalide.");
@@ -123,6 +120,9 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
     asBool(s3.repitNuit) ||
     asBool(s3.repitWeekend) ||
     asBool(s3.repitUrgence);
+  const acceptsNightRate =
+    allyType === AllyType.GARDIENS && (asBool(s3.repitNuit) || asBool(s3.repitWeekend));
+  const acceptsDailyRate = allyType === AllyType.GARDIENS && asBool(s3.repitWeekend);
   if (!repitAny) {
     throw new BadRequestException("Section 3 : cochez au moins une modalité de service offerte.");
   }
@@ -145,6 +145,22 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
   }
   if (!isPositiveDecimalString(s3.hourlyRateSuggested)) {
     throw new BadRequestException("Section 3 : taux horaire suggéré doit être un montant numérique positif.");
+  }
+  if (
+    acceptsNightRate &&
+    s3.nightlyRateSuggested != null &&
+    String(s3.nightlyRateSuggested).trim() &&
+    !isPositiveDecimalString(s3.nightlyRateSuggested)
+  ) {
+    throw new BadRequestException("Section 3 : tarif par nuit suggéré doit être un montant numérique positif.");
+  }
+  if (
+    acceptsDailyRate &&
+    s3.dailyRateSuggested != null &&
+    String(s3.dailyRateSuggested).trim() &&
+    !isPositiveDecimalString(s3.dailyRateSuggested)
+  ) {
+    throw new BadRequestException("Section 3 : tarif par jour suggéré doit être un montant numérique positif.");
   }
   const s4keys = [
     "canProvideBackgroundCheck",
@@ -184,7 +200,6 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
     section2: {
       rcrValid: rcrValid as "yes" | "no" | "in_progress",
       rcrExpiry: s2.rcrExpiry != null && isNonEmptyString(s2.rcrExpiry) ? String(s2.rcrExpiry).trim() : undefined,
-      rcrLevelC: rcrLevelC as "yes" | "no",
       experienceChildren: exp as "lt1" | "1_3" | "3_5" | "5p",
       experienceParticularNeeds: asBool(s2.experienceParticularNeeds),
       experienceFoster: asBool(s2.experienceFoster),
@@ -206,6 +221,14 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
       maxChildren: isNonEmptyString(s3.maxChildren) ? String(s3.maxChildren).trim() : "1",
       serviceRadius: radius as "10" | "25" | "50" | "more",
       hourlyRateSuggested: String(s3.hourlyRateSuggested).trim(),
+      nightlyRateSuggested:
+        acceptsNightRate && s3.nightlyRateSuggested != null && isNonEmptyString(s3.nightlyRateSuggested)
+          ? String(s3.nightlyRateSuggested).trim()
+          : undefined,
+      dailyRateSuggested:
+        acceptsDailyRate && s3.dailyRateSuggested != null && isNonEmptyString(s3.dailyRateSuggested)
+          ? String(s3.dailyRateSuggested).trim()
+          : undefined,
       dispoSemaine: asBool(s3.dispoSemaine),
       dispoSoir: asBool(s3.dispoSoir) || asBool(s3.repitSoiree),
       dispoWeekend: asBool(s3.dispoWeekend) || asBool(s3.repitWeekend),
@@ -261,6 +284,12 @@ export function buildAvailabilityFromRegistration(reg: AllyRegistrationPayload):
     finDeSemaine: reg.section3.dispoWeekend || reg.section3.repitWeekend,
     flexible: reg.section3.dispoFlexible,
     rayonKm: reg.section3.serviceRadius,
-    maxEnfants: reg.section3.maxChildren
+    maxEnfants: reg.section3.maxChildren,
+    ...(reg.section3.nightlyRateSuggested
+      ? { tarifParNuit: reg.section3.nightlyRateSuggested }
+      : {}),
+    ...(reg.section3.dailyRateSuggested
+      ? { tarifParJour: reg.section3.dailyRateSuggested }
+      : {})
   };
 }

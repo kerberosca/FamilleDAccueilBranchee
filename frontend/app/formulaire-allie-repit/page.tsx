@@ -28,8 +28,7 @@ export default function FormulaireAllieRepitPage() {
       <section className="space-y-2 border-t border-slate-700 pt-6">
         <h2 className="text-xl font-semibold text-white">Section 2 — Vos compétences</h2>
         <ul className="list-inside list-disc text-sm">
-          <li>Certification RCR / premiers secours, date d&apos;expiration</li>
-          <li>Formation RCR Niveau C</li>
+          <li>Certification RCR / premiers secours de niveau C et date d&apos;expiration</li>
           <li>Expérience avec des enfants et expériences spécifiques (besoins particuliers, famille d&apos;accueil, traumas)</li>
           <li>Votre approche avec les enfants</li>
         </ul>
@@ -41,7 +40,7 @@ export default function FormulaireAllieRepitPage() {
           <li>Type d'allié choisi : Gardien compétent, Entretien Ménage ou Tutorat</li>
           <li>Types de répit : soirée, nuit, fin de semaine, urgence / dépannage</li>
           <li>Âges acceptés, nombre maximal d&apos;enfants, secteur (distance)</li>
-          <li>Taux horaire suggéré, disponibilités générales</li>
+          <li>Tarifs suggérés à l&apos;heure, par nuit ou par jour, disponibilités générales</li>
         </ul>
       </section>
 

@@ -341,6 +341,7 @@ describe("Smoke e2e", () => {
 
   it("POST /api/v1/auth/register envoie un courriel de bienvenue aux allies", async () => {
     emailSendMock.mockClear();
+    const legacyAllyRegistration = validAllyRegistration();
 
     await request(app.getHttpServer())
       .post("/api/v1/auth/register")
@@ -354,7 +355,15 @@ describe("Smoke e2e", () => {
         region: "QC",
         allyType: AllyType.GARDIENS,
         contactPhone: "514-555-1212",
-        allyRegistration: validAllyRegistration()
+        allyRegistration: {
+          ...legacyAllyRegistration,
+          section2: {
+            ...legacyAllyRegistration.section2,
+            // Compatibilite avec les candidatures sauvegardees avant la fusion
+            // des deux questions RCR dans le formulaire.
+            rcrLevelC: "yes"
+          }
+        }
       })
       .expect(201);
 
@@ -434,14 +443,27 @@ describe("Smoke e2e", () => {
     emailSendMock.mockClear();
     const token = await loginAs("RESSOURCE");
 
-    await request(app.getHttpServer())
+    const updated = await request(app.getHttpServer())
       .patch("/api/v1/profiles/resource/me")
       .set("Authorization", `Bearer ${token}`)
       .send({
         displayName: "Ressource Locale",
-        allyRegistration: validAllyRegistration({ hourlyRateSuggested: "36" })
+        allyRegistration: validAllyRegistration({
+          hourlyRateSuggested: "36",
+          repitNuit: true,
+          nightlyRateSuggested: "145",
+          dailyRateSuggested: "210"
+        })
       })
       .expect(200);
+
+    expect(updated.body.hourlyRate).toBe(36);
+    expect(updated.body.availability).toEqual(
+      expect.objectContaining({ tarifParNuit: "145", tarifParJour: "210" })
+    );
+    expect(updated.body.allyRegistration.section3).toEqual(
+      expect.objectContaining({ nightlyRateSuggested: "145", dailyRateSuggested: "210" })
+    );
 
     expect(emailSendMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1912,7 +1934,14 @@ function withSchema(databaseUrl: string, schema: string) {
   return `${databaseUrl}${separator}schema=${schema}`;
 }
 
-function validAllyRegistration(overrides: { hourlyRateSuggested?: string } = {}) {
+function validAllyRegistration(
+  overrides: {
+    hourlyRateSuggested?: string;
+    repitNuit?: boolean;
+    nightlyRateSuggested?: string;
+    dailyRateSuggested?: string;
+  } = {}
+) {
   return {
     version: "2025-03-repit-v1",
     section1: {
@@ -1923,7 +1952,6 @@ function validAllyRegistration(overrides: { hourlyRateSuggested?: string } = {})
     },
     section2: {
       rcrValid: "yes",
-      rcrLevelC: "yes",
       experienceChildren: "1_3",
       experienceParticularNeeds: false,
       experienceFoster: false,
@@ -1932,7 +1960,7 @@ function validAllyRegistration(overrides: { hourlyRateSuggested?: string } = {})
     },
     section3: {
       repitSoiree: true,
-      repitNuit: false,
+      repitNuit: overrides.repitNuit ?? false,
       repitWeekend: true,
       repitUrgence: false,
       age0_5: false,
@@ -1941,6 +1969,12 @@ function validAllyRegistration(overrides: { hourlyRateSuggested?: string } = {})
       maxChildren: "2",
       serviceRadius: "25",
       hourlyRateSuggested: overrides.hourlyRateSuggested ?? "32",
+      ...(overrides.nightlyRateSuggested
+        ? { nightlyRateSuggested: overrides.nightlyRateSuggested }
+        : {}),
+      ...(overrides.dailyRateSuggested
+        ? { dailyRateSuggested: overrides.dailyRateSuggested }
+        : {}),
       dispoSemaine: true,
       dispoSoir: true,
       dispoWeekend: true,
