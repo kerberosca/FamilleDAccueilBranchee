@@ -29,6 +29,7 @@ export type AllyRegistrationPayload = {
     age12p: boolean;
     maxChildren: string;
     serviceRadius: "10" | "25" | "50" | "more";
+    rateType: "HOURLY" | "FLAT";
     hourlyRateSuggested: string;
     nightlyRateSuggested?: string;
     dailyRateSuggested?: string;
@@ -78,6 +79,7 @@ export function emptyAllyRegistration(): AllyRegistrationPayload {
       age12p: false,
       maxChildren: "",
       serviceRadius: "25",
+      rateType: "HOURLY",
       hourlyRateSuggested: "",
       nightlyRateSuggested: undefined,
       dailyRateSuggested: undefined,
@@ -107,5 +109,11 @@ export function parseAllyRegistrationFromApi(raw: unknown): AllyRegistrationPayl
   if (o.version !== ALLY_REGISTRATION_VERSION || !o.section1 || !o.section2 || !o.section3 || !o.section4) {
     return null;
   }
-  return o;
+  return {
+    ...o,
+    section3: {
+      ...o.section3,
+      rateType: o.section3.rateType === "FLAT" ? "FLAT" : "HOURLY"
+    }
+  };
 }

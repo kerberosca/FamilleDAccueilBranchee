@@ -27,12 +27,12 @@ export class BillingService {
       include: { resourceProfile: true }
     });
     if (!user || user.role !== Role.RESOURCE || !user.resourceProfile) {
-      throw new BadRequestException("Only RESOURCE accounts can use this endpoint");
+      throw new BadRequestException("Seul un compte allié peut accéder à cette fonction.");
     }
 
     const priceId = this.configService.get<string>("STRIPE_RESOURCE_ONBOARDING_PRICE_ID");
     if (!priceId) {
-      throw new BadRequestException("Missing STRIPE_RESOURCE_ONBOARDING_PRICE_ID");
+      throw new BadRequestException("Le paiement des alliés n'est pas configuré.");
     }
     const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
 
@@ -56,11 +56,11 @@ export class BillingService {
   async createFamilySubscriptionCheckoutSession(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.role !== Role.FAMILY) {
-      throw new BadRequestException("Only FAMILY accounts can use this endpoint");
+      throw new BadRequestException("Seul un compte famille peut accéder à cette fonction.");
     }
     const priceId = this.configService.get<string>("STRIPE_FAMILY_SUBSCRIPTION_PRICE_ID");
     if (!priceId) {
-      throw new BadRequestException("Missing STRIPE_FAMILY_SUBSCRIPTION_PRICE_ID");
+      throw new BadRequestException("Le paiement des familles n'est pas configuré.");
     }
     const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
 
@@ -129,7 +129,7 @@ export class BillingService {
     const webhookSecret = this.configService.get<string>("STRIPE_WEBHOOK_SECRET");
     if (!webhookSecret || !signature) {
       this.logger.warn("Stripe webhook rejected (missing config/signature)");
-      throw new BadRequestException("Stripe webhook signature missing or not configured");
+      throw new BadRequestException("La signature de la notification Stripe est absente ou non configurée.");
     }
 
     const event = this.stripeService.client.webhooks.constructEvent(rawBody, signature, webhookSecret);

@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { AllyType } from "@prisma/client";
+import { AllyType, ResourceRateType } from "@prisma/client";
 
 /** Version du schéma — incrémenter si les champs obligatoires changent. */
 export const ALLY_REGISTRATION_VERSION = "2025-03-repit-v1";
@@ -32,6 +32,7 @@ export type AllyRegistrationPayload = {
     age12p: boolean;
     maxChildren: string;
     serviceRadius: "10" | "25" | "50" | "more";
+    rateType: ResourceRateType;
     hourlyRateSuggested: string;
     nightlyRateSuggested?: string;
     dailyRateSuggested?: string;
@@ -140,11 +141,15 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
   if (radius !== "10" && radius !== "25" && radius !== "50" && radius !== "more") {
     throw new BadRequestException("Section 3 : secteur desservi (distance) invalide.");
   }
+  const rateType =
+    allyType === AllyType.MENAGE && s3.rateType === ResourceRateType.FLAT
+      ? ResourceRateType.FLAT
+      : ResourceRateType.HOURLY;
   if (!isNonEmptyString(s3.hourlyRateSuggested)) {
-    throw new BadRequestException("Section 3 : taux horaire suggéré requis.");
+    throw new BadRequestException("Section 3 : tarif suggéré requis.");
   }
   if (!isPositiveDecimalString(s3.hourlyRateSuggested)) {
-    throw new BadRequestException("Section 3 : taux horaire suggéré doit être un montant numérique positif.");
+    throw new BadRequestException("Section 3 : tarif suggéré doit être un montant numérique positif.");
   }
   if (
     acceptsNightRate &&
@@ -218,8 +223,12 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
       age0_5: asBool(s3.age0_5),
       age6_12: asBool(s3.age6_12),
       age12p: asBool(s3.age12p),
-      maxChildren: isNonEmptyString(s3.maxChildren) ? String(s3.maxChildren).trim() : "1",
+      maxChildren:
+        allyType === AllyType.GARDIENS && isNonEmptyString(s3.maxChildren)
+          ? String(s3.maxChildren).trim()
+          : "",
       serviceRadius: radius as "10" | "25" | "50" | "more",
+      rateType,
       hourlyRateSuggested: String(s3.hourlyRateSuggested).trim(),
       nightlyRateSuggested:
         acceptsNightRate && s3.nightlyRateSuggested != null && isNonEmptyString(s3.nightlyRateSuggested)

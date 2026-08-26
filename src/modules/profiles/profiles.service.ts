@@ -5,6 +5,7 @@ import {
   Prisma,
   ResourceOnboardingState,
   ResourcePublishStatus,
+  ResourceRateType,
   ResourceVerificationStatus,
   Role
 } from "@prisma/client";
@@ -47,14 +48,14 @@ export class ProfilesService {
     if (user.role === Role.FAMILY) {
       const profile = await this.prisma.familyProfile.findUnique({ where: { userId: user.sub } });
       if (!profile) {
-        throw new NotFoundException("Family profile not found");
+        throw new NotFoundException("Profil de famille introuvable.");
       }
       return profile;
     }
     if (user.role === Role.RESOURCE) {
       const profile = await this.prisma.resourceProfile.findUnique({ where: { userId: user.sub } });
       if (!profile) {
-        throw new NotFoundException("Resource profile not found");
+        throw new NotFoundException("Profil allié introuvable.");
       }
       return this.toResourcePrivateView(profile);
     }
@@ -63,7 +64,7 @@ export class ProfilesService {
 
   async updateMyFamilyProfile(user: JwtPayload, dto: UpdateFamilyProfileDto) {
     if (user.role !== Role.FAMILY) {
-      throw new ForbiddenException("Only FAMILY can update this profile");
+      throw new ForbiddenException("Seul un compte famille peut modifier ce profil.");
     }
     return this.prisma.familyProfile.update({
       where: { userId: user.sub },
@@ -77,7 +78,7 @@ export class ProfilesService {
 
   async updateMyResourceProfile(user: JwtPayload, dto: UpdateResourceProfileDto) {
     if (user.role !== Role.RESOURCE) {
-      throw new ForbiddenException("Only RESOURCE can update this profile");
+      throw new ForbiddenException("Seul un compte allié peut modifier ce profil.");
     }
     const {
       questionnaireAnswers: qAnswers,
@@ -108,7 +109,12 @@ export class ProfilesService {
       include: { user: true }
     });
     if (!existing) {
-      throw new NotFoundException("Resource profile not found");
+      throw new NotFoundException("Profil allié introuvable.");
+    }
+    if (allyRegRaw === undefined && (rest.skillsTags !== undefined || rest.hourlyRate !== undefined)) {
+      throw new BadRequestException(
+        "Modifiez les services et le tarif dans le formulaire complet de candidature allié."
+      );
     }
 
     let allyRegJson: Prisma.InputJsonValue | undefined;
@@ -117,8 +123,7 @@ export class ProfilesService {
 	      const nextAllyType = rest.allyType ?? existing.allyType ?? AllyType.GARDIENS;
       const reg = parseAndValidateAllyRegistration(allyRegRaw, nextAllyType);
 	      const allyLabel = nextAllyType ? allyTypeToPublicLabel(nextAllyType) : undefined;
-	      const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel, nextAllyType);
-      const skillsTags = [...new Set([...fromReg, ...(rest.skillsTags ?? existing.skillsTags)])];
+	      const skillsTags = buildSkillsTagsFromRegistration(reg, allyLabel, nextAllyType);
       const hourlyRaw = parseFloat(reg.section3.hourlyRateSuggested.replace(",", "."));
       allyRegJson = JSON.parse(JSON.stringify(reg)) as Prisma.InputJsonValue;
       derivedFromAlly = {
@@ -127,6 +132,7 @@ export class ProfilesService {
         contactPhone: rest.contactPhone ?? existing.contactPhone ?? undefined,
         skillsTags,
         hourlyRate: hourlyRaw,
+        rateType: reg.section3.rateType ?? ResourceRateType.HOURLY,
         availability: buildAvailabilityFromRegistration(reg) as Prisma.InputJsonValue,
         bio: reg.section2.approachChildren,
         allyRegistration: allyRegJson,
@@ -134,7 +140,12 @@ export class ProfilesService {
       };
     }
 
-    const { allyRegistration: _drop, skillsTags: tagsFromRest, ...restWithoutAlly } = rest as UpdateResourceProfileDto & {
+    const {
+      allyRegistration: _drop,
+      skillsTags: _dropSkills,
+      hourlyRate: _dropRate,
+      ...restWithoutAlly
+    } = rest as UpdateResourceProfileDto & {
       allyRegistration?: unknown;
     };
 
@@ -142,11 +153,9 @@ export class ProfilesService {
       where: { userId: user.sub },
       data: {
         ...restWithoutAlly,
-        ...(tagsFromRest !== undefined ? { skillsTags: tagsFromRest } : {}),
         questionnaireAnswers: questionnaireJson,
         backgroundCheckStatus: bgStatus,
         postalCode: rest.postalCode ? normalizePostalCode(rest.postalCode) : undefined,
-        hourlyRate: allyRegRaw !== undefined ? undefined : (rest.hourlyRate ?? undefined),
         availability:
           allyRegRaw !== undefined ? undefined : toJson(rest.availability),
         ...(allyRegRaw !== undefined ? derivedFromAlly : {})
@@ -213,6 +222,9 @@ export class ProfilesService {
       throw new NotFoundException("Profil allié introuvable.");
     }
     if (isPublishing(dto)) {
+      if (!existing.user.emailVerifiedAt) {
+        throw new BadRequestException("L'adresse de connexion doit être confirmée avant la publication du profil.");
+      }
       await this.resourceDocumentsService.assertResourceDocumentsComplete([resourceId]);
       await this.trainingService.assertTrainingPassedForPublication(resourceId, existing.publishStatus);
     }
@@ -245,14 +257,20 @@ export class ProfilesService {
   }
 
   async bulkModerateResources(resourceIds: string[], dto: BulkModerateResourceDto, actorUserId: string) {
-    if (isPublishing(dto)) {
-      await this.resourceDocumentsService.assertResourceDocumentsComplete(resourceIds);
-      await this.trainingService.assertTrainingsPassedForPublication(resourceIds);
-    }
     const existingResources = await this.prisma.resourceProfile.findMany({
       where: { id: { in: resourceIds } },
       include: { user: true }
     });
+    if (isPublishing(dto)) {
+      const unverified = existingResources.filter((resource) => !resource.user.emailVerifiedAt);
+      if (unverified.length > 0) {
+        throw new BadRequestException(
+          `Adresse de connexion non confirmée pour ${unverified.length} profil(s) allié(s).`
+        );
+      }
+      await this.resourceDocumentsService.assertResourceDocumentsComplete(resourceIds);
+      await this.trainingService.assertTrainingsPassedForPublication(resourceIds);
+    }
     const result = await this.prisma.resourceProfile.updateMany({
       where: { id: { in: resourceIds } },
       data: {
@@ -430,14 +448,14 @@ export class ProfilesService {
       include: { user: true }
     });
     if (!resource) {
-      throw new NotFoundException("Resource not found");
+      throw new NotFoundException("Allié introuvable.");
     }
     const isPublishedAndVerified =
       resource.publishStatus === ResourcePublishStatus.PUBLISHED &&
       resource.verificationStatus === ResourceVerificationStatus.VERIFIED;
     const isAdmin = currentUser?.role === Role.ADMIN;
     if (!isPublishedAndVerified && !isAdmin) {
-      throw new NotFoundException("Resource not found");
+      throw new NotFoundException("Allié introuvable.");
     }
     const canContact = await this.canContactResource(currentUser);
     const premium = await this.canSeeSensitiveResourceInfo(currentUser);
@@ -473,6 +491,7 @@ export class ProfilesService {
       postalCode: resource.postalCode,
       skillsTags: resource.skillsTags,
       hourlyRate: decimalToNumber(resource.hourlyRate),
+      rateType: resource.rateType ?? ResourceRateType.HOURLY,
       averageRating: decimalToNumber(resource.averageRating),
       bio: resource.bio,
       verificationStatus: resource.verificationStatus,
@@ -502,6 +521,7 @@ export class ProfilesService {
       bio: resource.bio,
       skillsTags: resource.skillsTags,
       hourlyRate: decimalToNumber(resource.hourlyRate),
+      rateType: resource.rateType ?? ResourceRateType.HOURLY,
       availability: resource.availability,
       verificationStatus: resource.verificationStatus,
       publishStatus: resource.publishStatus,
@@ -552,7 +572,7 @@ function toJson(input: unknown): Prisma.InputJsonValue | undefined {
     try {
       return JSON.parse(input) as Prisma.InputJsonValue;
     } catch {
-      throw new ForbiddenException("Invalid availability JSON");
+      throw new ForbiddenException("Les disponibilités enregistrées sont invalides.");
     }
   }
   return input as Prisma.InputJsonValue;

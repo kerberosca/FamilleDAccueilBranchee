@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -237,9 +237,9 @@ export function AllyOnboardingWizard({
       if (isChildCareOffer && !isPositiveInteger(reg.section3.maxChildren)) {
         return "Le nombre maximal d'enfants doit être un nombre entier positif.";
       }
-      if (!reg.section3.hourlyRateSuggested.trim()) return "Taux horaire suggéré requis.";
+      if (!reg.section3.hourlyRateSuggested.trim()) return "Tarif suggéré requis.";
       if (!isPositiveDecimal(reg.section3.hourlyRateSuggested)) {
-        return "Le taux horaire suggéré doit être un montant numérique positif.";
+        return "Le tarif suggéré doit être un montant numérique positif.";
       }
       if (
         isChildCareOffer &&
@@ -335,6 +335,44 @@ export function AllyOnboardingWizard({
     ? STEP_LABELS_REGISTER[step] ?? ""
     : ["Informations générales", "Compétences", "Offre", "Engagement", "Récap"][step] ?? "";
 
+  const serviceLabels = (
+    ["repitSoiree", "repitNuit", "repitWeekend", "repitUrgence"] as const
+  )
+    .filter((key) => reg.section3[key])
+    .map((key) => SERVICE_OPTIONS[selectedAllyType].labels[key]);
+  const experienceLabels = [
+    reg.section2.experienceParticularNeeds ? "Enfants à besoins particuliers" : null,
+    reg.section2.experienceFoster ? "Enfants placés en famille d'accueil" : null,
+    reg.section2.experienceTrauma ? "Enfants ayant vécu des traumas" : null,
+    reg.section2.experienceOtherText?.trim() || null
+  ].filter((value): value is string => Boolean(value));
+  const availabilityLabels = [
+    reg.section3.dispoSemaine ? "En semaine, de jour" : null,
+    reg.section3.dispoSoir ? "En soirée" : null,
+    reg.section3.dispoWeekend ? "Fin de semaine" : null,
+    reg.section3.dispoFlexible ? "Horaire flexible" : null
+  ].filter((value): value is string => Boolean(value));
+  const ageLabels = [
+    reg.section3.age0_5 ? "0-5 ans" : null,
+    reg.section3.age6_12 ? "6-12 ans" : null,
+    reg.section3.age12p ? "12 ans et +" : null
+  ].filter((value): value is string => Boolean(value));
+  const rcrLabels = { yes: "Valide", no: "Non", in_progress: "En cours" } as const;
+  const experienceDurationLabels = {
+    lt1: "Moins d'un an",
+    "1_3": "1 à 3 ans",
+    "3_5": "3 à 5 ans",
+    "5p": "5 ans et +"
+  } as const;
+  const editSteps = {
+    account: 1,
+    identity: isRegister ? 2 : 0,
+    contact: isRegister ? 3 : 1,
+    skills: isRegister ? 4 : 2,
+    offer: isRegister ? 5 : 3,
+    engagement: isRegister ? 6 : 4
+  };
+
   const chk = (checked: boolean, onChange: (v: boolean) => void, disabled = false) => (
     <input
       type="checkbox"
@@ -396,7 +434,13 @@ export function AllyOnboardingWizard({
               et j&apos;accepte le traitement de mes données.
             </span>
           </label>
-          <Input type="email" placeholder="Courriel (connexion)" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <label htmlFor="login-email" className="space-y-1 text-sm text-slate-300">
+            <span className="font-medium">Adresse de connexion</span>
+            <Input id="login-email" type="email" placeholder="nom@exemple.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <span className="block text-xs text-slate-500">
+              Un lien de vérification sera envoyé à cette adresse. Elle servira à vous connecter et à recevoir les communications liées à votre compte et à votre formation.
+            </span>
+          </label>
           <Input
             type="password"
             placeholder="Mot de passe (8 car., majuscule, chiffre, spécial)"
@@ -428,7 +472,15 @@ export function AllyOnboardingWizard({
                 key={value}
                 type="button"
                 variant={allyType === value ? "primary" : "secondary"}
-                onClick={() => setAllyType(value)}
+                onClick={() => {
+                  setAllyType(value);
+                  if (value !== "MENAGE") {
+                    setReg((current) => ({
+                      ...current,
+                      section3: { ...current.section3, rateType: "HOURLY" }
+                    }));
+                  }
+                }}
               >
                 {label}
               </Button>
@@ -470,12 +522,19 @@ export function AllyOnboardingWizard({
             value={contactPhone}
             onChange={(e) => setContactPhone(e.target.value)}
           />
-          <Input
-            type="email"
-            placeholder="Courriel de contact (visible aux familles après validation)"
-            value={reg.section1.contactEmail}
-            onChange={(e) => setReg((r) => ({ ...r, section1: { ...r.section1, contactEmail: e.target.value } }))}
-          />
+          <label htmlFor="public-contact-email" className="space-y-1 text-sm text-slate-300">
+            <span className="font-medium">Courriel public de contact</span>
+            <Input
+              id="public-contact-email"
+              type="email"
+              placeholder="contact@exemple.com"
+              value={reg.section1.contactEmail}
+              onChange={(e) => setReg((r) => ({ ...r, section1: { ...r.section1, contactEmail: e.target.value } }))}
+            />
+            <span className="block text-xs text-slate-500">
+              Cette adresse peut être visible aux familles après la publication. Elle peut être différente de votre adresse de connexion.
+            </span>
+          </label>
           <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
             {chk(reg.section1.age18Confirmed, (v) => setReg((r) => ({ ...r, section1: { ...r.section1, age18Confirmed: v } })))}
             <span>Je confirme avoir 18 ans ou plus.</span>
@@ -701,13 +760,36 @@ export function AllyOnboardingWizard({
             <div>
               <p className="text-sm font-medium text-slate-200">Vos tarifs suggérés</p>
               <p className="text-xs text-slate-400">
-                Le tarif horaire reste la référence de votre profil. Ajoutez les autres tarifs qui s&apos;appliquent;
-                l&apos;entente finale se fait directement avec la famille.
+                Choisissez le mode de tarification qui correspond au service. L&apos;entente finale se fait directement
+                avec la famille.
               </p>
             </div>
+            {selectedAllyType === "MENAGE" ? (
+              <label className="block space-y-1">
+                <span className="text-sm text-slate-300">Type de tarif</span>
+                <select
+                  className="w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
+                  value={reg.section3.rateType}
+                  onChange={(event) =>
+                    setReg((current) => ({
+                      ...current,
+                      section3: {
+                        ...current.section3,
+                        rateType: event.target.value === "FLAT" ? "FLAT" : "HOURLY"
+                      }
+                    }))
+                  }
+                >
+                  <option value="HOURLY">Tarif horaire</option>
+                  <option value="FLAT">Tarif forfaitaire</option>
+                </select>
+              </label>
+            ) : null}
             <label htmlFor="hourly-rate" className="block space-y-1">
               <span className="text-sm text-slate-300">
-                {selectedAllyType === "MENAGE" ? "Tarif suggéré ($/h ou forfait)" : "Tarif horaire suggéré ($/h)"}
+                {selectedAllyType === "MENAGE" && reg.section3.rateType === "FLAT"
+                  ? "Montant forfaitaire suggéré ($)"
+                  : "Tarif horaire suggéré ($/h)"}
               </span>
               <Input
                 id="hourly-rate"
@@ -782,14 +864,17 @@ export function AllyOnboardingWizard({
       {/* Section 4 */}
       {((isRegister && step === 6) || (!isRegister && step === 4)) ? (
         <Card className="space-y-3 p-4">
-          <h2 className="text-lg font-semibold text-white">Section 4 - Vérifications et engagement</h2>
-          <p className="text-sm text-slate-400">Je suis en mesure de fournir (sur demande) :</p>
+          <h2 className="text-lg font-semibold text-white">Section 4 - Documents et engagements requis</h2>
+          <p className="text-sm text-slate-400">
+            Ces confirmations sont obligatoires pour soumettre votre candidature. Les documents seront demandés par FAB au moment approprié.
+          </p>
+          <p className="text-xs font-medium text-amber-200">* Obligatoire</p>
           <label className="flex items-start gap-2 text-sm text-slate-300">
             {chk(reg.section4.canProvideBackgroundCheck, (v) =>
               setReg((r) => ({ ...r, section4: { ...r.section4, canProvideBackgroundCheck: v } }))
             )}
             <span>
-              Vérification d&apos;antécédents judiciaires valide
+              Vérification d&apos;antécédents judiciaires valide *
               <a
                 href="https://request.idqc.ca/"
                 target="_blank"
@@ -804,7 +889,7 @@ export function AllyOnboardingWizard({
             {chk(reg.section4.canProvideTwoRefs, (v) =>
               setReg((r) => ({ ...r, section4: { ...r.section4, canProvideTwoRefs: v } }))
             )}
-            Deux références professionnelles
+            Deux références professionnelles *
           </label>
           <label className="flex items-start gap-2 text-sm text-slate-300">
             {chk(reg.section4.canProvideRcrProof, (v) =>
@@ -812,7 +897,7 @@ export function AllyOnboardingWizard({
               reg.section2.rcrValid !== "yes"
             )}
             <span>
-              Preuve de certification RCR
+              Preuve de certification RCR {reg.section2.rcrValid === "yes" ? "*" : ""}
               {reg.section2.rcrValid !== "yes" ? (
                 <span className="block text-xs text-slate-500">Disponible seulement si la certification RCR est valide.</span>
               ) : null}
@@ -851,25 +936,59 @@ export function AllyOnboardingWizard({
         <Card className="space-y-3 p-4">
           <h2 className="text-lg font-semibold text-white">Récapitulatif</h2>
           <p className="text-sm text-slate-400">
-            Vérifiez vos informations avant d&apos;envoyer votre candidature. Vous pourrez la modifier depuis « Mon profil ».
+            Vérifiez l&apos;ensemble de votre candidature avant de l&apos;envoyer. Utilisez « Modifier » pour retourner directement à une section.
           </p>
-          <ul className="space-y-1 text-sm text-slate-300">
-            {isRegister ? <li>Courriel : {email}</li> : null}
-            <li>Nom : {displayName}</li>
-            <li>Type : {allyType ? ALLY_TYPE_LABELS[allyType] : "-"}</li>
-            <li>
-              {city}, {region} - {postalCode}
-            </li>
-            <li>Téléphone : {contactPhone}</li>
-            <li>Contact : {reg.section1.contactEmail}</li>
-            <li>Tarif horaire indicatif : {reg.section3.hourlyRateSuggested} $/h</li>
-            {isChildCareOffer && reg.section3.nightlyRateSuggested ? (
-              <li>Tarif indicatif par nuit : {reg.section3.nightlyRateSuggested} $</li>
-            ) : null}
-            {isChildCareOffer && reg.section3.dailyRateSuggested ? (
-              <li>Tarif indicatif par jour : {reg.section3.dailyRateSuggested} $</li>
-            ) : null}
-          </ul>
+          {isRegister ? (
+            <RecapSection title="Compte FAB" onEdit={() => setStep(editSteps.account)}>
+              <p><strong>Adresse de connexion :</strong> {email}</p>
+              <p className="text-xs text-slate-400">Cette adresse sert à vous connecter et à recevoir les communications liées à votre compte et à votre formation.</p>
+            </RecapSection>
+          ) : null}
+
+          <RecapSection title="Identité et localisation" onEdit={() => setStep(editSteps.identity)}>
+            <p><strong>Nom :</strong> {displayName}</p>
+            <p><strong>Type d&apos;allié :</strong> {allyType ? ALLY_TYPE_LABELS[allyType] : "Non précisé"}</p>
+            <p><strong>Localité :</strong> {city}, {region} — {postalCode}</p>
+          </RecapSection>
+
+          <RecapSection title="Coordonnées et secteur" onEdit={() => setStep(editSteps.contact)}>
+            <p><strong>Adresse postale :</strong> {reg.section1.streetAddress}</p>
+            <p><strong>Secteur desservi :</strong> {reg.section1.sectorServiced}</p>
+            <p><strong>Téléphone public :</strong> {contactPhone}</p>
+            <p><strong>Courriel public de contact :</strong> {reg.section1.contactEmail}</p>
+            <p className="text-xs text-slate-400">Le courriel public peut être différent de l&apos;adresse de connexion.</p>
+          </RecapSection>
+
+          <RecapSection title="Compétences" onEdit={() => setStep(editSteps.skills)}>
+            <p>
+              <strong>Certification RCR / premiers secours :</strong> {rcrLabels[reg.section2.rcrValid]}
+              {reg.section2.rcrExpiry ? ` — expiration ${reg.section2.rcrExpiry}` : ""}
+            </p>
+            <p><strong>Expérience avec des enfants :</strong> {experienceDurationLabels[reg.section2.experienceChildren]}</p>
+            <p><strong>Expériences particulières :</strong> {experienceLabels.join(", ") || "Aucune précisée"}</p>
+            <p><strong>Approche :</strong> {reg.section2.approachChildren}</p>
+          </RecapSection>
+
+          <RecapSection title="Services, disponibilité et tarifs" onEdit={() => setStep(editSteps.offer)}>
+            <p><strong>Services :</strong> {serviceLabels.join(", ") || "Aucun"}</p>
+            {isChildCareOffer ? <p><strong>Âges acceptés :</strong> {ageLabels.join(", ") || "Aucun"}</p> : null}
+            {isChildCareOffer ? <p><strong>Nombre maximal d&apos;enfants :</strong> {reg.section3.maxChildren}</p> : null}
+            <p><strong>Rayon de service :</strong> {reg.section3.serviceRadius === "more" ? "Plus de 50 km" : `${reg.section3.serviceRadius} km`}</p>
+            <p><strong>Disponibilités :</strong> {availabilityLabels.join(", ") || "Aucune précisée"}</p>
+            <p>
+              <strong>{reg.section3.rateType === "FLAT" ? "Tarif forfaitaire suggéré" : "Tarif horaire suggéré"} :</strong>{" "}
+              {reg.section3.hourlyRateSuggested} ${reg.section3.rateType === "FLAT" ? " forfaitaire" : " / heure"}
+            </p>
+            {isChildCareOffer && reg.section3.nightlyRateSuggested ? <p><strong>Tarif par nuit :</strong> {reg.section3.nightlyRateSuggested} $</p> : null}
+            {isChildCareOffer && reg.section3.dailyRateSuggested ? <p><strong>Tarif par jour :</strong> {reg.section3.dailyRateSuggested} $</p> : null}
+          </RecapSection>
+
+          <RecapSection title="Documents et engagements" onEdit={() => setStep(editSteps.engagement)}>
+            <p>Vérification d&apos;antécédents : confirmée</p>
+            <p>Deux références professionnelles : confirmées</p>
+            <p>Déclarations obligatoires : acceptées</p>
+            {reg.section2.rcrValid === "yes" ? <p>Preuve de certification RCR : confirmée</p> : null}
+          </RecapSection>
           <form onSubmit={handleSubmit} className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={goBack}>
               Retour
@@ -882,6 +1001,28 @@ export function AllyOnboardingWizard({
       ) : null}
 
     </div>
+  );
+}
+
+function RecapSection({
+  title,
+  onEdit,
+  children
+}: {
+  title: string;
+  onEdit: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-[#4f476f] bg-[#0f0b24]/55 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="font-medium text-white">{title}</h3>
+        <button type="button" className="text-sm font-medium text-[#b9ccff] underline hover:text-white" onClick={onEdit}>
+          Modifier
+        </button>
+      </div>
+      <div className="space-y-1 text-sm text-slate-300">{children}</div>
+    </section>
   );
 }
 

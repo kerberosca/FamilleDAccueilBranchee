@@ -12,6 +12,7 @@ import {
 	  BackgroundCheckStatus,
 	  AllyType,
 	  Prisma,
+  ResourceRateType,
   ResourceOnboardingState,
   ResourcePublishStatus,
   ResourceVerificationStatus,
@@ -20,10 +21,11 @@ import {
   UserStatus
 } from "@prisma/client";
 import * as argon2 from "argon2";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { AllyWebhooksService } from "../ally-webhooks/ally-webhooks.service";
 import {
   buildAllyWelcomeEmail,
+  buildEmailVerificationEmail,
   buildPasswordResetEmail,
   buildTeamNewAllyEmail,
   buildTeamNewFamilyEmail
@@ -41,6 +43,7 @@ import {
 import { RegisterDto } from "./dto/register.dto";
 
 const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 h
+const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 h
 
 type TokenPair = {
   accessToken: string;
@@ -64,7 +67,7 @@ export class AuthService {
 
   async register(input: RegisterDto) {
     if (input.role === Role.ADMIN) {
-      throw new BadRequestException("ADMIN registration is disabled");
+      throw new BadRequestException("La création d'un compte administrateur est désactivée.");
     }
     if (input.role === Role.RESOURCE && input.allyType == null) {
 	      throw new BadRequestException("Le type d'allié (Gardien compétent, Entretien Ménage ou Tutorat) est obligatoire.");
@@ -79,7 +82,7 @@ export class AuthService {
     }
     const existing = await this.prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
     if (existing) {
-      throw new ConflictException("Email already in use");
+      throw new ConflictException("Cette adresse courriel est déjà utilisée.");
     }
 
     const passwordHash = await argon2.hash(input.password);
@@ -94,7 +97,7 @@ export class AuthService {
       const reg = parseAndValidateAllyRegistration(input.allyRegistration, input.allyType!);
 	      const allyLabel = allyTypeToPublicLabel(input.allyType!);
       const fromReg = buildSkillsTagsFromRegistration(reg, allyLabel, input.allyType!);
-      const skillsTags = [...new Set([...fromReg, ...(input.tags ?? [])])];
+      const skillsTags = [...new Set(fromReg)];
       const hourlyRaw = parseFloat(reg.section3.hourlyRateSuggested.replace(",", "."));
       const bioText = input.bio?.trim() ? input.bio : reg.section2.approachChildren;
       const availability = buildAvailabilityFromRegistration(reg) as Prisma.InputJsonValue;
@@ -110,6 +113,7 @@ export class AuthService {
           bio: bioText,
           skillsTags,
           hourlyRate: hourlyRaw,
+          rateType: reg.section3.rateType ?? ResourceRateType.HOURLY,
           availability,
           contactEmail: reg.section1.contactEmail,
           contactPhone: input.contactPhone!.trim(),
@@ -150,6 +154,11 @@ export class AuthService {
     });
 
     const tokens = await this.generateAndPersistTokens(created);
+    await this.sendEmailVerification({
+      userId: created.id,
+      email: created.email,
+      displayName: input.displayName
+    });
     if (input.role === Role.RESOURCE && resourceProfile) {
       if (created.resourceProfile) {
         await this.trainingService.ensureEnrollment(created.resourceProfile.id);
@@ -207,11 +216,11 @@ export class AuthService {
   async refresh(userId: string, refreshToken: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || !user.refreshTokenHash) {
-      throw new UnauthorizedException("Invalid refresh token");
+      throw new UnauthorizedException("Votre session est invalide ou a expiré.");
     }
     const tokenValid = await argon2.verify(user.refreshTokenHash, refreshToken);
     if (!tokenValid) {
-      throw new UnauthorizedException("Invalid refresh token");
+      throw new UnauthorizedException("Votre session est invalide ou a expiré.");
     }
     const maintenanceActive = await this.maintenanceService.isActive();
     if (maintenanceActive && user.role !== Role.ADMIN) {
@@ -222,19 +231,27 @@ export class AuthService {
   }
 
   async refreshWithToken(refreshToken: string) {
-    const payload = await this.jwtService.verifyAsync<{ sub: string }>(refreshToken, {
-      secret: this.configService.getOrThrow<string>("JWT_REFRESH_SECRET")
-    });
-    return this.refresh(payload.sub, refreshToken);
+    const secret = this.configService.getOrThrow<string>("JWT_REFRESH_SECRET");
+    try {
+      const payload = await this.jwtService.verifyAsync<{ sub: string }>(refreshToken, {
+        secret
+      });
+      return this.refresh(payload.sub, refreshToken);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException("Votre session est invalide ou a expiré.");
+    }
   }
 
   async issueTokensForUser(userId: string): Promise<TokenPair> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new UnauthorizedException("User not found");
+      throw new UnauthorizedException("Compte introuvable.");
     }
     if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException("Account disabled");
+      throw new UnauthorizedException("Compte désactivé. Contactez l'administrateur.");
     }
     return this.generateAndPersistTokens(user);
   }
@@ -358,8 +375,69 @@ export class AuthService {
   }
 
   async verifyEmail(token: string) {
-    this.logger.warn("Email verification attempt rejected: no verification token store is configured.");
-    throw new BadRequestException("Lien de vérification invalide ou expiré.");
+    const tokenHash = hashEmailVerificationToken(token);
+    const record = await this.prisma.emailVerificationToken.findUnique({
+      where: { tokenHash },
+      include: { user: true }
+    });
+    if (!record || record.expiresAt < new Date()) {
+      if (record) {
+        await this.prisma.emailVerificationToken.delete({ where: { id: record.id } });
+      }
+      throw new BadRequestException("Lien de vérification invalide ou expiré.");
+    }
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { emailVerifiedAt: record.user.emailVerifiedAt ?? new Date() }
+      }),
+      this.prisma.emailVerificationToken.delete({ where: { id: record.id } })
+    ]);
+    return { success: true, message: "Votre adresse de connexion est maintenant confirmée." };
+  }
+
+  async resendEmailVerification(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { familyProfile: true, resourceProfile: true }
+    });
+    if (!user) {
+      throw new UnauthorizedException("Compte introuvable.");
+    }
+    if (user.emailVerifiedAt) {
+      return { success: true, alreadyVerified: true, message: "Cette adresse de connexion est déjà confirmée." };
+    }
+    await this.sendEmailVerification({
+      userId: user.id,
+      email: user.email,
+      displayName: user.resourceProfile?.displayName ?? user.familyProfile?.displayName ?? user.email
+    });
+    return { success: true, alreadyVerified: false, message: "Un nouveau lien de vérification a été envoyé." };
+  }
+
+  private async sendEmailVerification(params: { userId: string; email: string; displayName: string }) {
+    const token = randomBytes(32).toString("hex");
+    const tokenHash = hashEmailVerificationToken(token);
+    const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
+    await this.prisma.emailVerificationToken.upsert({
+      where: { userId: params.userId },
+      update: { tokenHash, expiresAt },
+      create: { userId: params.userId, tokenHash, expiresAt }
+    });
+    const frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
+    const verificationUrl = `${frontendUrl.replace(/\/$/, "")}/verify-email?token=${token}`;
+    const result = await this.emailService.send({
+      to: params.email,
+      subject: "Confirmez votre adresse de connexion FAB",
+      html: buildEmailVerificationEmail({
+        displayName: params.displayName,
+        verificationUrl,
+        frontendUrl
+      })
+    });
+    if (!result.ok) {
+      this.logger.warn(`Envoi de vérification échoué pour ${params.email}: ${result.error}`);
+    }
   }
 
   private async generateAndPersistTokens(user: User): Promise<TokenPair> {
@@ -389,6 +467,7 @@ function sanitizeUser(user: User) {
   return {
     id: user.id,
     email: user.email,
+    emailVerifiedAt: user.emailVerifiedAt,
     role: user.role,
     status: user.status,
     createdAt: user.createdAt,
@@ -398,6 +477,10 @@ function sanitizeUser(user: User) {
 
 function normalizePostalCode(postalCode: string): string {
   return postalCode.replace(/\s+/g, "").toUpperCase();
+}
+
+function hashEmailVerificationToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 function allyTypeToPublicLabel(allyType: AllyType): string {

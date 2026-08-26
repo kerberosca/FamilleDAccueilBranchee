@@ -30,6 +30,13 @@ type Course = {
   attemptsUsed: number;
   attemptsRemaining: number;
   certificateAvailable: boolean;
+  finalResult?: {
+    scorePercent: number;
+    correctAnswers: number;
+    totalQuestions: number;
+    attemptNumber: number | null;
+    completedAt: string;
+  } | null;
   lessons: LessonSummary[];
   quizQuestions: PublicQuestion[];
 };
@@ -59,6 +66,10 @@ type QuizResult = {
   attentionRequired?: boolean;
   certificateAvailable?: boolean;
   certificateCode?: string;
+  correctAnswers?: number;
+  totalQuestions?: number;
+  attemptNumber?: number;
+  completedAt?: string;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -78,6 +89,7 @@ export default function AllyTrainingPage() {
   const [error, setError] = useState<string | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [lessonConfirmed, setLessonConfirmed] = useState(false);
 
   const allLessonsComplete = Boolean(course?.lessons.every((item) => item.completed));
   const currentSummary = useMemo(
@@ -116,6 +128,7 @@ export default function AllyTrainingPage() {
     try {
       const nextLesson = await apiGet<Lesson>(`/training/me/lessons/${lessonKey}`, { token: accessToken });
       setLesson(nextLesson);
+      setLessonConfirmed(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
       if (knownCourse?.status === "NOT_STARTED") {
         setCourse({ ...knownCourse, status: "IN_PROGRESS" });
@@ -132,7 +145,10 @@ export default function AllyTrainingPage() {
     setBusy(true);
     setError(null);
     try {
-      const next = await apiPatch<Course>(`/training/me/lessons/${lesson.key}/complete`, { token: accessToken });
+      const next = await apiPatch<Course>(`/training/me/lessons/${lesson.key}/complete`, {
+        token: accessToken,
+        body: { confirmed: true }
+      });
       setCourse(next);
       const nextSummary = next.lessons.find((item) => item.number === lesson.number + 1);
       if (nextSummary) await openLesson(nextSummary.key, next);
@@ -166,7 +182,14 @@ export default function AllyTrainingPage() {
                 status: "PASSED",
                 certificateAvailable: Boolean(result.certificateAvailable),
                 attemptsUsed: current.attemptsUsed + 1,
-                attemptsRemaining: result.attemptsRemaining
+                attemptsRemaining: result.attemptsRemaining,
+                finalResult: {
+                  scorePercent: result.scorePercent,
+                  correctAnswers: result.correctAnswers ?? 0,
+                  totalQuestions: result.totalQuestions ?? current.quizQuestions.length,
+                  attemptNumber: result.attemptNumber ?? current.attemptsUsed + 1,
+                  completedAt: result.completedAt ?? new Date().toISOString()
+                }
               }
             : current
         );
@@ -240,9 +263,13 @@ export default function AllyTrainingPage() {
                     <p className="mt-4 max-w-2xl text-base leading-7 text-[#d3cdeb]">Un parcours pratique pour devenir une présence fiable, bienveillante et sécurisante autour des familles.</p>
                   </div>
                   <div className="rounded-2xl border border-white/15 bg-[#0d0a25]/55 p-4 backdrop-blur">
-                    <div className="flex items-center justify-between text-sm"><span className="text-[#bdb5dc]">Progression</span><strong>{course.progressPercent} %</strong></div>
+                    <div className="flex items-center justify-between text-sm"><span className="text-[#bdb5dc]">Progression des modules</span><strong>{course.progressPercent} %</strong></div>
                     <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#09071b]"><div className="h-full rounded-full bg-gradient-to-r from-[#f29d52] via-[#8cb2ff] to-[#49d8e8]" style={{ width: `${course.progressPercent}%` }} /></div>
-                    <p className="mt-3 text-sm font-semibold text-[#aeeaf4]">{STATUS_LABELS[course.status] ?? course.status}</p>
+                    <p className="mt-3 text-sm font-semibold text-[#aeeaf4]">
+                      {course.status !== "PASSED" && course.progressPercent === 100
+                        ? "Modules terminés — test officiel à réussir"
+                        : STATUS_LABELS[course.status] ?? course.status}
+                    </p>
                   </div>
                 </div>
               </header>
@@ -252,6 +279,13 @@ export default function AllyTrainingPage() {
                   <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400/15 text-3xl" aria-hidden>✓</div>
                   <h2 className="mt-4 text-3xl font-bold text-white">Formation réussie</h2>
                   <p className="mx-auto mt-3 max-w-xl text-[#cbdad6]">Félicitations! Votre certificat est prêt. L&apos;équipe FAB poursuivra la validation finale de votre candidature et de vos documents.</p>
+                  {course.finalResult ? (
+                    <dl className="mx-auto mt-6 grid max-w-xl gap-3 text-left sm:grid-cols-3">
+                      <div className="rounded-xl border border-emerald-300/20 bg-black/15 p-3"><dt className="text-xs text-emerald-100/70">Note finale</dt><dd className="mt-1 text-xl font-bold text-white">{course.finalResult.scorePercent} %</dd></div>
+                      <div className="rounded-xl border border-emerald-300/20 bg-black/15 p-3"><dt className="text-xs text-emerald-100/70">Bonnes réponses</dt><dd className="mt-1 text-xl font-bold text-white">{course.finalResult.correctAnswers}/{course.finalResult.totalQuestions}</dd></div>
+                      <div className="rounded-xl border border-emerald-300/20 bg-black/15 p-3"><dt className="text-xs text-emerald-100/70">Réussite</dt><dd className="mt-1 font-semibold text-white">{formatTrainingDate(course.finalResult.completedAt)}</dd>{course.finalResult.attemptNumber ? <dd className="text-xs text-emerald-100/70">Tentative {course.finalResult.attemptNumber}</dd> : null}</div>
+                    </dl>
+                  ) : null}
                   <Button onClick={downloadCertificate} disabled={busy} className="mt-6 !rounded-xl !bg-[#f29d52] !px-5 !py-3 !font-bold !text-[#211435] hover:!bg-[#ffb36c]">
                     Télécharger mon certificat PDF
                   </Button>
@@ -303,9 +337,17 @@ export default function AllyTrainingPage() {
                             </section>
                           ))}
                         </div>
-                        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[#ded4c4] bg-[#efe7da] p-5 sm:px-9">
-                          <span className="text-sm text-[#5d6d67]">Votre progression est enregistrée dans FAB.</span>
-                          <Button onClick={completeCurrentLesson} disabled={busy || currentSummary?.completed} className="!rounded-xl !bg-[#1f6758] !px-5 !py-3 hover:!bg-[#185548]">
+                        <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-[#ded4c4] bg-[#efe7da] p-5 sm:px-9">
+                          <div className="space-y-2">
+                            <span className="block text-sm text-[#5d6d67]">Votre progression est enregistrée dans FAB.</span>
+                            {!currentSummary?.completed ? (
+                              <label className="flex cursor-pointer items-start gap-2 text-sm font-medium text-[#294b42]">
+                                <input type="checkbox" className="mt-0.5" checked={lessonConfirmed} onChange={(event) => setLessonConfirmed(event.target.checked)} />
+                                <span>Je confirme avoir consulté le contenu de ce module.</span>
+                              </label>
+                            ) : null}
+                          </div>
+                          <Button onClick={completeCurrentLesson} disabled={busy || currentSummary?.completed || !lessonConfirmed} className="!rounded-xl !bg-[#1f6758] !px-5 !py-3 hover:!bg-[#185548]">
                             {currentSummary?.completed ? "Module complété ✓" : busy ? "Enregistrement…" : "Terminer ce module"}
                           </Button>
                         </footer>
@@ -364,4 +406,11 @@ export default function AllyTrainingPage() {
 
 function toMessage(error: unknown) {
   return error instanceof Error ? error.message : "Une erreur est survenue.";
+}
+
+function formatTrainingDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "Date non disponible"
+    : new Intl.DateTimeFormat("fr-CA", { year: "numeric", month: "long", day: "numeric" }).format(date);
 }

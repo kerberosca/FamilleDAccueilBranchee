@@ -33,6 +33,10 @@ export function TrainingSummaryCard() {
   }, [accessToken]);
 
   if (!summary) return null;
+  const statusLabel =
+    summary.status !== "PASSED" && summary.progressPercent === 100
+      ? "Modules terminés — test officiel à réussir"
+      : STATUS_LABELS[summary.status] ?? summary.status;
 
   return (
     <section className="overflow-hidden rounded-[24px] border border-[#7969bb]/55 bg-gradient-to-br from-[#241b55] via-[#1a1741] to-[#102b4a] p-5 shadow-[0_20px_60px_-38px_rgba(81,128,255,0.8)]">
@@ -40,10 +44,10 @@ export function TrainingSummaryCard() {
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#91dded]">Parcours allié</p>
           <h2 className="mt-2 text-xl font-semibold text-white">Ma formation d&apos;allié FAB</h2>
-          <p className="mt-1 text-sm text-[#c9c2e8]">{STATUS_LABELS[summary.status] ?? summary.status}</p>
+          <p className="mt-1 text-sm text-[#c9c2e8]">{statusLabel}</p>
         </div>
         <span className="rounded-full border border-[#99b5ff]/30 bg-[#182b55] px-3 py-1 text-sm font-semibold text-[#c9d7ff]">
-          {summary.progressPercent} %
+          Modules : {summary.progressPercent} %
         </span>
       </div>
       <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-[#0d0a24]" aria-label={`Progression ${summary.progressPercent} %`}>

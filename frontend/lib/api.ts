@@ -82,7 +82,7 @@ async function tryRefresh(): Promise<string | null> {
 function redirectToLogin() {
   if (typeof window === "undefined") return;
   const next = encodeURIComponent(window.location.pathname + window.location.search);
-  window.location.href = `/login?next=${next}`;
+  window.location.href = `/login?next=${next}&reason=session-expired`;
 }
 
 async function requestJson<T>(
@@ -123,10 +123,11 @@ async function requestJson<T>(
         return requestJson<T>(path, { ...options, token: newAccess }, true);
       }
       redirectToLogin();
-      const message =
-        (json as { message?: string | string[] } | null)?.message ??
-        `Erreur ${response.status} sur ${path}`;
-      throw new ApiError(Array.isArray(message) ? message.join(", ") : message, response.status, json);
+      throw new ApiError(
+        "Votre session a expiré. Veuillez vous reconnecter pour poursuivre.",
+        response.status,
+        json
+      );
     }
     const message =
       (json as { message?: string | string[] } | null)?.message ??

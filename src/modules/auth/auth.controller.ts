@@ -61,7 +61,7 @@ export class AuthController {
   ) {
     const token = (req.cookies as Record<string, string>)?.[REFRESH_COOKIE_NAME] ?? body.refreshToken;
     if (!token) {
-      throw new UnauthorizedException("Refresh token manquant (cookie ou body)");
+      throw new UnauthorizedException("Votre session est invalide ou a expiré.");
     }
     const result = await this.authService.refreshWithToken(token);
     this.setRefreshCookie(res, result.refreshToken);
@@ -110,6 +110,15 @@ export class AuthController {
   @Post("verify-email")
   async verifyEmail(@Body() body: VerifyEmailDto) {
     return this.authService.verifyEmail(body.token);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 3, ttl: 15 * 60_000 } })
+  @HttpCode(200)
+  @Post("resend-email-verification")
+  async resendEmailVerification(@CurrentUser() user: JwtPayload) {
+    return this.authService.resendEmailVerification(user.sub);
   }
 
   @Public()

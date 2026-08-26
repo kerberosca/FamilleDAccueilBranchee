@@ -16,6 +16,7 @@ type ResourceDetail = {
   postalCode: string;
   skillsTags: string[];
   hourlyRate?: number | string | null;
+  rateType?: "HOURLY" | "FLAT";
   averageRating?: number | string | null;
   bio?: string | null;
   verificationStatus: string;
@@ -122,7 +123,8 @@ export default function ResourceDetailPage() {
         ) : null}
         {resource.hourlyRate != null ? (
           <p className="text-sm">
-            <strong>Tarif horaire :</strong> {String(resource.hourlyRate)} $
+            <strong>{resource.rateType === "FLAT" ? "Tarif forfaitaire" : "Tarif horaire"} :</strong>{" "}
+            {String(resource.hourlyRate)} ${resource.rateType === "FLAT" ? " forfaitaire" : " / heure"}
           </p>
         ) : null}
         {resource.bio ? <p className="text-sm text-slate-200">{resource.bio}</p> : null}

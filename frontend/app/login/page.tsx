@@ -27,6 +27,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/me";
+  const sessionExpired = searchParams.get("reason") === "session-expired";
   const { setTokens, isAuthenticated, isAuthLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,7 +49,7 @@ function LoginForm() {
         body: { email: email.trim(), password },
       });
       setTokens(res.accessToken, res.refreshToken ?? null);
-      router.push(next);
+      router.push(safeInternalNext(next));
     } catch (err) {
       const message =
         err instanceof ApiError
@@ -144,7 +145,13 @@ function LoginForm() {
             </div>
           </form>
 
-          {error ? <div className="mt-4"><Alert tone="error">{error}</Alert></div> : null}
+          {error ? (
+            <div className="mt-4"><Alert tone="error">{error}</Alert></div>
+          ) : sessionExpired ? (
+            <div className="mt-4">
+              <Alert tone="info">Votre session a expiré. Veuillez vous reconnecter pour poursuivre.</Alert>
+            </div>
+          ) : null}
 
           <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <Link href="/onboarding" className="font-medium text-[#3d5fa8] hover:text-[#2e4f97]">

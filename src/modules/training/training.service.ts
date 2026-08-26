@@ -195,7 +195,10 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
     return lesson;
   }
 
-  async completeLesson(userId: string, lessonKey: string) {
+  async completeLesson(userId: string, lessonKey: string, confirmed: boolean) {
+    if (!confirmed) {
+      throw new BadRequestException("Confirmez avoir consulté le contenu du module avant de le terminer.");
+    }
     const lesson = this.getLessonDefinition(lessonKey);
     const enrollment = await this.getEnrollmentForUser(userId, true);
     await this.assertPreviousLessonsComplete(enrollment.id, lesson.number);
@@ -287,6 +290,10 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
       return {
         passed: true,
         scorePercent: graded.scorePercent,
+        correctAnswers: graded.correctCount,
+        totalQuestions: QUIZ_QUESTIONS.length,
+        attemptNumber,
+        completedAt: now,
         attemptsRemaining: MAX_QUIZ_ATTEMPTS - activeAttempts - 1,
         feedback,
         certificateAvailable: true,
@@ -457,7 +464,21 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
         data: { status: TrainingEmailStatus.PENDING, processingAt: null }
       });
       const due = await this.prisma.trainingEmailLog.findMany({
-        where: { status: TrainingEmailStatus.PENDING, scheduledFor: { lte: new Date() } },
+        where: {
+          status: TrainingEmailStatus.PENDING,
+          scheduledFor: { lte: new Date() },
+          OR: [
+            { type: TrainingReminderType.ATTENTION },
+            { enrollment: { status: { in: [TrainingStatus.PASSED, TrainingStatus.ATTENTION_REQUIRED] } } },
+            {
+              enrollment: {
+                resourceProfile: {
+                  user: { emailVerifiedAt: { not: null } }
+                }
+              }
+            }
+          ]
+        },
         orderBy: { scheduledFor: "asc" },
         take: 20
       });
@@ -480,7 +501,7 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
       include: {
         enrollment: {
           include: {
-            resourceProfile: { include: { user: { select: { email: true } } } },
+            resourceProfile: { include: { user: { select: { email: true, emailVerifiedAt: true } } } },
             lessonProgress: true
           }
         }
@@ -610,6 +631,16 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
         attempt.type === TrainingAssessmentType.QUIZ &&
         (!enrollment.attemptsResetAt || attempt.submittedAt > enrollment.attemptsResetAt)
     );
+    const passedAttempt = quizAttempts.find((attempt) => attempt.passed);
+    const finalResult = enrollment.certificate
+      ? {
+          scorePercent: enrollment.certificate.scorePercent,
+          correctAnswers: Math.round((enrollment.certificate.scorePercent / 100) * QUIZ_QUESTIONS.length),
+          totalQuestions: QUIZ_QUESTIONS.length,
+          attemptNumber: passedAttempt?.attemptNumber ?? null,
+          completedAt: enrollment.completedAt ?? enrollment.certificate.issuedAt
+        }
+      : null;
     return {
       id: enrollment.id,
       courseVersion: enrollment.courseVersion,
@@ -627,6 +658,7 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
       attemptsUsed: quizAttempts.length,
       attemptsRemaining: Math.max(0, MAX_QUIZ_ATTEMPTS - quizAttempts.length),
       certificateAvailable: Boolean(enrollment.certificate),
+      finalResult,
       lessons: ALLY_TRAINING_LESSONS.map((lesson) => ({
         key: lesson.key,
         number: lesson.number,
@@ -799,6 +831,7 @@ function gradeQuestions(questions: TrainingQuestion[], answers: Record<string, n
   const correct = questions.filter((question) => answers[question.id] === question.correctIndex).length;
   return {
     scorePercent: Math.round((correct / questions.length) * 100),
+    correctCount: correct,
     feedback: questions.map((question) => ({
       questionId: question.id,
       correct: answers[question.id] === question.correctIndex,

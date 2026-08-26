@@ -7,6 +7,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
+import { CompleteLessonDto } from "./dto/complete-lesson.dto";
 import { SubmitAssessmentDto } from "./dto/submit-assessment.dto";
 import { TrainingService } from "./training.service";
 
@@ -31,8 +32,8 @@ export class TrainingController {
 
   @Roles(Role.RESOURCE)
   @Patch("me/lessons/:lessonKey/complete")
-  completeLesson(@CurrentUser() user: JwtPayload, @Param("lessonKey") lessonKey: string) {
-    return this.trainingService.completeLesson(user.sub, lessonKey);
+  completeLesson(@CurrentUser() user: JwtPayload, @Param("lessonKey") lessonKey: string, @Body() dto: CompleteLessonDto) {
+    return this.trainingService.completeLesson(user.sub, lessonKey, dto.confirmed);
   }
 
   @Roles(Role.RESOURCE)

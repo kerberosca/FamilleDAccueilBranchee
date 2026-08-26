@@ -21,13 +21,13 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user as JwtPayload | undefined;
     if (!user) {
-      throw new ForbiddenException("Access denied");
+      throw new ForbiddenException("Accès refusé.");
     }
     if (user.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException("User is not active");
+      throw new ForbiddenException("Votre compte est désactivé.");
     }
     if (!requiredRoles.includes(user.role)) {
-      throw new ForbiddenException("Insufficient role");
+      throw new ForbiddenException("Vous n'avez pas les droits requis pour effectuer cette action.");
     }
     return true;
   }

@@ -147,6 +147,35 @@ export function buildAllyWelcomeEmail(params: {
   });
 }
 
+export function buildEmailVerificationEmail(params: {
+  displayName: string;
+  verificationUrl: string;
+  frontendUrl: string;
+}): string {
+  return buildFabEmail({
+    frontendUrl: params.frontendUrl,
+    eyebrow: "Sécurité du compte",
+    title: "Confirmez votre adresse de connexion",
+    intro: `Bonjour ${params.displayName}, confirmez cette adresse courriel pour sécuriser votre compte FAB.`,
+    sections: [
+      {
+        title: "Pourquoi la confirmer?",
+        body: "Cette adresse sert à vous connecter et à recevoir les messages liés à votre compte et à votre formation."
+      },
+      {
+        title: "Courriel public de contact",
+        body: "Vous pourrez conserver une adresse différente dans votre profil pour les communications avec les familles."
+      },
+      {
+        title: "Durée de validité",
+        body: "Ce lien est valide pendant 24 heures."
+      }
+    ],
+    action: { label: "Confirmer mon adresse", href: params.verificationUrl },
+    note: "Votre espace demeure accessible, mais certaines actions sensibles resteront limitées tant que cette adresse n'est pas confirmée."
+  });
+}
+
 export function buildAllyProfileUpdatedEmail(params: {
   displayName: string;
   frontendUrl: string;
@@ -276,6 +305,9 @@ export function buildAllyAdminStatusEmail(params: {
 }): string {
   const approved = params.verificationStatus === "VERIFIED" && params.publishStatus === "PUBLISHED";
   const rejected = params.verificationStatus === "REJECTED";
+  const verificationStatus = statusLabel(ALLY_VERIFICATION_STATUS_LABELS, params.verificationStatus);
+  const publishStatus = statusLabel(ALLY_PUBLISH_STATUS_LABELS, params.publishStatus);
+  const onboardingState = statusLabel(ALLY_ONBOARDING_STATUS_LABELS, params.onboardingState);
   return buildFabEmail({
     frontendUrl: params.frontendUrl,
     eyebrow: approved ? "Profil allié approuvé" : rejected ? "Candidature allié révisée" : "Profil allié mis à jour",
@@ -292,15 +324,15 @@ export function buildAllyAdminStatusEmail(params: {
     sections: [
       {
         title: "Statut de vérification",
-        body: params.verificationStatus ?? "Inchangé"
+        body: verificationStatus
       },
       {
         title: "Statut de publication",
-        body: params.publishStatus ?? "Inchangé"
+        body: publishStatus
       },
       {
         title: "État du parcours",
-        body: params.onboardingState ?? "Inchangé"
+        body: onboardingState
       }
     ],
     action: { label: "Voir mon profil", href: absoluteUrl(params.frontendUrl, "/me") },
@@ -308,6 +340,33 @@ export function buildAllyAdminStatusEmail(params: {
       ? "Pour toute question ou correction à apporter, contactez l'équipe FAB."
       : "Ces statuts contrôlent la visibilité de votre profil et les prochaines étapes de validation."
   });
+}
+
+const ALLY_VERIFICATION_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Brouillon",
+  PENDING_VERIFICATION: "En attente de vérification",
+  VERIFIED: "Vérifié",
+  REJECTED: "Refusé"
+};
+
+const ALLY_PUBLISH_STATUS_LABELS: Record<string, string> = {
+  HIDDEN: "Non publié",
+  PUBLISHED: "Publié",
+  SUSPENDED: "Suspendu"
+};
+
+const ALLY_ONBOARDING_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Brouillon",
+  PENDING_PAYMENT: "Paiement en attente",
+  PENDING_VERIFICATION: "En attente de vérification",
+  VERIFIED: "Vérifié",
+  PUBLISHED: "Publié",
+  SUSPENDED: "Suspendu"
+};
+
+function statusLabel(labels: Record<string, string>, value?: string | null): string {
+  if (!value) return "Inchangé";
+  return labels[value] ?? value;
 }
 
 export function buildTeamNewAllyEmail(params: {

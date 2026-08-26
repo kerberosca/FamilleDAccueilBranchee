@@ -53,6 +53,11 @@ enum AllyType {
   AUTRES
 }
 
+enum ResourceRateType {
+  HOURLY
+  FLAT
+}
+
 enum BackgroundCheckStatus {
   NOT_REQUESTED
   REQUESTED
@@ -100,6 +105,7 @@ enum TrainingEmailStatus {
 model User {
   id               String     @id @default(cuid())
   email            String     @unique
+  emailVerifiedAt  DateTime?
   passwordHash     String
   refreshTokenHash String?
   role             Role
@@ -107,13 +113,27 @@ model User {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  familyProfile       FamilyProfile?
-  resourceProfile     ResourceProfile?
-  subscriptions       Subscription[]
-  adminAuditLogs      AdminAuditLog[]      @relation("AdminActor")
-  passwordResetTokens PasswordResetToken[]
+  familyProfile          FamilyProfile?
+  resourceProfile        ResourceProfile?
+  subscriptions          Subscription[]
+  adminAuditLogs         AdminAuditLog[]         @relation("AdminActor")
+  passwordResetTokens    PasswordResetToken[]
+  emailVerificationToken EmailVerificationToken?
 
   sentMessages Message[] @relation("MessageSender")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([expiresAt])
 }
 
 model PasswordResetToken {
@@ -160,6 +180,7 @@ model ResourceProfile {
   bio                        String?
   skillsTags                 String[]
   hourlyRate                 Decimal?                   @db.Decimal(10, 2)
+  rateType                   ResourceRateType           @default(HOURLY)
   availability               Json?
   verificationStatus         ResourceVerificationStatus @default(DRAFT)
   publishStatus              ResourcePublishStatus      @default(HIDDEN)

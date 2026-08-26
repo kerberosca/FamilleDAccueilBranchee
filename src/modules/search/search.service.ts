@@ -59,6 +59,7 @@ export class SearchService {
               skillsTags: resource.skillsTags,
               averageRating: decimalToNumber(resource.averageRating),
               hourlyRate: decimalToNumber(resource.hourlyRate),
+              rateType: resource.rateType,
               bio: resource.bio,
               contactEmail: resource.contactEmail,
               contactPhone: resource.contactPhone
@@ -70,7 +71,8 @@ export class SearchService {
               region: resource.region,
               skillsTags: resource.skillsTags,
               averageRating: decimalToNumber(resource.averageRating),
-              hourlyRate: decimalToNumber(resource.hourlyRate)
+              hourlyRate: decimalToNumber(resource.hourlyRate),
+              rateType: resource.rateType
             }
       )
     };

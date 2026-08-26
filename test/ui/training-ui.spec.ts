@@ -138,7 +138,7 @@ test("affiche les 8 modules, la progression et la vidéo dans la mise en page FA
 
   await expect(page.getByRole("complementary", { name: "Modules de la formation" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Modules de la formation" }).getByRole("button")).toHaveCount(8);
-  await expect(page.getByText("Progression", { exact: true })).toBeVisible();
+  await expect(page.getByText("Progression des modules", { exact: true })).toBeVisible();
   await expect(page.getByText("0 %")).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Module test 1" })).toBeVisible();
   await expect(page.getByTitle("Présentation de la formation des alliés FAB")).toBeVisible();
@@ -150,14 +150,22 @@ test("affiche les 8 modules, la progression et la vidéo dans la mise en page FA
 test("permet de terminer un module uniquement au clavier", async ({ page }) => {
   await prepareTrainingPage(page);
 
+  const confirmation = page.getByRole("checkbox", { name: "Je confirme avoir consulté le contenu de ce module." });
   const finishButton = page.getByRole("button", { name: "Terminer ce module" });
+  await expect(finishButton).toBeDisabled();
   await page.locator("body").press("Tab");
-  let reachedFinishButton = false;
+  let reachedConfirmation = false;
   for (let step = 0; step < 20; step += 1) {
-    reachedFinishButton = await finishButton.evaluate((button) => document.activeElement === button);
-    if (reachedFinishButton) break;
+    reachedConfirmation = await confirmation.evaluate((checkbox) => document.activeElement === checkbox);
+    if (reachedConfirmation) break;
     await page.keyboard.press("Tab");
   }
+  expect(reachedConfirmation).toBe(true);
+  await page.keyboard.press("Space");
+  await expect(confirmation).toBeChecked();
+  await expect(finishButton).toBeEnabled();
+  await page.keyboard.press("Tab");
+  const reachedFinishButton = await finishButton.evaluate((button) => document.activeElement === button);
   expect(reachedFinishButton).toBe(true);
 
   await page.keyboard.press("Enter");

@@ -15,20 +15,20 @@ export class MessagingService {
 
   async createConversation(currentUser: JwtPayload, dto: CreateConversationDto) {
     if (currentUser.role !== Role.FAMILY) {
-      throw new ForbiddenException("Only FAMILY can initiate a conversation");
+      throw new ForbiddenException("Seul un compte famille peut démarrer une conversation.");
     }
     const premium = await this.subscriptionAccessService.hasActiveFamilySubscription(currentUser.sub);
     if (!premium) {
-      throw new ForbiddenException("Family subscription is required to contact resources");
+      throw new ForbiddenException("Un abonnement famille actif est requis pour contacter un allié.");
     }
 
     const family = await this.prisma.familyProfile.findUnique({ where: { userId: currentUser.sub } });
     if (!family) {
-      throw new NotFoundException("Family profile not found");
+      throw new NotFoundException("Profil de famille introuvable.");
     }
     const resource = await this.prisma.resourceProfile.findUnique({ where: { id: dto.resourceProfileId } });
     if (!resource) {
-      throw new NotFoundException("Resource not found");
+      throw new NotFoundException("Allié introuvable.");
     }
     if (
       resource.publishStatus !== ResourcePublishStatus.PUBLISHED ||
@@ -36,7 +36,7 @@ export class MessagingService {
       (resource.onboardingState !== ResourceOnboardingState.VERIFIED &&
         resource.onboardingState !== ResourceOnboardingState.PUBLISHED)
     ) {
-      throw new ForbiddenException("Resource is not available for contact");
+      throw new ForbiddenException("Cet allié n'est pas disponible pour être contacté.");
     }
 
     const conversation = await this.prisma.conversation.upsert({
@@ -114,7 +114,7 @@ export class MessagingService {
     if (currentUser.role === Role.FAMILY) {
       const premium = await this.subscriptionAccessService.hasActiveFamilySubscription(currentUser.sub);
       if (!premium) {
-        throw new ForbiddenException("Family subscription expired");
+        throw new ForbiddenException("Votre abonnement famille a expiré.");
       }
     }
     await this.prisma.message.create({
@@ -137,14 +137,14 @@ export class MessagingService {
       }
     });
     if (!conversation) {
-      throw new NotFoundException("Conversation not found");
+      throw new NotFoundException("Conversation introuvable.");
     }
 
     const isAdmin = currentUser.role === Role.ADMIN;
     const isFamilyOwner = conversation.family.userId === currentUser.sub;
     const isResourceOwner = conversation.resource.userId === currentUser.sub;
     if (!isAdmin && !isFamilyOwner && !isResourceOwner) {
-      throw new ForbiddenException("Not part of this conversation");
+      throw new ForbiddenException("Vous ne participez pas à cette conversation.");
     }
     return conversation;
   }

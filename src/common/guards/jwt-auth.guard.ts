@@ -1,4 +1,4 @@
-import { ExecutionContext, ForbiddenException, Injectable } from "@nestjs/common";
+import { ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { AuthGuard } from "@nestjs/passport";
 import { UserStatus } from "@prisma/client";
@@ -24,11 +24,11 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 
   handleRequest<TUser = JwtPayload>(err: unknown, user: TUser) {
     if (err || !user) {
-      throw err ?? new ForbiddenException("Unauthorized");
+      throw new UnauthorizedException("Votre session est invalide ou a expiré.");
     }
     const payload = user as unknown as JwtPayload;
     if (payload.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException("User is not active");
+      throw new ForbiddenException("Votre compte est désactivé.");
     }
     return user;
   }

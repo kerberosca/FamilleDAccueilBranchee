@@ -41,7 +41,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
     return {
       error: "InternalServerError",
-      message: "Internal server error"
+      message: "Une erreur interne est survenue."
     };
   }
 }

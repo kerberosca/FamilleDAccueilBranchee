@@ -105,13 +105,14 @@ describe("Smoke e2e", () => {
     const adminToken = await loginAs("ADMIN");
     const familyToken = await loginAs("FAMILLE");
 
-    const anonymous = await request(app.getHttpServer()).get("/api/v1/system-status");
-    expect([401, 403]).toContain(anonymous.status);
+    const anonymous = await request(app.getHttpServer()).get("/api/v1/system-status").expect(401);
+    expect(anonymous.body.message).toBe("Votre session est invalide ou a expiré.");
 
-    await request(app.getHttpServer())
+    const forbidden = await request(app.getHttpServer())
       .get("/api/v1/system-status")
       .set("Authorization", `Bearer ${familyToken}`)
       .expect(403);
+    expect(forbidden.body.message).toBe("Vous n'avez pas les droits requis pour effectuer cette action.");
 
     const res = await request(app.getHttpServer())
       .get("/api/v1/system-status")
@@ -474,6 +475,61 @@ describe("Smoke e2e", () => {
     );
   });
 
+  it("structure les services et accepte un tarif forfaitaire pour l'entretien ménager", async () => {
+    const token = await loginAs("RESSOURCE");
+
+    const directUpdate = await request(app.getHttpServer())
+      .patch("/api/v1/profiles/resource/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ skillsTags: ["Service libre"], hourlyRate: 99 })
+      .expect(400);
+    expect(directUpdate.body.message).toContain("formulaire complet de candidature");
+
+    const updated = await request(app.getHttpServer())
+      .patch("/api/v1/profiles/resource/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        allyType: AllyType.MENAGE,
+        contactPhone: "514-555-0000",
+        allyRegistration: validAllyRegistration({ hourlyRateSuggested: "125", rateType: "FLAT" })
+      })
+      .expect(200);
+
+    expect(updated.body.rateType).toBe("FLAT");
+    expect(updated.body.hourlyRate).toBe(125);
+    expect(updated.body.skillsTags).toContain("entretien régulier");
+    expect(updated.body.skillsTags).not.toContain("Service libre");
+  });
+
+  it("refuse de publier un profil dont l'adresse de connexion n'est pas confirmée", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const unverified = await prisma.user.create({
+      data: {
+        email: "publication.non.verifiee@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        resourceProfile: {
+          create: {
+            displayName: "Allié non vérifié",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            skillsTags: ["Tutorat"]
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+
+    const result = await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${unverified.resourceProfile!.id}/moderation`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ publishStatus: ResourcePublishStatus.PUBLISHED })
+      .expect(400);
+    expect(result.body.message).toContain("adresse de connexion");
+  });
+
   it("PATCH /api/v1/profiles/resource/:id/moderation envoie un courriel a l'allie", async () => {
     emailSendMock.mockClear();
     const token = await loginAs("ADMIN");
@@ -518,6 +574,11 @@ describe("Smoke e2e", () => {
         html: expect.stringContaining("Votre profil allié est approuvé")
       })
     );
+    const moderationEmail = (emailSendMock.mock.calls as unknown as Array<[{ html?: string }]>)[0]?.[0];
+    expect(moderationEmail.html).toContain("Vérifié");
+    expect(moderationEmail.html).toContain("Publié");
+    expect(moderationEmail.html).not.toContain("VERIFIED");
+    expect(moderationEmail.html).not.toContain("PUBLISHED");
   });
 
   it("GET /api/v1/search/resources avec abonnement actif expire : preview sans contacts", async () => {
@@ -757,6 +818,47 @@ describe("Smoke e2e", () => {
     expect(res.body.message).toBeDefined();
   });
 
+  it("verifie l'adresse de connexion et permet de renvoyer un lien", async () => {
+    emailSendMock.mockClear();
+    const registered = await request(app.getHttpServer())
+      .post("/api/v1/auth/register")
+      .send({
+        email: "verification.compte@local.test",
+        password: "Bienvenue123!",
+        role: Role.FAMILY,
+        displayName: "Compte à vérifier",
+        postalCode: "H2X1Y4",
+        city: "Montreal",
+        region: "QC"
+      })
+      .expect(201);
+
+    expect(registered.body.user.emailVerifiedAt).toBeNull();
+    const pendingUser = await prisma.user.findUniqueOrThrow({ where: { email: "verification.compte@local.test" } });
+    expect(pendingUser.emailVerifiedAt).toBeNull();
+    expect(await prisma.emailVerificationToken.count({ where: { userId: pendingUser.id } })).toBe(1);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/resend-email-verification")
+      .set("Authorization", `Bearer ${registered.body.accessToken}`)
+      .expect(200);
+
+    const verificationMessages = (emailSendMock.mock.calls as unknown as Array<[{ subject?: string; html?: string }]>).filter(
+      ([message]) => message.subject === "Confirmez votre adresse de connexion FAB"
+    );
+    expect(verificationMessages).toHaveLength(2);
+    const html = verificationMessages.at(-1)?.[0].html ?? "";
+    const rawToken = html.match(/verify-email\?token=([a-f0-9]+)/)?.[1];
+    expect(rawToken).toBeTruthy();
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/verify-email")
+      .send({ token: rawToken })
+      .expect(201);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: pendingUser.id } })).emailVerifiedAt).toBeTruthy();
+    expect(await prisma.emailVerificationToken.count({ where: { userId: pendingUser.id } })).toBe(0);
+  });
+
   it("POST /api/v1/auth/login authentifie puis logout invalide le refresh token", async () => {
     const password = "Bienvenue123!";
     const user = await prisma.user.create({
@@ -865,7 +967,25 @@ describe("Smoke e2e", () => {
   it("POST /api/v1/auth/refresh refuse un jeton manquant", async () => {
     const res = await request(app.getHttpServer()).post("/api/v1/auth/refresh").send({}).expect(401);
 
-    expect(res.body.message).toBeDefined();
+    expect(res.body.message).toBe("Votre session est invalide ou a expiré.");
+  });
+
+  it("POST /api/v1/auth/refresh refuse un jeton invalide avec un message français", async () => {
+    const res = await request(app.getHttpServer())
+      .post("/api/v1/auth/refresh")
+      .send({ refreshToken: "jeton-invalide" })
+      .expect(401);
+
+    expect(res.body.message).toBe("Votre session est invalide ou a expiré.");
+  });
+
+  it("GET /api/v1/users/me refuse un jeton invalide avec un message français", async () => {
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/users/me")
+      .set("Authorization", "Bearer jeton-invalide")
+      .expect(401);
+
+    expect(res.body.message).toBe("Votre session est invalide ou a expiré.");
   });
 
   it("DELETE /api/v1/auth/me supprime le compte connecte", async () => {
@@ -1335,6 +1455,21 @@ describe("Smoke e2e", () => {
       .set("Authorization", `Bearer ${resourceToken}`)
       .expect(404);
 
+    await request(app.getHttpServer())
+      .get(`/api/v1/training/me/lessons/${overview.body.lessons[0].key}`)
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/training/me/lessons/${overview.body.lessons[0].key}/complete`)
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .send({ confirmed: false })
+      .expect(400);
+    expect(
+      await prisma.trainingLessonProgress.count({
+        where: { enrollmentId: overview.body.id, completedAt: { not: null } }
+      })
+    ).toBe(0);
+
     for (const lesson of overview.body.lessons as { key: string }[]) {
       await request(app.getHttpServer())
         .get(`/api/v1/training/me/lessons/${lesson.key}`)
@@ -1343,6 +1478,7 @@ describe("Smoke e2e", () => {
       await request(app.getHttpServer())
         .patch(`/api/v1/training/me/lessons/${lesson.key}/complete`)
         .set("Authorization", `Bearer ${resourceToken}`)
+        .send({ confirmed: true })
         .expect(200);
     }
 
@@ -1412,7 +1548,17 @@ describe("Smoke e2e", () => {
       .expect(201);
     expect(passed.body.passed).toBe(true);
     expect(passed.body.scorePercent).toBe(62);
+    expect(passed.body.correctAnswers).toBe(8);
+    expect(passed.body.totalQuestions).toBe(13);
     expect(passed.body.certificateAvailable).toBe(true);
+
+    const completedCourse = await request(app.getHttpServer())
+      .get("/api/v1/training/me")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(200);
+    expect(completedCourse.body.finalResult).toEqual(
+      expect.objectContaining({ scorePercent: 62, correctAnswers: 8, totalQuestions: 13 })
+    );
 
     const certificate = await request(app.getHttpServer())
       .get("/api/v1/training/me/certificate")
@@ -1450,6 +1596,7 @@ describe("Smoke e2e", () => {
         passwordHash: "hash",
         role: Role.RESOURCE,
         status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
         resourceProfile: {
           create: {
             displayName: "Allié Formation Requise",
@@ -1498,6 +1645,7 @@ describe("Smoke e2e", () => {
         passwordHash: "hash",
         role: Role.RESOURCE,
         status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
         resourceProfile: {
           create: {
             displayName: "Allie a rattraper",
@@ -1639,6 +1787,7 @@ describe("Smoke e2e", () => {
         passwordHash: "hash",
         role: Role.RESOURCE,
         status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
         resourceProfile: {
           create: {
             displayName: "Allie Relances",
@@ -1683,6 +1832,7 @@ describe("Smoke e2e", () => {
         passwordHash: "hash",
         role: Role.RESOURCE,
         status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
         resourceProfile: {
           create: {
             displayName: "Allie Deja Commence",
@@ -1726,6 +1876,48 @@ describe("Smoke e2e", () => {
     expect(day3.status).toBe(TrainingEmailStatus.SKIPPED);
   });
 
+  it("garde les relances en attente tant que l'adresse de connexion n'est pas confirmée", async () => {
+    const trainingService = app.get(TrainingService);
+    await prisma.trainingEmailLog.updateMany({
+      where: { status: TrainingEmailStatus.PENDING },
+      data: { scheduledFor: new Date(Date.now() + 30 * 24 * 60 * 60_000) }
+    });
+    const user = await prisma.user.create({
+      data: {
+        email: "allie-relances-non-verifie@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        resourceProfile: {
+          create: {
+            displayName: "Allié sans courriel vérifié",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            skillsTags: ["Tutorat"],
+            contactEmail: "contact-public@local.test"
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+    const { enrollment } = await trainingService.ensureEnrollment(user.resourceProfile!.id);
+    await prisma.trainingEmailLog.updateMany({
+      where: { enrollmentId: enrollment.id },
+      data: { scheduledFor: new Date(Date.now() - 60_000) }
+    });
+
+    emailSendMock.mockClear();
+    await trainingService.processDueEmails();
+
+    expect(emailSendMock).not.toHaveBeenCalled();
+    expect(
+      await prisma.trainingEmailLog.count({
+        where: { enrollmentId: enrollment.id, status: TrainingEmailStatus.PENDING, providerMessageId: null }
+      })
+    ).toBe(4);
+  });
+
   it("bloque toutes les relances de formation sans bloquer les autres courriels FAB", async () => {
     const trainingService = app.get(TrainingService);
     const configService = app.get(ConfigService);
@@ -1757,8 +1949,8 @@ describe("Smoke e2e", () => {
         })
         .expect(201);
 
-      // Les courriels transactionnels normaux (bienvenue et avis équipe) restent actifs.
-      expect(emailSendMock).toHaveBeenCalledTimes(2);
+      // Les courriels transactionnels normaux (vérification, bienvenue et avis équipe) restent actifs.
+      expect(emailSendMock).toHaveBeenCalledTimes(3);
       const enrollment = await prisma.trainingEnrollment.findFirstOrThrow({
         where: { resourceProfile: { user: { email: "allie-courriels-pauses@local.test" } } }
       });
@@ -1768,7 +1960,7 @@ describe("Smoke e2e", () => {
       });
 
       await trainingService.processDueEmails();
-      expect(emailSendMock).toHaveBeenCalledTimes(2);
+      expect(emailSendMock).toHaveBeenCalledTimes(3);
       expect(
         await prisma.trainingEmailLog.count({
           where: { enrollmentId: enrollment.id, status: TrainingEmailStatus.PENDING, providerMessageId: null }
@@ -1779,7 +1971,7 @@ describe("Smoke e2e", () => {
       configService.set("ALLY_TRAINING_EMAILS_ENABLED", "true");
       configService.set("ALLY_TRAINING_EMAILS_START_AT", "");
       await trainingService.processDueEmails();
-      expect(emailSendMock).toHaveBeenCalledTimes(2);
+      expect(emailSendMock).toHaveBeenCalledTimes(3);
       expect(
         await prisma.trainingEmailLog.count({
           where: { enrollmentId: enrollment.id, status: TrainingEmailStatus.PENDING }
@@ -2059,6 +2251,7 @@ function answersWithCorrectCount(correctAnswers: Record<string, number>, correct
 function validAllyRegistration(
   overrides: {
     hourlyRateSuggested?: string;
+    rateType?: "HOURLY" | "FLAT";
     repitNuit?: boolean;
     nightlyRateSuggested?: string;
     dailyRateSuggested?: string;
@@ -2090,6 +2283,7 @@ function validAllyRegistration(
       age12p: true,
       maxChildren: "2",
       serviceRadius: "25",
+      rateType: overrides.rateType ?? "HOURLY",
       hourlyRateSuggested: overrides.hourlyRateSuggested ?? "32",
       ...(overrides.nightlyRateSuggested
         ? { nightlyRateSuggested: overrides.nightlyRateSuggested }
@@ -2136,7 +2330,8 @@ async function seedDevUsers(prisma: PrismaService) {
       email: "admin@local.test",
       passwordHash: "hash",
       role: Role.ADMIN,
-      status: UserStatus.ACTIVE
+      status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date()
     }
   });
 
@@ -2146,6 +2341,7 @@ async function seedDevUsers(prisma: PrismaService) {
       passwordHash: "hash",
       role: Role.FAMILY,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
       familyProfile: {
         create: {
           displayName: "Famille Locale",
@@ -2174,6 +2370,7 @@ async function seedDevUsers(prisma: PrismaService) {
       passwordHash: "hash",
       role: Role.RESOURCE,
       status: UserStatus.ACTIVE,
+      emailVerifiedAt: new Date(),
       resourceProfile: {
         create: {
           displayName: "Ressource Locale",

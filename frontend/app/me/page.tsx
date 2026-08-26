@@ -10,12 +10,13 @@ import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
 import { ResourceDocumentsPanel } from "../../components/resource-documents-panel";
 import { TrainingSummaryCard } from "../../components/training-summary-card";
-import { apiDelete, apiGet, apiPatch } from "../../lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 
 type MeResponse = {
   id: string;
   email: string;
+  emailVerifiedAt?: string | null;
   role: string;
   status: string;
   createdAt?: string;
@@ -46,6 +47,7 @@ type ResourceProfileResponse = {
   bio?: string | null;
   skillsTags: string[];
   hourlyRate?: string | number | null;
+  rateType?: "HOURLY" | "FLAT";
   availability?: unknown;
   verificationStatus: string;
   publishStatus: string;
@@ -104,6 +106,27 @@ type FieldErrors = Partial<
   >
 >;
 
+const VERIFICATION_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Brouillon",
+  PENDING_VERIFICATION: "Vérification en cours",
+  VERIFIED: "Vérifié",
+  REJECTED: "Refusé"
+};
+const PUBLISH_STATUS_LABELS: Record<string, string> = {
+  HIDDEN: "Non publié",
+  PUBLISHED: "Publié",
+  SUSPENDED: "Suspendu"
+};
+
+function resourceModerationMessage(profile: ResourceProfileResponse): string {
+  if (profile.verificationStatus === "PENDING_VERIFICATION" && profile.publishStatus === "HIDDEN") {
+    return "Vérification en cours — votre profil n'est pas encore publié.";
+  }
+  const verification = VERIFICATION_STATUS_LABELS[profile.verificationStatus] ?? profile.verificationStatus;
+  const publication = PUBLISH_STATUS_LABELS[profile.publishStatus] ?? profile.publishStatus;
+  return `Vérification : ${verification} — publication : ${publication}.`;
+}
+
 export default function MePage() {
   const router = useRouter();
   const { accessToken, logout } = useAuth();
@@ -114,6 +137,7 @@ export default function MePage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -409,7 +433,7 @@ export default function MePage() {
         region,
         availabilityJson
       }),
-      ...validateResourceFields({ hourlyRate, contactEmail })
+      ...validateResourceFields({ contactEmail })
     };
     if (Object.keys(validation).length > 0) {
       setFieldErrors(validation);
@@ -429,8 +453,6 @@ export default function MePage() {
           region,
           streetAddress: streetAddress.trim() || undefined,
           bio: bio || undefined,
-          skillsTags: toTags(tagsCsv),
-          hourlyRate: hourlyRate ? Number(hourlyRate) : undefined,
           contactEmail: contactEmail || undefined,
           contactPhone: contactPhone || undefined,
           availability: parseAvailabilityOrThrow(availabilityJson),
@@ -459,6 +481,23 @@ export default function MePage() {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const resendEmailVerification = async () => {
+    if (!accessToken) return;
+    setResendingVerification(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await apiPost<{ message: string }>("/auth/resend-email-verification", {
+        token: accessToken
+      });
+      setSuccess(response.message);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Le lien de vérification n'a pas pu être envoyé.");
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -513,10 +552,24 @@ export default function MePage() {
         {error ? <Alert tone="error">{error}</Alert> : null}
         {success ? <Alert tone="info">{success}</Alert> : null}
         {me ? (
-          <Card className="space-y-1 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
-            <p className="text-sm text-slate-300">
-              Connecté avec <strong className="text-white">{me.email}</strong>
-            </p>
+          <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Adresse de connexion</p>
+              <p className="mt-1 break-all text-sm text-slate-300">
+                <strong className="text-white">{me.email}</strong>{" "}
+                <span className={me.emailVerifiedAt ? "text-emerald-300" : "text-amber-200"}>
+                  — {me.emailVerifiedAt ? "confirmée" : "à confirmer"}
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Cette adresse sert à vous connecter et à recevoir les messages liés à votre compte et à votre formation.
+              </p>
+              {!me.emailVerifiedAt ? (
+                <Button type="button" variant="secondary" className="mt-3" disabled={resendingVerification} onClick={() => void resendEmailVerification()}>
+                  {resendingVerification ? "Envoi…" : "Renvoyer le lien de vérification"}
+                </Button>
+              ) : null}
+            </div>
             <p className="text-sm text-slate-400">
               Rôle : {me.role === "ADMIN" ? "Administrateur" : me.role === "FAMILY" ? "Famille" : me.role === "RESOURCE" ? "Allié" : me.role}
             </p>
@@ -737,32 +790,30 @@ export default function MePage() {
 
             <fieldset className="space-y-4 rounded-xl border border-[#4f476f] bg-[#0f0b24]/60 p-4">
               <legend className="px-1 text-sm font-medium text-slate-200">Services et tarifs</legend>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="space-y-1 sm:col-span-2">
-                  <span className="text-sm font-medium text-slate-200">Compétences et services</span>
-                  <Input
-                    placeholder="Ex. gardien, aide aux devoirs, transport"
-                    value={tagsCsv}
-                    onChange={(e) => setTagsCsv(e.target.value)}
-                  />
-                  <p className="text-xs text-slate-500">Séparez les services par des virgules.</p>
-                </label>
-
-                <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-200">Tarif horaire suggéré</span>
-                  <Input
-                    placeholder="Ex. 28"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={hourlyRate}
-                    onChange={(e) => {
-                      setHourlyRate(e.target.value);
-                      setFieldErrors((prev) => ({ ...prev, hourlyRate: undefined }));
-                    }}
-                  />
-                  <FieldError error={fieldErrors.hourlyRate} />
-                </label>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-slate-200">Services déclarés</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {toTags(tagsCsv)?.map((tag) => (
+                      <span key={tag} className="rounded-full border border-[#5d5782] bg-[#1a1535] px-3 py-1 text-sm text-slate-200">
+                        {tag}
+                      </span>
+                    )) ?? <span className="text-sm text-slate-400">Aucun service déclaré.</span>}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-200">
+                    {(profile as ResourceProfileResponse | null)?.rateType === "FLAT" ? "Tarif forfaitaire suggéré" : "Tarif horaire suggéré"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-300">
+                    {hourlyRate
+                      ? `${hourlyRate} $${(profile as ResourceProfileResponse | null)?.rateType === "FLAT" ? " forfaitaire" : " / heure"}`
+                      : "Non précisé"}
+                  </p>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Pour modifier ces renseignements structurés, utilisez le formulaire complet de candidature plus bas.
+                </p>
               </div>
             </fieldset>
 
@@ -770,7 +821,7 @@ export default function MePage() {
               <legend className="px-1 text-sm font-medium text-slate-200">Coordonnées</legend>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-200">Courriel de contact</span>
+                  <span className="text-sm font-medium text-slate-200">Courriel public de contact</span>
                   <Input
                     placeholder="nom@exemple.com"
                     type="email"
@@ -781,6 +832,7 @@ export default function MePage() {
                     }}
                   />
                   <FieldError error={fieldErrors.contactEmail} />
+                  <p className="text-xs text-slate-500">Cette adresse peut être visible aux familles après la publication de votre profil. Elle ne change pas votre adresse de connexion.</p>
                 </label>
 
                 <label className="space-y-1">
@@ -834,20 +886,21 @@ export default function MePage() {
                     <option value="more">Plus de 50 km</option>
                   </select>
                 </label>
-                <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-200">Nombre maximum d'enfants</span>
-                  <Input
-                    placeholder="Ex. 2"
-                    value={resourceAvailability.maxChildren}
-                    onChange={(e) => updateResourceAvailability({ maxChildren: e.target.value })}
-                  />
-                </label>
+                {(profile as ResourceProfileResponse | null)?.allyType === "GARDIENS" ? (
+                  <label className="space-y-1">
+                    <span className="text-sm font-medium text-slate-200">Nombre maximum d&apos;enfants</span>
+                    <Input
+                      placeholder="Ex. 2"
+                      value={resourceAvailability.maxChildren}
+                      onChange={(e) => updateResourceAvailability({ maxChildren: e.target.value })}
+                    />
+                  </label>
+                ) : null}
               </div>
             </fieldset>
             {(profile as ResourceProfileResponse | null)?.verificationStatus ? (
               <Alert tone="info">
-                Modération: {(profile as ResourceProfileResponse).verificationStatus} /{" "}
-                {(profile as ResourceProfileResponse).publishStatus}
+                {resourceModerationMessage(profile as ResourceProfileResponse)}
               </Alert>
             ) : null}
             <h3 className="text-base font-medium pt-2 border-t border-slate-700 mt-2">Vérification d&apos;antécédents judiciaires</h3>
@@ -1093,14 +1146,8 @@ function validateCommonFields(input: {
   return errors;
 }
 
-function validateResourceFields(input: { hourlyRate: string; contactEmail: string }): FieldErrors {
+function validateResourceFields(input: { contactEmail: string }): FieldErrors {
   const errors: FieldErrors = {};
-  if (input.hourlyRate.trim()) {
-    const value = Number(input.hourlyRate);
-    if (Number.isNaN(value) || value < 0) {
-      errors.hourlyRate = "Le tarif horaire doit être un nombre positif.";
-    }
-  }
   if (input.contactEmail.trim()) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(input.contactEmail.trim())) {

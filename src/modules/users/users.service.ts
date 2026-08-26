@@ -9,7 +9,7 @@ export class UsersService {
   async getById(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new NotFoundException("Compte introuvable.");
     }
     return sanitizeUser(user);
   }
@@ -25,7 +25,7 @@ export class UsersService {
   async updateRole(userId: string, role: Role, actorUserId?: string) {
     const target = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!target) {
-      throw new NotFoundException("User not found");
+      throw new NotFoundException("Compte introuvable.");
     }
     if (target.role === Role.ADMIN && role !== Role.ADMIN) {
       const adminCount = await this.prisma.user.count({ where: { role: Role.ADMIN } });
@@ -204,6 +204,7 @@ export class UsersService {
 function sanitizeUser(user: {
   id: string;
   email: string;
+  emailVerifiedAt: Date | null;
   role: string;
   status: string;
   createdAt: Date;
@@ -212,6 +213,7 @@ function sanitizeUser(user: {
   return {
     id: user.id,
     email: user.email,
+    emailVerifiedAt: user.emailVerifiedAt,
     role: user.role,
     status: user.status,
     createdAt: user.createdAt,

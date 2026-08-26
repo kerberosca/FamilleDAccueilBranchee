@@ -133,7 +133,9 @@ const PUBLISH_STATUS_LABELS: Record<string, string> = {
 };
 const ONBOARDING_STATE_LABELS: Record<string, string> = {
   DRAFT: "Brouillon",
+  PENDING_PAYMENT: "Paiement en attente",
   PENDING_VERIFICATION: "En attente de vérification",
+  VERIFIED: "Vérifié",
   PUBLISHED: "Publié",
   SUSPENDED: "Suspendu"
 };

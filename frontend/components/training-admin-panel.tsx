@@ -63,6 +63,18 @@ const EMAIL_LABELS: Record<string, string> = {
   SUCCESS: "Confirmation de réussite",
   ATTENTION: "Avis à l'équipe"
 };
+const EMAIL_STATUS_LABELS: Record<string, string> = {
+  PENDING: "En attente",
+  PROCESSING: "En traitement",
+  SENT: "Envoyé",
+  SKIPPED: "Ignoré",
+  FAILED: "Échec"
+};
+const PUBLISH_STATUS_LABELS: Record<string, string> = {
+  HIDDEN: "Masqué",
+  PUBLISHED: "Publié",
+  SUSPENDED: "Suspendu"
+};
 
 export function TrainingAdminPanel() {
   const { accessToken } = useAuth();
@@ -172,7 +184,7 @@ export function TrainingAdminPanel() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-white">{item.displayName}</h3>{item.overdue ? <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200">J14 dépassé</span> : null}</div>
                 <p className="break-all text-sm text-slate-400">{item.email}</p>
-                <p className="mt-2 text-xs text-slate-500">Dernière activité : {formatDate(item.lastActivityAt)} · Publication : {item.publishStatus}</p>
+                <p className="mt-2 text-xs text-slate-500">Dernière activité : {formatDate(item.lastActivityAt)} · Publication : {PUBLISH_STATUS_LABELS[item.publishStatus] ?? item.publishStatus}</p>
               </div>
               <div>
                 <div className="flex justify-between text-xs"><span>{STATUS_LABELS[item.status]}</span><strong>{item.progressPercent} %</strong></div>
@@ -188,7 +200,7 @@ export function TrainingAdminPanel() {
               <summary className="cursor-pointer text-sm font-medium text-[#a8c3ff]">Voir les tentatives et les relances</summary>
               <div className="mt-3 grid gap-4 lg:grid-cols-2">
                 <div><h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">Tentatives</h4>{item.attempts.length ? <ul className="mt-2 space-y-1 text-sm">{item.attempts.map((attempt) => <li key={attempt.id}>{ATTEMPT_LABELS[attempt.type] ?? attempt.type} #{attempt.attemptNumber} · {attempt.scorePercent} % · {attempt.passed ? "réussi" : "échoué"}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">Aucune tentative.</p>}</div>
-                <div><h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">Courriels</h4><ul className="mt-2 space-y-1 text-sm">{item.emailLogs.map((log) => <li key={log.type}>{EMAIL_LABELS[log.type] ?? log.type} · {log.status} · {formatDate(log.sentAt ?? log.scheduledFor)}</li>)}</ul></div>
+                <div><h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">Courriels</h4><ul className="mt-2 space-y-1 text-sm">{item.emailLogs.map((log) => <li key={log.type}>{EMAIL_LABELS[log.type] ?? log.type} · {EMAIL_STATUS_LABELS[log.status] ?? log.status} · {formatDate(log.sentAt ?? log.scheduledFor)}</li>)}</ul></div>
               </div>
             </details>
           </article>
