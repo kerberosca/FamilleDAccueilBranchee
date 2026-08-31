@@ -389,12 +389,12 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
           }
         : {})
     };
-    const [total, enrollments, grouped] = await this.prisma.$transaction([
+    const [total, enrollments, grouped, allEnrollments, individuallyEnabled] = await this.prisma.$transaction([
       this.prisma.trainingEnrollment.count({ where }),
       this.prisma.trainingEnrollment.findMany({
         where,
         include: {
-          resourceProfile: { include: { user: { select: { email: true } } } },
+          resourceProfile: { include: { user: { select: { email: true, emailVerifiedAt: true } } } },
           lessonProgress: true,
           attempts: { orderBy: { submittedAt: "desc" } },
           certificate: true,
@@ -408,7 +408,9 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
         by: ["status"],
         orderBy: { status: "asc" },
         _count: { status: true }
-      })
+      }),
+      this.prisma.trainingEnrollment.count(),
+      this.prisma.trainingEnrollment.count({ where: { emailAutomationEnabledAt: { not: null } } })
     ]);
     const stats: Record<string, number> = Object.fromEntries(Object.values(TrainingStatus).map((value) => [value, 0]));
     grouped.forEach((item) => (stats[item.status] = (item._count as { status: number }).status));
@@ -420,7 +422,11 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
       pageSize,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
       stats,
-      emailAutomation: this.publicEmailAutomationState(),
+      emailAutomation: {
+        ...this.publicEmailAutomationState(),
+        individuallyEnabled,
+        individuallyLocked: Math.max(0, allEnrollments - individuallyEnabled)
+      },
       items: enrollments.map((enrollment) => this.toAdminView(enrollment))
     };
   }
@@ -445,6 +451,107 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
     return { id: updated.id, status: updated.status };
   }
 
+  async enableEmailAutomation(enrollmentId: string, actorUserId: string) {
+    const enrollment = await this.prisma.trainingEnrollment.findUnique({
+      where: { id: enrollmentId },
+      include: {
+        resourceProfile: {
+          include: { user: { select: { email: true, emailVerifiedAt: true } } }
+        }
+      }
+    });
+    if (!enrollment) throw new NotFoundException("Parcours allié introuvable.");
+    if (enrollment.emailAutomationEnabledAt) {
+      return {
+        id: enrollment.id,
+        emailAutomationEnabledAt: enrollment.emailAutomationEnabledAt,
+        changed: false
+      };
+    }
+    if (!enrollment.resourceProfile.user.emailVerifiedAt) {
+      throw new BadRequestException("L'adresse de connexion doit être vérifiée avant d'activer les courriels.");
+    }
+    if (
+      enrollment.status === TrainingStatus.PASSED ||
+      enrollment.status === TrainingStatus.ATTENTION_REQUIRED
+    ) {
+      throw new BadRequestException("Les courriels ne peuvent pas être activés pour ce parcours terminé ou à traiter manuellement.");
+    }
+
+    const now = new Date();
+    const configuredStartAt = this.getConfiguredEmailStartAt();
+    const baseline = configuredStartAt && configuredStartAt > now ? configuredStartAt : now;
+    const changed = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.trainingEnrollment.updateMany({
+        where: { id: enrollmentId, emailAutomationEnabledAt: null },
+        data: { emailAutomationEnabledAt: now }
+      });
+      if (!updated.count) return false;
+      for (const [type, days] of REMINDER_DELAYS) {
+        await tx.trainingEmailLog.updateMany({
+          where: { enrollmentId, type, status: TrainingEmailStatus.PENDING },
+          data: { scheduledFor: new Date(baseline.getTime() + days * 24 * 60 * 60_000) }
+        });
+      }
+      return true;
+    });
+
+    if (changed) {
+      await this.usersService.logAdminAction(
+        actorUserId,
+        "ALLY_TRAINING_EMAILS_ENABLED",
+        "TRAINING_ENROLLMENT",
+        enrollmentId,
+        {
+          resourceProfileId: enrollment.resourceProfileId,
+          displayName: enrollment.resourceProfile.displayName,
+          email: enrollment.resourceProfile.user.email,
+          enabledAt: now.toISOString()
+        }
+      );
+      setTimeout(() => void this.processDueEmails(), 0).unref();
+    }
+
+    const current = changed
+      ? now
+      : (
+          await this.prisma.trainingEnrollment.findUniqueOrThrow({
+            where: { id: enrollmentId },
+            select: { emailAutomationEnabledAt: true }
+          })
+        ).emailAutomationEnabledAt;
+    return { id: enrollmentId, emailAutomationEnabledAt: current, changed };
+  }
+
+  async pauseEmailAutomation(enrollmentId: string, actorUserId: string) {
+    const enrollment = await this.prisma.trainingEnrollment.findUnique({
+      where: { id: enrollmentId },
+      include: {
+        resourceProfile: { include: { user: { select: { email: true } } } }
+      }
+    });
+    if (!enrollment) throw new NotFoundException("Parcours allié introuvable.");
+
+    const changed = await this.prisma.trainingEnrollment.updateMany({
+      where: { id: enrollmentId, emailAutomationEnabledAt: { not: null } },
+      data: { emailAutomationEnabledAt: null }
+    });
+    if (changed.count) {
+      await this.usersService.logAdminAction(
+        actorUserId,
+        "ALLY_TRAINING_EMAILS_PAUSED",
+        "TRAINING_ENROLLMENT",
+        enrollmentId,
+        {
+          resourceProfileId: enrollment.resourceProfileId,
+          displayName: enrollment.resourceProfile.displayName,
+          email: enrollment.resourceProfile.user.email
+        }
+      );
+    }
+    return { id: enrollmentId, emailAutomationEnabledAt: null, changed: Boolean(changed.count) };
+  }
+
   async getCertificateForUser(userId: string) {
     const enrollment = await this.getEnrollmentForUser(userId, false);
     return this.certificatePayload(enrollment.id);
@@ -467,6 +574,7 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
         where: {
           status: TrainingEmailStatus.PENDING,
           scheduledFor: { lte: new Date() },
+          enrollment: { emailAutomationEnabledAt: { not: null } },
           OR: [
             { type: TrainingReminderType.ATTENTION },
             { enrollment: { status: { in: [TrainingStatus.PASSED, TrainingStatus.ATTENTION_REQUIRED] } } },
@@ -492,7 +600,11 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
 
   private async processEmailLog(id: string) {
     const claimed = await this.prisma.trainingEmailLog.updateMany({
-      where: { id, status: TrainingEmailStatus.PENDING },
+      where: {
+        id,
+        status: TrainingEmailStatus.PENDING,
+        enrollment: { emailAutomationEnabledAt: { not: null } }
+      },
       data: { status: TrainingEmailStatus.PROCESSING, processingAt: new Date() }
     });
     if (!claimed.count) return;
@@ -509,6 +621,13 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
     });
     if (!log) return;
     const { enrollment } = log;
+    if (!enrollment.emailAutomationEnabledAt || !this.getEmailAutomationState().enabled) {
+      await this.prisma.trainingEmailLog.updateMany({
+        where: { id, status: TrainingEmailStatus.PROCESSING },
+        data: { status: TrainingEmailStatus.PENDING, processingAt: null }
+      });
+      return;
+    }
     if (!this.shouldSend(log.type, enrollment.status)) {
       await this.prisma.trainingEmailLog.update({
         where: { id },
@@ -696,6 +815,8 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
       assignedAt: enrollment.assignedAt,
       lastActivityAt: enrollment.lastActivityAt,
       completedAt: enrollment.completedAt,
+      emailVerified: Boolean(enrollment.resourceProfile.user.emailVerifiedAt),
+      emailAutomationEnabledAt: enrollment.emailAutomationEnabledAt,
       attemptsUsed: quizAttempts.length,
       attemptsRemaining: Math.max(0, MAX_QUIZ_ATTEMPTS - quizAttempts.length),
       overdue:
@@ -703,7 +824,9 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
         Date.now() - enrollment.assignedAt.getTime() >= 14 * 24 * 60 * 60_000,
       certificateAvailable: Boolean(enrollment.certificate),
       nextReminder:
-        enrollment.emailLogs.find((log: any) => log.status === TrainingEmailStatus.PENDING)?.scheduledFor ?? null,
+        enrollment.emailAutomationEnabledAt
+          ? enrollment.emailLogs.find((log: any) => log.status === TrainingEmailStatus.PENDING)?.scheduledFor ?? null
+          : null,
       attempts: enrollment.attempts.map((attempt: any) => ({
         id: attempt.id,
         type: attempt.type,
@@ -739,10 +862,13 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
 
   private async rebasePendingInitialReminders(startAt: Date) {
     const enrollments = await this.prisma.trainingEnrollment.findMany({
-      where: { status: { in: EMAIL_ELIGIBLE_STATUSES } },
+      where: {
+        status: { in: EMAIL_ELIGIBLE_STATUSES },
+        emailAutomationEnabledAt: { not: null }
+      },
       select: {
         id: true,
-        assignedAt: true,
+        emailAutomationEnabledAt: true,
         emailLogs: {
           where: { status: TrainingEmailStatus.PENDING, type: { in: INITIAL_REMINDER_TYPES } },
           select: { id: true, type: true, scheduledFor: true }
@@ -751,7 +877,8 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
     });
     let rescheduled = 0;
     for (const enrollment of enrollments) {
-      const baseline = enrollment.assignedAt < startAt ? startAt : enrollment.assignedAt;
+      const enabledAt = enrollment.emailAutomationEnabledAt ?? startAt;
+      const baseline = enabledAt < startAt ? startAt : enabledAt;
       for (const log of enrollment.emailLogs) {
         const reminder = REMINDER_DELAYS.find(([type]) => type === log.type);
         if (!reminder) continue;

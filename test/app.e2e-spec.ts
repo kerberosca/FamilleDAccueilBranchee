@@ -1574,7 +1574,7 @@ describe("Smoke e2e", () => {
 
     const stored = await prisma.trainingCertificate.count({ where: { enrollmentId: blocked.body.id } });
     const successEmails = await prisma.trainingEmailLog.count({
-      where: { enrollmentId: blocked.body.id, type: "SUCCESS" }
+      where: { enrollmentId: blocked.body.id, type: "SUCCESS", status: TrainingEmailStatus.PENDING, providerMessageId: null }
     });
     const activeReminders = await prisma.trainingEmailLog.count({
       where: {
@@ -1802,6 +1802,10 @@ describe("Smoke e2e", () => {
       include: { resourceProfile: true }
     });
     const { enrollment } = await trainingService.ensureEnrollment(reminderUser.resourceProfile!.id);
+    await prisma.trainingEnrollment.update({
+      where: { id: enrollment.id },
+      data: { emailAutomationEnabledAt: new Date() }
+    });
     await prisma.trainingEmailLog.updateMany({
       where: { enrollmentId: enrollment.id },
       data: { scheduledFor: new Date(Date.now() - 60_000) }
@@ -1847,6 +1851,10 @@ describe("Smoke e2e", () => {
       include: { resourceProfile: true }
     });
     const started = await trainingService.ensureEnrollment(startedUser.resourceProfile!.id);
+    await prisma.trainingEnrollment.update({
+      where: { id: started.enrollment.id },
+      data: { emailAutomationEnabledAt: new Date() }
+    });
     const startedCourse = await trainingService.getMyCourse(startedUser.id);
     await trainingService.openLesson(startedUser.id, startedCourse.lessons[0].key);
     await prisma.trainingEmailLog.updateMany({
@@ -1902,6 +1910,15 @@ describe("Smoke e2e", () => {
       include: { resourceProfile: true }
     });
     const { enrollment } = await trainingService.ensureEnrollment(user.resourceProfile!.id);
+    const adminToken = await loginAs("ADMIN");
+    await request(app.getHttpServer())
+      .post(`/api/v1/training/admin/enrollments/${enrollment.id}/emails/enable`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(400);
+    await prisma.trainingEnrollment.update({
+      where: { id: enrollment.id },
+      data: { emailAutomationEnabledAt: new Date() }
+    });
     await prisma.trainingEmailLog.updateMany({
       where: { enrollmentId: enrollment.id },
       data: { scheduledFor: new Date(Date.now() - 60_000) }
@@ -1954,6 +1971,10 @@ describe("Smoke e2e", () => {
       const enrollment = await prisma.trainingEnrollment.findFirstOrThrow({
         where: { resourceProfile: { user: { email: "allie-courriels-pauses@local.test" } } }
       });
+      await prisma.trainingEnrollment.update({
+        where: { id: enrollment.id },
+        data: { emailAutomationEnabledAt: new Date() }
+      });
       await prisma.trainingEmailLog.updateMany({
         where: { enrollmentId: enrollment.id },
         data: { scheduledFor: new Date(Date.now() - 60_000) }
@@ -1977,6 +1998,155 @@ describe("Smoke e2e", () => {
           where: { enrollmentId: enrollment.id, status: TrainingEmailStatus.PENDING }
         })
       ).toBe(4);
+    } finally {
+      configService.set("ALLY_TRAINING_EMAILS_ENABLED", previousEnabled);
+      configService.set("ALLY_TRAINING_EMAILS_START_AT", previousStartAt);
+    }
+  });
+
+  it("verrouille les parcours par défaut et active seulement les alliés choisis", async () => {
+    const trainingService = app.get(TrainingService);
+    const configService = app.get(ConfigService);
+    const previousEnabled = configService.get<string>("ALLY_TRAINING_EMAILS_ENABLED", "false");
+    const previousStartAt = configService.get<string>("ALLY_TRAINING_EMAILS_START_AT", "");
+    configService.set("ALLY_TRAINING_EMAILS_ENABLED", "false");
+    configService.set("ALLY_TRAINING_EMAILS_START_AT", "2020-01-01T00:00:00.000Z");
+
+    try {
+      await prisma.trainingEmailLog.updateMany({
+        where: { status: TrainingEmailStatus.PENDING },
+        data: { scheduledFor: new Date(Date.now() + 30 * 24 * 60 * 60_000) }
+      });
+      const allies = await Promise.all(
+        [
+          ["allie-individuel-un@local.test", "Allié individuel un"],
+          ["allie-individuel-deux@local.test", "Allié individuel deux"]
+        ].map(async ([email, displayName]) => {
+          const user = await prisma.user.create({
+            data: {
+              email,
+              passwordHash: "hash",
+              role: Role.RESOURCE,
+              status: UserStatus.ACTIVE,
+              emailVerifiedAt: new Date(),
+              resourceProfile: {
+                create: {
+                  displayName,
+                  postalCode: "H2X1Y4",
+                  city: "Montreal",
+                  region: "QC",
+                  skillsTags: ["repit"],
+                  contactEmail: email
+                }
+              }
+            },
+            include: { resourceProfile: true }
+          });
+          return (await trainingService.ensureEnrollment(user.resourceProfile!.id)).enrollment;
+        })
+      );
+      expect(allies[0].emailAutomationEnabledAt).toBeNull();
+      expect(allies[1].emailAutomationEnabledAt).toBeNull();
+
+      await prisma.trainingEmailLog.updateMany({
+        where: { enrollmentId: { in: allies.map((item) => item.id) } },
+        data: { scheduledFor: new Date(Date.now() - 60_000) }
+      });
+      emailSendMock.mockClear();
+      configService.set("ALLY_TRAINING_EMAILS_ENABLED", "true");
+      await trainingService.processDueEmails();
+      expect(emailSendMock).not.toHaveBeenCalled();
+
+      const adminToken = await loginAs("ADMIN");
+      const resourceToken = await loginAs("RESSOURCE");
+      await request(app.getHttpServer())
+        .post(`/api/v1/training/admin/enrollments/${allies[0].id}/emails/enable`)
+        .set("Authorization", `Bearer ${resourceToken}`)
+        .expect(403);
+
+      configService.set("ALLY_TRAINING_EMAILS_ENABLED", "false");
+      const enabled = await request(app.getHttpServer())
+        .post(`/api/v1/training/admin/enrollments/${allies[0].id}/emails/enable`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(201);
+      expect(enabled.body.changed).toBe(true);
+      expect(enabled.body.emailAutomationEnabledAt).toEqual(expect.any(String));
+
+      const enabledAgain = await request(app.getHttpServer())
+        .post(`/api/v1/training/admin/enrollments/${allies[0].id}/emails/enable`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(201);
+      expect(enabledAgain.body).toEqual({
+        id: allies[0].id,
+        emailAutomationEnabledAt: enabled.body.emailAutomationEnabledAt,
+        changed: false
+      });
+      expect(
+        await prisma.adminAuditLog.count({
+          where: { targetId: allies[0].id, action: "ALLY_TRAINING_EMAILS_ENABLED" }
+        })
+      ).toBe(1);
+
+      await trainingService.processDueEmails();
+      expect(emailSendMock).not.toHaveBeenCalled();
+      configService.set("ALLY_TRAINING_EMAILS_ENABLED", "true");
+      await trainingService.processDueEmails();
+      expect(emailSendMock).toHaveBeenCalledTimes(1);
+      expect(emailSendMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ to: "allie-individuel-un@local.test" })
+      );
+      expect(
+        await prisma.trainingEmailLog.count({
+          where: { enrollmentId: allies[1].id, status: TrainingEmailStatus.SENT }
+        })
+      ).toBe(0);
+
+      const paused = await request(app.getHttpServer())
+        .post(`/api/v1/training/admin/enrollments/${allies[0].id}/emails/pause`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(201);
+      expect(paused.body).toEqual({ id: allies[0].id, emailAutomationEnabledAt: null, changed: true });
+      await prisma.trainingEmailLog.update({
+        where: {
+          enrollmentId_type: { enrollmentId: allies[0].id, type: TrainingReminderType.DAY_3 }
+        },
+        data: { scheduledFor: new Date(Date.now() - 60_000) }
+      });
+      await trainingService.processDueEmails();
+      expect(emailSendMock).toHaveBeenCalledTimes(1);
+
+      configService.set("ALLY_TRAINING_EMAILS_ENABLED", "false");
+      const reenabled = await request(app.getHttpServer())
+        .post(`/api/v1/training/admin/enrollments/${allies[0].id}/emails/enable`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(201);
+      expect(reenabled.body.changed).toBe(true);
+      const day3 = await prisma.trainingEmailLog.findUniqueOrThrow({
+        where: {
+          enrollmentId_type: { enrollmentId: allies[0].id, type: TrainingReminderType.DAY_3 }
+        }
+      });
+      expect(day3.status).toBe(TrainingEmailStatus.PENDING);
+      expect(day3.scheduledFor.getTime()).toBeGreaterThan(Date.now() + 2 * 24 * 60 * 60_000);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/training/admin/enrollments/${allies[1].id}/emails/enable`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(201);
+      configService.set("ALLY_TRAINING_EMAILS_ENABLED", "true");
+      await trainingService.processDueEmails();
+      expect(emailSendMock).toHaveBeenCalledTimes(2);
+      expect(emailSendMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ to: "allie-individuel-deux@local.test" })
+      );
+
+      const dashboard = await request(app.getHttpServer())
+        .get("/api/v1/training/admin/enrollments?page=1&pageSize=5")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .expect(200);
+      expect(dashboard.body.emailAutomation).toEqual(
+        expect.objectContaining({ individuallyEnabled: expect.any(Number), individuallyLocked: expect.any(Number) })
+      );
     } finally {
       configService.set("ALLY_TRAINING_EMAILS_ENABLED", previousEnabled);
       configService.set("ALLY_TRAINING_EMAILS_START_AT", previousStartAt);
@@ -2013,6 +2183,10 @@ describe("Smoke e2e", () => {
       });
       const { enrollment } = await trainingService.ensureEnrollment(user.resourceProfile!.id);
       const startAt = new Date("2035-01-15T14:00:00.000Z");
+      await prisma.trainingEnrollment.update({
+        where: { id: enrollment.id },
+        data: { emailAutomationEnabledAt: new Date("2035-01-01T14:00:00.000Z") }
+      });
       configService.set("ALLY_TRAINING_EMAILS_START_AT", startAt.toISOString());
 
       const first = await trainingService.prepareEmailAutomation();
@@ -2035,6 +2209,67 @@ describe("Smoke e2e", () => {
       configService.set("ALLY_TRAINING_EMAILS_ENABLED", previousEnabled);
       configService.set("ALLY_TRAINING_EMAILS_START_AT", previousStartAt);
     }
+  });
+
+  it("applique le verrou individuel aux confirmations de réussite et aux avis d'attention", async () => {
+    const trainingService = app.get(TrainingService);
+    await prisma.trainingEmailLog.updateMany({
+      where: { status: TrainingEmailStatus.PENDING },
+      data: { scheduledFor: new Date(Date.now() + 30 * 24 * 60 * 60_000) }
+    });
+    const enrollments = await Promise.all(
+      [
+        ["allie-succes-active@local.test", "Allié succès actif", TrainingStatus.PASSED, TrainingReminderType.SUCCESS],
+        ["allie-attention-active@local.test", "Allié attention actif", TrainingStatus.ATTENTION_REQUIRED, TrainingReminderType.ATTENTION]
+      ].map(async ([email, displayName, status, type]) => {
+        const user = await prisma.user.create({
+          data: {
+            email,
+            passwordHash: "hash",
+            role: Role.RESOURCE,
+            status: UserStatus.ACTIVE,
+            emailVerifiedAt: new Date(),
+            resourceProfile: {
+              create: {
+                displayName,
+                postalCode: "H2X1Y4",
+                city: "Montreal",
+                region: "QC",
+                skillsTags: ["repit"],
+                contactEmail: email
+              }
+            }
+          },
+          include: { resourceProfile: true }
+        });
+        const { enrollment } = await trainingService.ensureEnrollment(user.resourceProfile!.id);
+        await prisma.trainingEnrollment.update({
+          where: { id: enrollment.id },
+          data: { status: status as TrainingStatus, emailAutomationEnabledAt: new Date() }
+        });
+        await prisma.trainingEmailLog.upsert({
+          where: { enrollmentId_type: { enrollmentId: enrollment.id, type: type as TrainingReminderType } },
+          update: { status: TrainingEmailStatus.PENDING, scheduledFor: new Date(Date.now() - 60_000) },
+          create: { enrollmentId: enrollment.id, type: type as TrainingReminderType, scheduledFor: new Date(Date.now() - 60_000) }
+        });
+        return enrollment.id;
+      })
+    );
+
+    emailSendMock.mockClear();
+    await trainingService.processDueEmails();
+    expect(emailSendMock).toHaveBeenCalledTimes(2);
+    const recipients = (emailSendMock.mock.calls as unknown as Array<[{ to: string }]>).map(([message]) => message.to);
+    expect(recipients).toEqual(expect.arrayContaining(["allie-succes-active@local.test", "notifications@local.test"]));
+    expect(
+      await prisma.trainingEmailLog.count({
+        where: {
+          enrollmentId: { in: enrollments },
+          type: { in: [TrainingReminderType.SUCCESS, TrainingReminderType.ATTENTION] },
+          status: TrainingEmailStatus.SENT
+        }
+      })
+    ).toBe(2);
   });
 
   it("ne relance pas les parcours reussis ou en attention requise", async () => {
@@ -2063,7 +2298,7 @@ describe("Smoke e2e", () => {
         const result = await trainingService.ensureEnrollment(user.resourceProfile!.id);
         await prisma.trainingEnrollment.update({
           where: { id: result.enrollment.id },
-          data: { status: status as TrainingStatus }
+          data: { status: status as TrainingStatus, emailAutomationEnabledAt: new Date() }
         });
         await prisma.trainingEmailLog.updateMany({
           where: { enrollmentId: result.enrollment.id },

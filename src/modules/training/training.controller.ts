@@ -76,6 +76,18 @@ export class TrainingController {
   }
 
   @Roles(Role.ADMIN)
+  @Post("admin/enrollments/:enrollmentId/emails/enable")
+  enableEmails(@CurrentUser() user: JwtPayload, @Param("enrollmentId") enrollmentId: string) {
+    return this.trainingService.enableEmailAutomation(enrollmentId, user.sub);
+  }
+
+  @Roles(Role.ADMIN)
+  @Post("admin/enrollments/:enrollmentId/emails/pause")
+  pauseEmails(@CurrentUser() user: JwtPayload, @Param("enrollmentId") enrollmentId: string) {
+    return this.trainingService.pauseEmailAutomation(enrollmentId, user.sub);
+  }
+
+  @Roles(Role.ADMIN)
   @Get("admin/enrollments/:enrollmentId/certificate")
   async getCertificate(@Param("enrollmentId") enrollmentId: string, @Res() response: Response) {
     const certificate = await this.trainingService.getCertificateForAdmin(enrollmentId);

@@ -205,18 +205,19 @@ model ResourceProfile {
 }
 
 model TrainingEnrollment {
-  id                String         @id @default(cuid())
-  resourceProfileId String
-  courseVersion     String         @default("faba-v1")
-  status            TrainingStatus @default(NOT_STARTED)
-  currentLessonKey  String?
-  assignedAt        DateTime       @default(now())
-  startedAt         DateTime?
-  lastActivityAt    DateTime?
-  completedAt       DateTime?
-  attemptsResetAt   DateTime?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id                       String         @id @default(cuid())
+  resourceProfileId        String
+  courseVersion            String         @default("faba-v1")
+  status                   TrainingStatus @default(NOT_STARTED)
+  currentLessonKey         String?
+  assignedAt               DateTime       @default(now())
+  startedAt                DateTime?
+  lastActivityAt           DateTime?
+  completedAt              DateTime?
+  attemptsResetAt          DateTime?
+  emailAutomationEnabledAt DateTime?
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
 
   resourceProfile ResourceProfile             @relation(fields: [resourceProfileId], references: [id], onDelete: Cascade)
   lessonProgress  TrainingLessonProgress[]
@@ -227,6 +228,7 @@ model TrainingEnrollment {
   @@unique([resourceProfileId, courseVersion])
   @@index([status, assignedAt])
   @@index([lastActivityAt])
+  @@index([emailAutomationEnabledAt])
 }
 
 model TrainingLessonProgress {

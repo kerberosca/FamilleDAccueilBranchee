@@ -20,6 +20,8 @@ type TrainingAdminItem = {
   assignedAt: string;
   lastActivityAt?: string | null;
   completedAt?: string | null;
+  emailVerified: boolean;
+  emailAutomationEnabledAt?: string | null;
   attemptsUsed: number;
   attemptsRemaining: number;
   overdue: boolean;
@@ -38,6 +40,8 @@ type TrainingAdminResponse = {
     enabled: boolean;
     status: "ACTIVE" | "PAUSED" | "SCHEDULED" | "MISCONFIGURED";
     startAt?: string | null;
+    individuallyEnabled: number;
+    individuallyLocked: number;
   };
   items: TrainingAdminItem[];
 };
@@ -122,6 +126,25 @@ export function TrainingAdminPanel() {
     }
   };
 
+  const changeEmailAutomation = async (item: TrainingAdminItem, enable: boolean) => {
+    if (!accessToken) return;
+    const confirmation = enable
+      ? `Activer les courriels automatiques de formation?\n\nAllié : ${item.displayName}\nAdresse de connexion : ${item.email}\n\nLa séquence J0, J3, J7 et J14 démarrera uniquement pour cet allié.`
+      : `Mettre les courriels de formation en pause?\n\nAllié : ${item.displayName}\nAdresse de connexion : ${item.email}\n\nLes courriels en attente seront conservés.`;
+    if (!window.confirm(confirmation)) return;
+    setBusyId(item.id);
+    setError(null);
+    try {
+      const action = enable ? "enable" : "pause";
+      await apiPost(`/training/admin/enrollments/${item.id}/emails/${action}`, { token: accessToken });
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "L'état des courriels n'a pas pu être modifié.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const downloadCertificate = async (item: TrainingAdminItem) => {
     if (!accessToken) return;
     setBusyId(item.id);
@@ -158,7 +181,7 @@ export function TrainingAdminPanel() {
       {error ? <Alert tone="error">{error}</Alert> : null}
       {data ? (
         <Alert tone={data.emailAutomation.status === "MISCONFIGURED" ? "error" : "info"}>
-          Relances par courriel : {emailAutomationLabel(data.emailAutomation)}
+          Relances par courriel : {emailAutomationLabel(data.emailAutomation)} · {data.emailAutomation.individuallyEnabled} parcours activé(s), {data.emailAutomation.individuallyLocked} verrouillé(s).
         </Alert>
       ) : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -180,11 +203,19 @@ export function TrainingAdminPanel() {
       <div className="space-y-3">
         {data?.items.map((item) => (
           <article key={item.id} className="rounded-2xl border border-[#4a4269] bg-[#100c29]/65 p-4">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px_170px] xl:items-center">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px_250px] xl:items-center">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-white">{item.displayName}</h3>{item.overdue ? <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200">J14 dépassé</span> : null}</div>
                 <p className="break-all text-sm text-slate-400">{item.email}</p>
                 <p className="mt-2 text-xs text-slate-500">Dernière activité : {formatDate(item.lastActivityAt)} · Publication : {PUBLISH_STATUS_LABELS[item.publishStatus] ?? item.publishStatus}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <span className={`rounded-full px-2 py-1 ${item.emailAutomationEnabledAt ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-700/70 text-slate-300"}`}>
+                    {item.emailAutomationEnabledAt ? "Courriels activés" : "Courriels verrouillés"}
+                  </span>
+                  {item.emailAutomationEnabledAt ? <span className="text-slate-500">Depuis le {formatDate(item.emailAutomationEnabledAt)}</span> : null}
+                  {!item.emailVerified ? <span className="text-amber-300">Adresse de connexion non vérifiée</span> : null}
+                </div>
+                {item.emailAutomationEnabledAt ? <p className="mt-2 text-xs text-slate-500">Prochaine relance : {item.nextReminder ? formatDate(item.nextReminder) : "Aucune"}</p> : null}
               </div>
               <div>
                 <div className="flex justify-between text-xs"><span>{STATUS_LABELS[item.status]}</span><strong>{item.progressPercent} %</strong></div>
@@ -192,6 +223,11 @@ export function TrainingAdminPanel() {
                 <p className="mt-2 text-xs text-slate-500">{item.completedLessons}/8 modules · {item.attemptsUsed} essai(s)</p>
               </div>
               <div className="flex flex-wrap gap-2 xl:justify-end">
+                {item.emailAutomationEnabledAt ? (
+                  <Button variant="secondary" onClick={() => void changeEmailAutomation(item, false)} disabled={busyId === item.id}>Mettre en pause</Button>
+                ) : item.status !== "PASSED" && item.status !== "ATTENTION_REQUIRED" ? (
+                  <Button onClick={() => void changeEmailAutomation(item, true)} disabled={busyId === item.id || !item.emailVerified}>Activer les courriels</Button>
+                ) : null}
                 {item.status === "ATTENTION_REQUIRED" ? <Button onClick={() => void resetAttempts(item)} disabled={busyId === item.id}>Réinitialiser</Button> : null}
                 {item.certificateAvailable ? <Button variant="secondary" onClick={() => void downloadCertificate(item)} disabled={busyId === item.id}>Certificat</Button> : null}
               </div>
@@ -200,7 +236,7 @@ export function TrainingAdminPanel() {
               <summary className="cursor-pointer text-sm font-medium text-[#a8c3ff]">Voir les tentatives et les relances</summary>
               <div className="mt-3 grid gap-4 lg:grid-cols-2">
                 <div><h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">Tentatives</h4>{item.attempts.length ? <ul className="mt-2 space-y-1 text-sm">{item.attempts.map((attempt) => <li key={attempt.id}>{ATTEMPT_LABELS[attempt.type] ?? attempt.type} #{attempt.attemptNumber} · {attempt.scorePercent} % · {attempt.passed ? "réussi" : "échoué"}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">Aucune tentative.</p>}</div>
-                <div><h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">Courriels</h4><ul className="mt-2 space-y-1 text-sm">{item.emailLogs.map((log) => <li key={log.type}>{EMAIL_LABELS[log.type] ?? log.type} · {EMAIL_STATUS_LABELS[log.status] ?? log.status} · {formatDate(log.sentAt ?? log.scheduledFor)}</li>)}</ul></div>
+                <div><h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">Courriels</h4><ul className="mt-2 space-y-1 text-sm">{item.emailLogs.map((log) => <li key={log.type}>{EMAIL_LABELS[log.type] ?? log.type} · {EMAIL_STATUS_LABELS[log.status] ?? log.status} · {log.status === "PENDING" && !item.emailAutomationEnabledAt ? "sera planifié à l'activation" : formatDate(log.sentAt ?? log.scheduledFor)}</li>)}</ul></div>
               </div>
             </details>
           </article>
