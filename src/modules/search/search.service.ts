@@ -1,5 +1,13 @@
 import { Injectable } from "@nestjs/common";
-import { ResourceOnboardingState, ResourcePublishStatus, ResourceVerificationStatus, Role } from "@prisma/client";
+import {
+  AllyType,
+  Prisma,
+  ResourceOnboardingState,
+  ResourcePublishStatus,
+  ResourceServiceDeliveryMode,
+  ResourceVerificationStatus,
+  Role
+} from "@prisma/client";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SubscriptionAccessService } from "../billing/subscription-access.service";
@@ -20,12 +28,23 @@ export class SearchService {
     const prefix = normalizedPostalCode.slice(0, 3);
     const tags = splitTags(query.tags);
     const page = query.page ?? 1;
+    const deliveryMode = query.deliveryMode ?? ResourceServiceDeliveryMode.IN_PERSON;
+    const isRemoteSearch = deliveryMode === ResourceServiceDeliveryMode.REMOTE;
 
-    const where = {
+    const where: Prisma.ResourceProfileWhereInput = {
       publishStatus: ResourcePublishStatus.PUBLISHED,
       verificationStatus: ResourceVerificationStatus.VERIFIED,
       onboardingState: { in: [ResourceOnboardingState.VERIFIED, ResourceOnboardingState.PUBLISHED] },
-      OR: [{ postalCode: normalizedPostalCode }, { postalCode: { startsWith: prefix } }]
+      isInternalTest: false,
+      ...(isRemoteSearch
+        ? {
+            allyType: AllyType.AUTRES,
+            serviceDeliveryMode: { in: [ResourceServiceDeliveryMode.REMOTE, ResourceServiceDeliveryMode.BOTH] }
+          }
+        : {
+            serviceDeliveryMode: { in: [ResourceServiceDeliveryMode.IN_PERSON, ResourceServiceDeliveryMode.BOTH] },
+            OR: [{ postalCode: normalizedPostalCode }, { postalCode: { startsWith: prefix } }]
+          })
     };
     const premium = await this.hasFullSearchAccess(user);
     const take = premium ? PREMIUM_PAGE_SIZE : PREVIEW_LIMIT;
@@ -47,7 +66,10 @@ export class SearchService {
       page: premium ? page : 1,
       pageSize: take,
       limitedPreview: !premium,
-      matchingStrategy: "MVP postal exact or first-3-prefix match. Upgrade later to geospatial.",
+      deliveryMode,
+      matchingStrategy: isRemoteSearch
+        ? "Tutorat à distance offert partout au Québec."
+        : "Correspondance locale par code postal complet ou par ses trois premiers caractères.",
       results: resources.map((resource) =>
         premium
           ? {
@@ -60,6 +82,7 @@ export class SearchService {
               averageRating: decimalToNumber(resource.averageRating),
               hourlyRate: decimalToNumber(resource.hourlyRate),
               rateType: resource.rateType,
+              serviceDeliveryMode: resource.serviceDeliveryMode,
               bio: resource.bio,
               contactEmail: resource.contactEmail,
               contactPhone: resource.contactPhone
@@ -72,7 +95,8 @@ export class SearchService {
               skillsTags: resource.skillsTags,
               averageRating: decimalToNumber(resource.averageRating),
               hourlyRate: decimalToNumber(resource.hourlyRate),
-              rateType: resource.rateType
+              rateType: resource.rateType,
+              serviceDeliveryMode: resource.serviceDeliveryMode
             }
       )
     };

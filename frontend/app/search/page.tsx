@@ -26,18 +26,21 @@ type SearchResponse = {
     skillsTags?: string[];
     contactEmail?: string;
     contactPhone?: string;
+    serviceDeliveryMode?: "IN_PERSON" | "REMOTE" | "BOTH";
   }>;
 };
 
 type SearchQuery = {
   postalCode: string;
   tags: string;
+  deliveryMode: "IN_PERSON" | "REMOTE";
   page: number;
 };
 
 const DEFAULT_QUERY: SearchQuery = {
   postalCode: "H2X1Y4",
   tags: "",
+  deliveryMode: "IN_PERSON",
   page: 1,
 };
 const FSA_REGEX = /^[A-Z][0-9][A-Z]$/;
@@ -49,6 +52,7 @@ export default function SearchPage() {
   const queryRef = useRef<SearchQuery>(DEFAULT_QUERY);
   const [formPostalCode, setFormPostalCode] = useState(DEFAULT_QUERY.postalCode);
   const [formTags, setFormTags] = useState("");
+  const [formDeliveryMode, setFormDeliveryMode] = useState<"IN_PERSON" | "REMOTE">("IN_PERSON");
   const [query, setQuery] = useState<SearchQuery>(DEFAULT_QUERY);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,10 +66,16 @@ export default function SearchPage() {
     async (nextQuery: SearchQuery, options: { pushHistory: boolean; syncForm: boolean }) => {
       setLoading(true);
       setError(null);
+      if (options.syncForm) {
+        setFormPostalCode(nextQuery.postalCode);
+        setFormTags(nextQuery.tags);
+        setFormDeliveryMode(nextQuery.deliveryMode);
+      }
       try {
         const params = new URLSearchParams({
           postalCode: nextQuery.postalCode,
           page: String(nextQuery.page),
+          deliveryMode: nextQuery.deliveryMode,
         });
         if (nextQuery.tags.trim()) {
           params.set("tags", nextQuery.tags.trim());
@@ -75,17 +85,16 @@ export default function SearchPage() {
         setQuery(nextQuery);
         queryRef.current = nextQuery;
 
-        if (options.syncForm) {
-          setFormPostalCode(nextQuery.postalCode);
-          setFormTags(nextQuery.tags);
-        }
-
         if (options.pushHistory) {
           const nextUrl = `/search?${params.toString()}`;
           window.history.pushState({}, "", nextUrl);
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Erreur inconnue");
+        setError(
+          e instanceof Error && e.message !== "Failed to fetch"
+            ? e.message
+            : "La recherche est temporairement indisponible. Réessayez dans quelques instants."
+        );
       } finally {
         setLoading(false);
       }
@@ -99,6 +108,7 @@ export default function SearchPage() {
       const same =
         queryRef.current.postalCode === q.postalCode &&
         queryRef.current.tags === q.tags &&
+        queryRef.current.deliveryMode === q.deliveryMode &&
         queryRef.current.page === q.page;
       if (!same) {
         void runSearch(q, { pushHistory: false, syncForm: true });
@@ -141,6 +151,7 @@ export default function SearchPage() {
       {
         postalCode: nextPostalCode,
         tags: formTags,
+        deliveryMode: formDeliveryMode,
         page: 1,
       },
       { pushHistory: true, syncForm: false }
@@ -205,7 +216,7 @@ export default function SearchPage() {
             <div className="max-w-xl text-white">
               <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">Recherche d&apos;alliés</h1>
               <p className="mt-3 text-sm text-[#ece7ff] sm:text-base">
-                Entrez votre code postal et trouvez rapidement des ressources de confiance proches de vous.
+                Trouvez une ressource près de chez vous ou un service de tutorat offert à distance partout au Québec.
               </p>
             </div>
 
@@ -213,13 +224,22 @@ export default function SearchPage() {
               onSubmit={onSubmit}
               className="rounded-2xl border border-[#ddd8f0] bg-white/95 p-4 text-[#221a43] shadow-[0_22px_42px_-34px_rgba(23,17,54,0.95)] backdrop-blur-sm"
             >
-              <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_190px_auto]">
                 <Input
                   value={formPostalCode}
                   onChange={(e) => setFormPostalCode(normalizePostalCode(e.target.value))}
                   placeholder="Code postal (H2X ou H2X1Y4)"
                   className="!border-[#d7d3ea] !bg-white !text-[#211a3e] placeholder:!text-[#7a7394] focus:!border-[#3469b9] focus:!ring-[#3469b9]/35"
                 />
+                <select
+                  aria-label="Mode de prestation"
+                  value={formDeliveryMode}
+                  onChange={(event) => setFormDeliveryMode(event.target.value as "IN_PERSON" | "REMOTE")}
+                  className="rounded-xl border border-[#d7d3ea] bg-white px-3 py-2 text-sm text-[#211a3e] focus:border-[#3469b9] focus:outline-none focus:ring-2 focus:ring-[#3469b9]/35"
+                >
+                  <option value="IN_PERSON">Services en personne</option>
+                  <option value="REMOTE">Tutorat à distance</option>
+                </select>
                 <Input
                   value={formTags}
                   onChange={(e) => setFormTags(e.target.value)}
@@ -235,7 +255,9 @@ export default function SearchPage() {
                 </Button>
               </div>
               <p className="mt-3 text-xs text-[#6f688e]">
-                Recherche par FSA (3 caractères, ex. H2X) ou code complet (6 caractères, ex. H2X1Y4).
+                {formDeliveryMode === "REMOTE"
+                  ? "Le tutorat à distance est recherché partout au Québec, sans restriction selon votre code postal."
+                  : "Recherche par FSA (3 caractères, ex. H2X) ou code complet (6 caractères, ex. H2X1Y4)."}
               </p>
             </form>
           </div>
@@ -317,9 +339,10 @@ function parseQuery(search: string): SearchQuery {
   const params = new URLSearchParams(search);
   const postalCode = normalizePostalCode(params.get("postalCode") || DEFAULT_QUERY.postalCode);
   const tags = params.get("tags")?.trim() || "";
+  const deliveryMode = params.get("deliveryMode") === "REMOTE" ? "REMOTE" : "IN_PERSON";
   const rawPage = Number(params.get("page") || String(DEFAULT_QUERY.page));
   const page = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
-  return { postalCode, tags, page };
+  return { postalCode, tags, deliveryMode, page };
 }
 
 function normalizePostalCode(value: string): string {

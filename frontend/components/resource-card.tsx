@@ -9,6 +9,7 @@ type ResourceResult = {
   skillsTags?: string[];
   contactEmail?: string;
   contactPhone?: string;
+  serviceDeliveryMode?: "IN_PERSON" | "REMOTE" | "BOTH";
 };
 
 /** Si true, l'utilisateur a l'abonnement premium : les champs vides = "Non renseigné". Sinon = "Masque (premium requis)". */
@@ -37,6 +38,11 @@ export function ResourceCard({
       <p className="mt-2 text-sm text-slate-300">
         Étiquettes : {resource.skillsTags?.length ? resource.skillsTags.join(", ") : "Aucune"}
       </p>
+      {resource.serviceDeliveryMode && resource.serviceDeliveryMode !== "IN_PERSON" ? (
+        <p className="mt-2 text-sm font-medium text-cyan-200">
+          Tutorat {resource.serviceDeliveryMode === "REMOTE" ? "à distance" : "en personne et à distance"}
+        </p>
+      ) : null}
       <p className="mt-2 text-sm text-slate-200">
         Courriel : <span className="text-white">{resource.contactEmail ?? contactPlaceholder}</span>
       </p>

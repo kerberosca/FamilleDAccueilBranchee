@@ -157,6 +157,7 @@ export function AllyOnboardingWizard({
   const maxStep = isRegister ? 7 : 5;
   const selectedAllyType = allyType ?? "GARDIENS";
   const isChildCareOffer = selectedAllyType === "GARDIENS";
+  const isTutoringOffer = selectedAllyType === "AUTRES";
 
   useEffect(() => {
     if (isRegister && step === 3 && !reg.section1.sectorServiced.trim() && city.trim()) {
@@ -414,6 +415,15 @@ export function AllyOnboardingWizard({
           <p className="text-sm text-slate-400">
             Prévoyez environ 10 minutes. Vous pouvez revenir en arrière à tout moment.
           </p>
+          <div className="rounded-xl border border-[#4e4771] bg-[#100c29]/70 p-3 text-sm text-slate-300">
+            <p className="font-medium text-white">À préparer pour la prochaine étape</p>
+            <p className="mt-1">Immédiatement après la création du compte, vous pourrez téléverser :</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-400">
+              <li>une attestation de vérification des antécédents;</li>
+              <li>votre preuve RCR si vous déclarez une certification valide;</li>
+              <li>vos références professionnelles pourront être vérifiées ultérieurement.</li>
+            </ul>
+          </div>
           <Button type="button" onClick={goNext}>
             Commencer
           </Button>
@@ -477,7 +487,11 @@ export function AllyOnboardingWizard({
                   if (value !== "MENAGE") {
                     setReg((current) => ({
                       ...current,
-                      section3: { ...current.section3, rateType: "HOURLY" }
+                      section3: {
+                        ...current.section3,
+                        rateType: "HOURLY",
+                        serviceDeliveryMode: value === "AUTRES" ? current.section3.serviceDeliveryMode : "IN_PERSON"
+                      }
                     }));
                   }
                 }}
@@ -516,14 +530,29 @@ export function AllyOnboardingWizard({
             value={reg.section1.streetAddress}
             onChange={(e) => setReg((r) => ({ ...r, section1: { ...r.section1, streetAddress: e.target.value } }))}
           />
-          <Input
-            type="tel"
-            placeholder="Téléphone"
-            value={contactPhone}
-            onChange={(e) => setContactPhone(e.target.value)}
-          />
+          <label htmlFor="contact-phone" className="space-y-1 text-sm text-slate-300">
+            <span className="font-medium">Téléphone de contact</span>
+            <Input
+              id="contact-phone"
+              type="tel"
+              placeholder="Téléphone de contact"
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+            />
+            <span className="block text-xs text-slate-500">
+              Visible seulement aux familles abonnées après l&apos;approbation et la publication de votre profil.
+            </span>
+          </label>
+          <div className="rounded-xl border border-[#4e4771] bg-[#100c29]/70 p-3 text-xs text-slate-400">
+            <p className="font-medium text-slate-200">Confidentialité de vos renseignements</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>Nom, ville, code postal, services, tarifs et présentation : visibles sur votre profil publié.</li>
+              <li>Téléphone et courriel de contact : visibles seulement aux familles abonnées.</li>
+              <li>Adresse postale complète : réservée à la validation interne de FAB.</li>
+            </ul>
+          </div>
           <label htmlFor="public-contact-email" className="space-y-1 text-sm text-slate-300">
-            <span className="font-medium">Courriel public de contact</span>
+            <span className="font-medium">Courriel de contact</span>
             <Input
               id="public-contact-email"
               type="email"
@@ -532,7 +561,7 @@ export function AllyOnboardingWizard({
               onChange={(e) => setReg((r) => ({ ...r, section1: { ...r.section1, contactEmail: e.target.value } }))}
             />
             <span className="block text-xs text-slate-500">
-              Cette adresse peut être visible aux familles après la publication. Elle peut être différente de votre adresse de connexion.
+              Visible seulement aux familles abonnées après l&apos;approbation et la publication de votre profil. Cette adresse peut être différente de votre adresse de connexion.
             </span>
           </label>
           <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
@@ -668,6 +697,32 @@ export function AllyOnboardingWizard({
         <Card className="space-y-3 p-4">
           <h2 className="text-lg font-semibold text-white">Section 3 - Votre offre de service</h2>
           <p className="text-sm text-slate-400">{SERVICE_OPTIONS[selectedAllyType].intro}</p>
+          {isTutoringOffer ? (
+            <label htmlFor="service-delivery-mode" className="block space-y-1">
+              <span className="text-sm font-medium text-slate-200">Mode de prestation du tutorat</span>
+              <select
+                id="service-delivery-mode"
+                className="w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
+                value={reg.section3.serviceDeliveryMode}
+                onChange={(event) =>
+                  setReg((current) => ({
+                    ...current,
+                    section3: {
+                      ...current.section3,
+                      serviceDeliveryMode: event.target.value as AllyRegistrationPayload["section3"]["serviceDeliveryMode"]
+                    }
+                  }))
+                }
+              >
+                <option value="IN_PERSON">En personne</option>
+                <option value="REMOTE">À distance</option>
+                <option value="BOTH">En personne et à distance</option>
+              </select>
+              <span className="block text-xs text-slate-500">
+                Le tutorat à distance pourra être trouvé par les familles partout au Québec.
+              </span>
+            </label>
+          ) : null}
           <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
             <label className="flex items-center gap-2">
               {chk(reg.section3.repitSoiree, (v) =>
@@ -738,24 +793,30 @@ export function AllyOnboardingWizard({
               />
             </>
           ) : null}
-          <div className="space-y-2">
-            <p className="text-sm text-slate-300">Secteur desservi (distance)</p>
-            <select
-              className="w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
-              value={reg.section3.serviceRadius}
-              onChange={(e) =>
-                setReg((r) => ({
-                  ...r,
-                  section3: { ...r.section3, serviceRadius: e.target.value as AllyRegistrationPayload["section3"]["serviceRadius"] }
-                }))
-              }
-            >
-              <option value="10">10 km</option>
-              <option value="25">25 km</option>
-              <option value="50">50 km</option>
-              <option value="more">Plus</option>
-            </select>
-          </div>
+          {!isTutoringOffer || reg.section3.serviceDeliveryMode !== "REMOTE" ? (
+            <div className="space-y-2">
+              <p className="text-sm text-slate-300">Secteur desservi (distance)</p>
+              <select
+                className="w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100"
+                value={reg.section3.serviceRadius}
+                onChange={(e) =>
+                  setReg((r) => ({
+                    ...r,
+                    section3: { ...r.section3, serviceRadius: e.target.value as AllyRegistrationPayload["section3"]["serviceRadius"] }
+                  }))
+                }
+              >
+                <option value="10">10 km</option>
+                <option value="25">25 km</option>
+                <option value="50">50 km</option>
+                <option value="more">Plus</option>
+              </select>
+            </div>
+          ) : (
+            <p className="rounded-lg border border-[#4f476f] bg-[#0f0b24]/50 p-3 text-sm text-slate-300">
+              Votre offre à distance sera présentée aux familles partout au Québec.
+            </p>
+          )}
           <div className="space-y-3 rounded-lg border border-[#4f476f] bg-[#0f0b24]/50 p-3">
             <div>
               <p className="text-sm font-medium text-slate-200">Vos tarifs suggérés</p>
@@ -866,7 +927,7 @@ export function AllyOnboardingWizard({
         <Card className="space-y-3 p-4">
           <h2 className="text-lg font-semibold text-white">Section 4 - Documents et engagements requis</h2>
           <p className="text-sm text-slate-400">
-            Ces confirmations sont obligatoires pour soumettre votre candidature. Les documents seront demandés par FAB au moment approprié.
+            Ces confirmations sont obligatoires pour soumettre votre candidature. Après la création du compte, vous pourrez téléverser immédiatement votre attestation d&apos;antécédents et, si applicable, votre preuve RCR. Les références professionnelles pourront être vérifiées ensuite par l&apos;équipe FAB.
           </p>
           <p className="text-xs font-medium text-amber-200">* Obligatoire</p>
           <label className="flex items-start gap-2 text-sm text-slate-300">
@@ -954,9 +1015,9 @@ export function AllyOnboardingWizard({
           <RecapSection title="Coordonnées et secteur" onEdit={() => setStep(editSteps.contact)}>
             <p><strong>Adresse postale :</strong> {reg.section1.streetAddress}</p>
             <p><strong>Secteur desservi :</strong> {reg.section1.sectorServiced}</p>
-            <p><strong>Téléphone public :</strong> {contactPhone}</p>
-            <p><strong>Courriel public de contact :</strong> {reg.section1.contactEmail}</p>
-            <p className="text-xs text-slate-400">Le courriel public peut être différent de l&apos;adresse de connexion.</p>
+            <p><strong>Téléphone de contact :</strong> {contactPhone}</p>
+            <p><strong>Courriel de contact :</strong> {reg.section1.contactEmail}</p>
+            <p className="text-xs text-slate-400">Le téléphone et le courriel de contact sont visibles seulement aux familles abonnées après la publication. L&apos;adresse postale complète demeure privée.</p>
           </RecapSection>
 
           <RecapSection title="Compétences" onEdit={() => setStep(editSteps.skills)}>
@@ -971,9 +1032,21 @@ export function AllyOnboardingWizard({
 
           <RecapSection title="Services, disponibilité et tarifs" onEdit={() => setStep(editSteps.offer)}>
             <p><strong>Services :</strong> {serviceLabels.join(", ") || "Aucun"}</p>
+            {isTutoringOffer ? (
+              <p>
+                <strong>Mode de prestation :</strong>{" "}
+                {reg.section3.serviceDeliveryMode === "REMOTE"
+                  ? "À distance"
+                  : reg.section3.serviceDeliveryMode === "BOTH"
+                    ? "En personne et à distance"
+                    : "En personne"}
+              </p>
+            ) : null}
             {isChildCareOffer ? <p><strong>Âges acceptés :</strong> {ageLabels.join(", ") || "Aucun"}</p> : null}
             {isChildCareOffer ? <p><strong>Nombre maximal d&apos;enfants :</strong> {reg.section3.maxChildren}</p> : null}
-            <p><strong>Rayon de service :</strong> {reg.section3.serviceRadius === "more" ? "Plus de 50 km" : `${reg.section3.serviceRadius} km`}</p>
+            {!isTutoringOffer || reg.section3.serviceDeliveryMode !== "REMOTE" ? (
+              <p><strong>Rayon de service :</strong> {reg.section3.serviceRadius === "more" ? "Plus de 50 km" : `${reg.section3.serviceRadius} km`}</p>
+            ) : null}
             <p><strong>Disponibilités :</strong> {availabilityLabels.join(", ") || "Aucune précisée"}</p>
             <p>
               <strong>{reg.section3.rateType === "FLAT" ? "Tarif forfaitaire suggéré" : "Tarif horaire suggéré"} :</strong>{" "}

@@ -7,7 +7,7 @@ export default function ConfidentialitePage() {
     <main className="mx-auto max-w-3xl space-y-6 p-6 pb-16">
       <h1 className="text-2xl font-bold text-white">Politique de confidentialité</h1>
       <p className="text-sm text-slate-400">
-        Dernière mise à jour : 14 février 2025. Le site FAB est opéré par Forméduc.
+        Dernière mise à jour : 5 septembre 2026. Le site FAB est opéré par Forméduc.
       </p>
 
       <section className="space-y-2">
@@ -52,7 +52,7 @@ export default function ConfidentialitePage() {
         </p>
         <h3 className="text-base font-medium text-cyan-300">4.2 Qui peut voir quelles données ?</h3>
         <p className="text-slate-300">
-          <strong>Profils d&apos;alliés :</strong> les familles disposant d&apos;un abonnement actif peuvent voir les profils publics des alliés (nom, ville, région, code postal, compétences, tarif, bio, coordonnées si rendues visibles).
+          <strong>Profils d&apos;alliés :</strong> le nom, la ville, le code postal, les services, les tarifs et la présentation sont visibles sur un profil approuvé et publié. Le téléphone et le courriel de contact sont visibles seulement aux familles disposant d&apos;un abonnement actif. L&apos;adresse postale complète demeure réservée à la validation interne de FAB et n&apos;est jamais affichée dans le répertoire public.
         </p>
         <p className="text-slate-300">
           <strong>Profils de familles :</strong> les alliés voient les informations des familles avec lesquelles ils sont déjà en conversation.

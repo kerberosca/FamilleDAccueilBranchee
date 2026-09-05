@@ -64,9 +64,16 @@ export class TrainingController {
     @Query("query") query?: string,
     @Query("status") status?: string,
     @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string
+    @Query("pageSize") pageSize?: string,
+    @Query("testProfile") testProfile?: string
   ) {
-    return this.trainingService.listForAdmin({ query, status, page: Number(page ?? 1), pageSize: Number(pageSize ?? 20) });
+    return this.trainingService.listForAdmin({
+      query,
+      status,
+      page: Number(page ?? 1),
+      pageSize: Number(pageSize ?? 20),
+      testProfile
+    });
   }
 
   @Roles(Role.ADMIN)

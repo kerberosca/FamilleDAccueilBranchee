@@ -58,6 +58,8 @@ type ResourceProfileResponse = {
   allyRegistration?: unknown;
   allyDeclarationsAcceptedAt?: string | null;
   backgroundCheckStatus?: string | null;
+  serviceDeliveryMode?: "IN_PERSON" | "REMOTE" | "BOTH";
+  isInternalTest?: boolean;
 };
 
 type FormSnapshot = {
@@ -714,6 +716,21 @@ export default function MePage() {
                 Ces informations aident les familles à comprendre votre offre et à vous contacter.
               </p>
             </div>
+            {(profile as ResourceProfileResponse | null)?.isInternalTest ? (
+              <Alert tone="info">
+                Profil de test interne : vous pouvez tester tout le parcours, mais ce profil ne peut pas être validé ni publié tant que ce statut est actif.
+              </Alert>
+            ) : null}
+            {(profile as ResourceProfileResponse | null)?.allyType === "AUTRES" ? (
+              <p className="text-sm text-slate-300">
+                <strong>Mode de prestation du tutorat :</strong>{" "}
+                {(profile as ResourceProfileResponse).serviceDeliveryMode === "REMOTE"
+                  ? "À distance"
+                  : (profile as ResourceProfileResponse).serviceDeliveryMode === "BOTH"
+                    ? "En personne et à distance"
+                    : "En personne"}
+              </p>
+            ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-1 sm:col-span-2">
@@ -821,7 +838,7 @@ export default function MePage() {
               <legend className="px-1 text-sm font-medium text-slate-200">Coordonnées</legend>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-1">
-                  <span className="text-sm font-medium text-slate-200">Courriel public de contact</span>
+                  <span className="text-sm font-medium text-slate-200">Courriel de contact</span>
                   <Input
                     placeholder="nom@exemple.com"
                     type="email"
@@ -832,7 +849,7 @@ export default function MePage() {
                     }}
                   />
                   <FieldError error={fieldErrors.contactEmail} />
-                  <p className="text-xs text-slate-500">Cette adresse peut être visible aux familles après la publication de votre profil. Elle ne change pas votre adresse de connexion.</p>
+                  <p className="text-xs text-slate-500">Visible seulement aux familles abonnées, après l&apos;approbation et la publication de votre profil. Cette adresse ne change pas votre adresse de connexion.</p>
                 </label>
 
                 <label className="space-y-1">
@@ -842,6 +859,7 @@ export default function MePage() {
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
                   />
+                  <p className="text-xs text-slate-500">Visible seulement aux familles abonnées, après l&apos;approbation et la publication de votre profil.</p>
                 </label>
               </div>
             </fieldset>
@@ -905,8 +923,9 @@ export default function MePage() {
             ) : null}
             <h3 className="text-base font-medium pt-2 border-t border-slate-700 mt-2">Vérification d&apos;antécédents judiciaires</h3>
             <p className="text-sm text-slate-400">
-              Pour être validé comme allié, une vérification d&apos;antécédents judiciaires est requise. Vous devrez fournir
-              les documents demandés selon les modalités communiquées.
+              Pour être validé comme allié, une attestation de vérification des antécédents est requise. Vous pouvez la
+              téléverser ci-dessous dès la création de votre compte, ainsi que votre preuve RCR si vous avez déclaré une
+              certification valide. Les références professionnelles pourront être vérifiées ultérieurement.
             </p>
             <ResourceDocumentsPanel token={accessToken} compact />
             <label className="flex items-center gap-2 cursor-pointer">

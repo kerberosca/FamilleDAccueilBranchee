@@ -44,6 +44,8 @@ type ResourceItem = {
   allyRegistration?: unknown;
   documentRequirements?: { required: string[]; missing: string[]; complete: boolean };
   allyDeclarationsAcceptedAt?: string | null;
+  serviceDeliveryMode: "IN_PERSON" | "REMOTE" | "BOTH";
+  isInternalTest: boolean;
   user: { id: string; email: string; status: string; role?: string };
 };
 type ResourcesResponse = PageMeta & { items: ResourceItem[] };
@@ -150,6 +152,11 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   RCR_PROOF: "Preuve RCR",
   CV: "CV"
 };
+const SERVICE_DELIVERY_MODE_LABELS: Record<string, string> = {
+  IN_PERSON: "En personne",
+  REMOTE: "À distance",
+  BOTH: "En personne et à distance"
+};
 
 function formatLabel(labels: Record<string, string>, value: string | null | undefined): string {
   if (!value) return "-";
@@ -210,6 +217,7 @@ export default function AdminPage() {
   const [resourceQuery, setResourceQuery] = useState("");
   const [verificationStatus, setVerificationStatus] = useState("");
   const [publishStatus, setPublishStatus] = useState("");
+  const [testProfileFilter, setTestProfileFilter] = useState("exclude");
   const [resourceSortBy, setResourceSortBy] = useState("updatedAt");
   const [resourceSortOrder, setResourceSortOrder] = useState("desc");
 
@@ -226,6 +234,7 @@ export default function AdminPage() {
     const resource = resources.find((item) => item.id === id);
     return Boolean(
       resource?.documentRequirements?.complete &&
+      !resource.isInternalTest &&
       (resource.publishStatus === "PUBLISHED" || resource.trainingStatus === "PASSED")
     );
   });
@@ -260,6 +269,7 @@ export default function AdminPage() {
     if (publishStatus) {
       params.set("publishStatus", publishStatus);
     }
+    params.set("testProfile", testProfileFilter);
     return `/profiles/resources/admin?${params.toString()}`;
   }, [
     resourcesMeta.page,
@@ -268,7 +278,8 @@ export default function AdminPage() {
     resourceSortOrder,
     resourceQuery,
     verificationStatus,
-    publishStatus
+    publishStatus,
+    testProfileFilter
   ]);
 
   const auditUrl = useMemo(() => {
@@ -497,6 +508,28 @@ export default function AdminPage() {
       setTab("audit");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const setResourceInternalTest = async (resource: ResourceItem) => {
+    if (!accessToken) return;
+    const enable = !resource.isInternalTest;
+    const confirmation = enable
+      ? `Marquer « ${resource.displayName} » comme profil de test interne?\n\nLe profil sera masqué et ne pourra pas être validé ni publié. La candidature, les documents, la formation, le certificat et les courriels individuels resteront testables.`
+      : `Retirer le statut de test interne de « ${resource.displayName} »?\n\nLe profil restera masqué et devra être approuvé séparément avant toute publication.`;
+    if (!window.confirm(confirmation)) return;
+    setBusyId(`test-${resource.id}`);
+    setError(null);
+    try {
+      await apiPatch(`/profiles/resource/${resource.id}/internal-test`, {
+        token: accessToken,
+        body: { isInternalTest: enable }
+      });
+      await refreshCurrentTab();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Le statut de test interne n'a pas pu être modifié.");
     } finally {
       setBusyId(null);
     }
@@ -733,7 +766,7 @@ export default function AdminPage() {
 
             {tab === "resources" ? (
               <Card className={`space-y-3 ${ADMIN_CARD_CLASS}`}>
-                <div className="grid min-w-0 gap-2 md:grid-cols-6">
+                <div className="grid min-w-0 gap-2 md:grid-cols-2 xl:grid-cols-7">
                   <Input placeholder="Recherche nom, courriel, ville, code postal" value={resourceQuery} onChange={(e) => setResourceQuery(e.target.value)} />
                   <select className={SELECT_CLASS} value={verificationStatus} onChange={(e) => setVerificationStatus(e.target.value)}>
                     <option value="">Vérification : toutes</option>
@@ -747,6 +780,11 @@ export default function AdminPage() {
                     <option value="HIDDEN">Masqué</option>
                     <option value="PUBLISHED">Publié</option>
                     <option value="SUSPENDED">Suspendu</option>
+                  </select>
+                  <select aria-label="Type de profil allié" className={SELECT_CLASS} value={testProfileFilter} onChange={(e) => setTestProfileFilter(e.target.value)}>
+                    <option value="exclude">Profils opérationnels</option>
+                    <option value="only">Tests internes</option>
+                    <option value="all">Tous les profils</option>
                   </select>
                   <select className={SELECT_CLASS} value={resourceSortBy} onChange={(e) => setResourceSortBy(e.target.value)}>
                     <option value="updatedAt">Tri : mise à jour</option>
@@ -799,7 +837,12 @@ export default function AdminPage() {
                         <input type="checkbox" checked={selectedResourceIds.includes(resource.id)} onChange={() => toggleResourceSelection(resource.id)} />
                         <div className={`text-sm ${ADMIN_TEXT_CLASS}`}>
                           <p>
-                            <strong>{resource.displayName}</strong> - {resource.user.email}
+                            <strong>{resource.displayName}</strong> - {resource.user.email}{" "}
+                            {resource.isInternalTest ? (
+                              <span className="ml-1 rounded-full bg-violet-500/20 px-2 py-0.5 text-xs font-medium text-violet-200">
+                                Test interne
+                              </span>
+                            ) : null}
                           </p>
                           <p>
                             États: {formatLabel(VERIFICATION_STATUS_LABELS, resource.verificationStatus)} /{" "}
@@ -813,6 +856,12 @@ export default function AdminPage() {
                           <p>
                             Localisation: {resource.city}, {resource.region} ({resource.postalCode})
                           </p>
+                          <p>Mode de prestation : {formatLabel(SERVICE_DELIVERY_MODE_LABELS, resource.serviceDeliveryMode)}</p>
+                          {resource.isInternalTest ? (
+                            <p className="text-xs font-medium text-violet-200">
+                              Publication bloquée tant que le statut de test interne est actif.
+                            </p>
+                          ) : null}
                           {resource.streetAddress ? (
                             <p className="break-words text-slate-400">Adresse : {resource.streetAddress}</p>
                           ) : null}
@@ -883,6 +932,7 @@ export default function AdminPage() {
                           variant="secondary"
                           disabled={
                             busyId === resource.id ||
+                            resource.isInternalTest ||
                             !resource.documentRequirements?.complete ||
                             (resource.publishStatus !== "PUBLISHED" && resource.trainingStatus !== "PASSED")
                           }
@@ -895,6 +945,13 @@ export default function AdminPage() {
                           }
                         >
                           Approuver + publier
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          disabled={busyId === `test-${resource.id}`}
+                          onClick={() => void setResourceInternalTest(resource)}
+                        >
+                          {resource.isInternalTest ? "Retirer le statut test" : "Marquer comme test interne"}
                         </Button>
                         <Button
                           disabled={busyId === resource.id}

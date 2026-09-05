@@ -58,6 +58,12 @@ enum ResourceRateType {
   FLAT
 }
 
+enum ResourceServiceDeliveryMode {
+  IN_PERSON
+  REMOTE
+  BOTH
+}
+
 enum BackgroundCheckStatus {
   NOT_REQUESTED
   REQUESTED
@@ -168,8 +174,8 @@ model FamilyProfile {
 }
 
 model ResourceProfile {
-  id                         String                     @id @default(cuid())
-  userId                     String                     @unique
+  id                         String                      @id @default(cuid())
+  userId                     String                      @unique
   allyType                   AllyType?
   displayName                String
   postalCode                 String
@@ -179,29 +185,34 @@ model ResourceProfile {
   streetAddress              String?
   bio                        String?
   skillsTags                 String[]
-  hourlyRate                 Decimal?                   @db.Decimal(10, 2)
-  rateType                   ResourceRateType           @default(HOURLY)
+  hourlyRate                 Decimal?                    @db.Decimal(10, 2)
+  rateType                   ResourceRateType            @default(HOURLY)
+  serviceDeliveryMode        ResourceServiceDeliveryMode @default(IN_PERSON)
+  isInternalTest             Boolean                     @default(false)
   availability               Json?
-  verificationStatus         ResourceVerificationStatus @default(DRAFT)
-  publishStatus              ResourcePublishStatus      @default(HIDDEN)
-  onboardingState            ResourceOnboardingState    @default(DRAFT)
+  verificationStatus         ResourceVerificationStatus  @default(DRAFT)
+  publishStatus              ResourcePublishStatus       @default(HIDDEN)
+  onboardingState            ResourceOnboardingState     @default(DRAFT)
   contactEmail               String?
   contactPhone               String?
-  averageRating              Decimal?                   @db.Decimal(3, 2)
+  averageRating              Decimal?                    @db.Decimal(3, 2)
   questionnaireAnswers       Json?
   // Formulaire Devenir allié FAB (sections 1-4), JSON
   allyRegistration           Json?
   // Acceptation des déclarations obligatoires (section 4)
   allyDeclarationsAcceptedAt DateTime?
-  backgroundCheckStatus      BackgroundCheckStatus      @default(NOT_REQUESTED)
-  createdAt                  DateTime                   @default(now())
-  updatedAt                  DateTime                   @updatedAt
+  backgroundCheckStatus      BackgroundCheckStatus       @default(NOT_REQUESTED)
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   conversations       Conversation[]       @relation("ConversationResource")
   documents           ResourceDocument[]
   trainingEnrollments TrainingEnrollment[]
+
+  @@index([isInternalTest])
+  @@index([allyType, serviceDeliveryMode])
 }
 
 model TrainingEnrollment {

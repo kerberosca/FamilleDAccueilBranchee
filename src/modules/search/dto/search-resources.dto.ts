@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsInt, IsOptional, IsString, Min } from "class-validator";
+import { ResourceServiceDeliveryMode } from "@prisma/client";
+import { IsIn, IsInt, IsOptional, IsString, Min } from "class-validator";
 
 export class SearchResourcesDto {
   @ApiProperty({ description: "Code postal (exact ou prefix 3 caracteres)" })
@@ -11,6 +12,14 @@ export class SearchResourcesDto {
   @IsOptional()
   @IsString()
   tags?: string;
+
+  @ApiPropertyOptional({
+    enum: [ResourceServiceDeliveryMode.IN_PERSON, ResourceServiceDeliveryMode.REMOTE],
+    default: ResourceServiceDeliveryMode.IN_PERSON
+  })
+  @IsOptional()
+  @IsIn([ResourceServiceDeliveryMode.IN_PERSON, ResourceServiceDeliveryMode.REMOTE])
+  deliveryMode?: ResourceServiceDeliveryMode;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

@@ -24,6 +24,7 @@ type ResourceDetail = {
   canContact?: boolean;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  serviceDeliveryMode?: "IN_PERSON" | "REMOTE" | "BOTH";
 };
 
 export default function ResourceDetailPage() {
@@ -121,6 +122,12 @@ export default function ResourceDetailPage() {
             <strong>Compétences :</strong> {resource.skillsTags.join(", ")}
           </p>
         ) : null}
+        {resource.serviceDeliveryMode && resource.serviceDeliveryMode !== "IN_PERSON" ? (
+          <p className="text-sm">
+            <strong>Mode de prestation :</strong>{" "}
+            {resource.serviceDeliveryMode === "REMOTE" ? "Tutorat à distance" : "En personne et à distance"}
+          </p>
+        ) : null}
         {resource.hourlyRate != null ? (
           <p className="text-sm">
             <strong>{resource.rateType === "FLAT" ? "Tarif forfaitaire" : "Tarif horaire"} :</strong>{" "}
@@ -131,8 +138,8 @@ export default function ResourceDetailPage() {
 
         {hasContact ? (
           <div className="space-y-1 text-sm">
-            {resource.contactEmail ? <p>Email : {resource.contactEmail}</p> : null}
-            {resource.contactPhone ? <p>Tél : {resource.contactPhone}</p> : null}
+            {resource.contactEmail ? <p>Courriel de contact : {resource.contactEmail}</p> : null}
+            {resource.contactPhone ? <p>Téléphone de contact : {resource.contactPhone}</p> : null}
           </div>
         ) : (
           <Alert tone="info">Coordonnées visibles avec un abonnement famille actif.</Alert>

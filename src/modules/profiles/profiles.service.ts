@@ -6,6 +6,7 @@ import {
   ResourceOnboardingState,
   ResourcePublishStatus,
   ResourceRateType,
+  ResourceServiceDeliveryMode,
   ResourceVerificationStatus,
   Role
 } from "@prisma/client";
@@ -133,6 +134,10 @@ export class ProfilesService {
         skillsTags,
         hourlyRate: hourlyRaw,
         rateType: reg.section3.rateType ?? ResourceRateType.HOURLY,
+        serviceDeliveryMode:
+          nextAllyType === AllyType.AUTRES
+            ? reg.section3.serviceDeliveryMode
+            : ResourceServiceDeliveryMode.IN_PERSON,
         availability: buildAvailabilityFromRegistration(reg) as Prisma.InputJsonValue,
         bio: reg.section2.approachChildren,
         allyRegistration: allyRegJson,
@@ -221,6 +226,11 @@ export class ProfilesService {
     if (!existing) {
       throw new NotFoundException("Profil allié introuvable.");
     }
+    if (existing.isInternalTest && isApprovingOrPublishing(dto)) {
+      throw new BadRequestException(
+        "Ce profil est identifié comme test interne. Retirez ce statut avant de le valider ou de le publier."
+      );
+    }
     if (isPublishing(dto)) {
       if (!existing.user.emailVerifiedAt) {
         throw new BadRequestException("L'adresse de connexion doit être confirmée avant la publication du profil.");
@@ -261,6 +271,14 @@ export class ProfilesService {
       where: { id: { in: resourceIds } },
       include: { user: true }
     });
+    if (isApprovingOrPublishing(dto)) {
+      const internalTests = existingResources.filter((resource) => resource.isInternalTest);
+      if (internalTests.length > 0) {
+        throw new BadRequestException(
+          `${internalTests.length} profil(s) de test interne ne peuvent pas être validés ou publiés.`
+        );
+      }
+    }
     if (isPublishing(dto)) {
       const unverified = existingResources.filter((resource) => !resource.user.emailVerifiedAt);
       if (unverified.length > 0) {
@@ -306,6 +324,61 @@ export class ProfilesService {
     return { updatedCount: result.count };
   }
 
+  async setInternalTestStatus(resourceId: string, isInternalTest: boolean, actorUserId: string) {
+    const existing = await this.prisma.resourceProfile.findUnique({ where: { id: resourceId } });
+    if (!existing) {
+      throw new NotFoundException("Profil allié introuvable.");
+    }
+    if (existing.isInternalTest === isInternalTest) {
+      return {
+        id: existing.id,
+        isInternalTest: existing.isInternalTest,
+        changed: false,
+        verificationStatus: existing.verificationStatus,
+        publishStatus: existing.publishStatus,
+        onboardingState: existing.onboardingState
+      };
+    }
+
+    const updated = await this.prisma.resourceProfile.update({
+      where: { id: resourceId },
+      data: {
+        isInternalTest,
+        ...(isInternalTest
+          ? {
+              publishStatus: ResourcePublishStatus.HIDDEN,
+              ...(existing.verificationStatus === ResourceVerificationStatus.VERIFIED
+                ? { verificationStatus: ResourceVerificationStatus.PENDING_VERIFICATION }
+                : {}),
+              ...(existing.onboardingState === ResourceOnboardingState.VERIFIED ||
+              existing.onboardingState === ResourceOnboardingState.PUBLISHED
+                ? { onboardingState: ResourceOnboardingState.PENDING_VERIFICATION }
+                : {})
+            }
+          : {})
+      }
+    });
+    await this.usersService.logAdminAction(
+      actorUserId,
+      isInternalTest ? "RESOURCE_INTERNAL_TEST_ENABLED" : "RESOURCE_INTERNAL_TEST_DISABLED",
+      "RESOURCE_PROFILE",
+      resourceId,
+      {
+        previousVerificationStatus: existing.verificationStatus,
+        previousPublishStatus: existing.publishStatus,
+        previousOnboardingState: existing.onboardingState
+      }
+    );
+    return {
+      id: updated.id,
+      isInternalTest: updated.isInternalTest,
+      changed: true,
+      verificationStatus: updated.verificationStatus,
+      publishStatus: updated.publishStatus,
+      onboardingState: updated.onboardingState
+    };
+  }
+
   private async sendAllyAdminStatusEmail(params: {
     to: string;
     displayName: string;
@@ -345,6 +418,7 @@ export class ProfilesService {
     pageSize?: number;
     sortBy?: string;
     sortOrder?: string;
+    testProfile?: string;
   }) {
     const query = (filters.query ?? "").trim();
     const verificationStatus =
@@ -355,6 +429,7 @@ export class ProfilesService {
       filters.publishStatus && isPublishStatus(filters.publishStatus) ? filters.publishStatus : undefined;
     const onboardingState =
       filters.onboardingState && isOnboardingState(filters.onboardingState) ? filters.onboardingState : undefined;
+    const testProfile = filters.testProfile === "only" ? "only" : filters.testProfile === "all" ? "all" : "exclude";
     const page = clamp(filters.page, 1, 9999, 1);
     const pageSize = clamp(filters.pageSize, 1, 50, 10);
     const skip = (page - 1) * pageSize;
@@ -362,6 +437,7 @@ export class ProfilesService {
     const orderBy = toResourceOrderBy(filters.sortBy, sortOrder);
 
     const where = {
+      ...(testProfile === "only" ? { isInternalTest: true } : testProfile === "exclude" ? { isInternalTest: false } : {}),
       ...(verificationStatus ? { verificationStatus } : {}),
       ...(publishStatus ? { publishStatus } : {}),
       ...(onboardingState ? { onboardingState } : {}),
@@ -421,6 +497,8 @@ export class ProfilesService {
         postalCode: resource.postalCode,
         streetAddress: resource.streetAddress,
         skillsTags: resource.skillsTags,
+        serviceDeliveryMode: resource.serviceDeliveryMode,
+        isInternalTest: resource.isInternalTest,
         verificationStatus: resource.verificationStatus,
         publishStatus: resource.publishStatus,
         onboardingState: resource.onboardingState,
@@ -452,7 +530,8 @@ export class ProfilesService {
     }
     const isPublishedAndVerified =
       resource.publishStatus === ResourcePublishStatus.PUBLISHED &&
-      resource.verificationStatus === ResourceVerificationStatus.VERIFIED;
+      resource.verificationStatus === ResourceVerificationStatus.VERIFIED &&
+      !resource.isInternalTest;
     const isAdmin = currentUser?.role === Role.ADMIN;
     if (!isPublishedAndVerified && !isAdmin) {
       throw new NotFoundException("Allié introuvable.");
@@ -492,6 +571,7 @@ export class ProfilesService {
       skillsTags: resource.skillsTags,
       hourlyRate: decimalToNumber(resource.hourlyRate),
       rateType: resource.rateType ?? ResourceRateType.HOURLY,
+      serviceDeliveryMode: resource.serviceDeliveryMode ?? ResourceServiceDeliveryMode.IN_PERSON,
       averageRating: decimalToNumber(resource.averageRating),
       bio: resource.bio,
       verificationStatus: resource.verificationStatus,
@@ -522,6 +602,8 @@ export class ProfilesService {
       skillsTags: resource.skillsTags,
       hourlyRate: decimalToNumber(resource.hourlyRate),
       rateType: resource.rateType ?? ResourceRateType.HOURLY,
+      serviceDeliveryMode: resource.serviceDeliveryMode ?? ResourceServiceDeliveryMode.IN_PERSON,
+      isInternalTest: Boolean(resource.isInternalTest),
       availability: resource.availability,
       verificationStatus: resource.verificationStatus,
       publishStatus: resource.publishStatus,
@@ -600,6 +682,14 @@ function isPublishing(dto: {
     dto.publishStatus === ResourcePublishStatus.PUBLISHED ||
     dto.onboardingState === ResourceOnboardingState.PUBLISHED
   );
+}
+
+function isApprovingOrPublishing(dto: {
+  verificationStatus?: ResourceVerificationStatus;
+  publishStatus?: ResourcePublishStatus;
+  onboardingState?: ResourceOnboardingState;
+}) {
+  return isPublishing(dto) || dto.onboardingState === ResourceOnboardingState.VERIFIED;
 }
 
 function clamp(value: number | undefined, min: number, max: number, fallback: number): number {

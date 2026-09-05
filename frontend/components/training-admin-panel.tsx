@@ -21,6 +21,7 @@ type TrainingAdminItem = {
   lastActivityAt?: string | null;
   completedAt?: string | null;
   emailVerified: boolean;
+  isInternalTest: boolean;
   emailAutomationEnabledAt?: string | null;
   attemptsUsed: number;
   attemptsRemaining: number;
@@ -85,6 +86,7 @@ export function TrainingAdminPanel() {
   const [data, setData] = useState<TrainingAdminResponse | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
+  const [testProfileFilter, setTestProfileFilter] = useState("exclude");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -94,8 +96,9 @@ export function TrainingAdminPanel() {
     const params = new URLSearchParams({ page: String(page), pageSize: "20" });
     if (query.trim()) params.set("query", query.trim());
     if (status) params.set("status", status);
+    params.set("testProfile", testProfileFilter);
     return `/training/admin/enrollments?${params.toString()}`;
-  }, [page, query, status]);
+  }, [page, query, status, testProfileFilter]);
 
   const load = useCallback(async () => {
     if (!accessToken) return;
@@ -192,11 +195,16 @@ export function TrainingAdminPanel() {
           </button>
         ))}
       </div>
-      <div className="grid gap-3 sm:grid-cols-[1fr_230px]">
+      <div className="grid gap-3 sm:grid-cols-[1fr_230px_230px]">
         <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Rechercher par nom ou courriel" />
-        <select className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+        <select aria-label="Statut de formation" className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
           <option value="">Tous les statuts</option>
           {DISPLAY_STATUSES.map((key) => <option key={key} value={key}>{STATUS_LABELS[key]}</option>)}
+        </select>
+        <select aria-label="Type de parcours" className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm" value={testProfileFilter} onChange={(event) => { setTestProfileFilter(event.target.value); setPage(1); }}>
+          <option value="exclude">Parcours opérationnels</option>
+          <option value="only">Tests internes</option>
+          <option value="all">Tous les parcours</option>
         </select>
       </div>
       {loading ? <Alert tone="info">Chargement des parcours…</Alert> : null}
@@ -205,7 +213,7 @@ export function TrainingAdminPanel() {
           <article key={item.id} className="rounded-2xl border border-[#4a4269] bg-[#100c29]/65 p-4">
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_180px_250px] xl:items-center">
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-white">{item.displayName}</h3>{item.overdue ? <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200">J14 dépassé</span> : null}</div>
+                <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-white">{item.displayName}</h3>{item.isInternalTest ? <span className="rounded-full bg-violet-500/20 px-2 py-1 text-xs text-violet-200">Test interne</span> : null}{item.overdue ? <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200">J14 dépassé</span> : null}</div>
                 <p className="break-all text-sm text-slate-400">{item.email}</p>
                 <p className="mt-2 text-xs text-slate-500">Dernière activité : {formatDate(item.lastActivityAt)} · Publication : {PUBLISH_STATUS_LABELS[item.publishStatus] ?? item.publishStatus}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">

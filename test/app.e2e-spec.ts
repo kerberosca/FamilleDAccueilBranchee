@@ -7,6 +7,7 @@ import {
   ResourceDocumentType,
   ResourceOnboardingState,
   ResourcePublishStatus,
+  ResourceServiceDeliveryMode,
   ResourceVerificationStatus,
   Role,
   SubscriptionStatus,
@@ -143,6 +144,114 @@ describe("Smoke e2e", () => {
 
     expect(res.body.totalFound).toBeGreaterThan(0);
     expect(res.body.results[0].displayName).toBe("Ressource Locale");
+  });
+
+  it("recherche le tutorat a distance partout au Quebec et conserve la recherche locale en personne", async () => {
+    const tag = "scenario-prestation-e2e";
+    await prisma.resourceProfile.createMany({
+      data: [
+        {
+          userId: (
+            await prisma.user.create({
+              data: {
+                email: "tutorat.remote@local.test",
+                passwordHash: "hash",
+                role: Role.RESOURCE,
+                status: UserStatus.ACTIVE,
+                emailVerifiedAt: new Date()
+              }
+            })
+          ).id,
+          allyType: AllyType.AUTRES,
+          displayName: "Tutorat distance e2e",
+          postalCode: "G1V2M2",
+          city: "Quebec",
+          region: "QC",
+          skillsTags: [tag],
+          serviceDeliveryMode: ResourceServiceDeliveryMode.REMOTE,
+          verificationStatus: ResourceVerificationStatus.VERIFIED,
+          publishStatus: ResourcePublishStatus.PUBLISHED,
+          onboardingState: ResourceOnboardingState.PUBLISHED
+        },
+        {
+          userId: (
+            await prisma.user.create({
+              data: {
+                email: "tutorat.hybride@local.test",
+                passwordHash: "hash",
+                role: Role.RESOURCE,
+                status: UserStatus.ACTIVE,
+                emailVerifiedAt: new Date()
+              }
+            })
+          ).id,
+          allyType: AllyType.AUTRES,
+          displayName: "Tutorat hybride e2e",
+          postalCode: "H2X1Y4",
+          city: "Montreal",
+          region: "QC",
+          skillsTags: [tag],
+          serviceDeliveryMode: ResourceServiceDeliveryMode.BOTH,
+          verificationStatus: ResourceVerificationStatus.VERIFIED,
+          publishStatus: ResourcePublishStatus.PUBLISHED,
+          onboardingState: ResourceOnboardingState.PUBLISHED
+        },
+        {
+          userId: (
+            await prisma.user.create({
+              data: {
+                email: "tutorat.presentiel@local.test",
+                passwordHash: "hash",
+                role: Role.RESOURCE,
+                status: UserStatus.ACTIVE,
+                emailVerifiedAt: new Date()
+              }
+            })
+          ).id,
+          allyType: AllyType.AUTRES,
+          displayName: "Tutorat presentiel e2e",
+          postalCode: "H2X2Y5",
+          city: "Montreal",
+          region: "QC",
+          skillsTags: [tag],
+          serviceDeliveryMode: ResourceServiceDeliveryMode.IN_PERSON,
+          verificationStatus: ResourceVerificationStatus.VERIFIED,
+          publishStatus: ResourcePublishStatus.PUBLISHED,
+          onboardingState: ResourceOnboardingState.PUBLISHED
+        }
+      ]
+    });
+
+    const adminToken = await loginAs("ADMIN");
+    const remote = await request(app.getHttpServer())
+      .get(`/api/v1/search/resources?postalCode=H2X1Y4&tags=${tag}&deliveryMode=REMOTE`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(remote.body.results.map((item: { displayName: string }) => item.displayName).sort()).toEqual([
+      "Tutorat distance e2e",
+      "Tutorat hybride e2e"
+    ]);
+
+    const inPerson = await request(app.getHttpServer())
+      .get(`/api/v1/search/resources?postalCode=H2X1Y4&tags=${tag}&deliveryMode=IN_PERSON`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(inPerson.body.results.map((item: { displayName: string }) => item.displayName).sort()).toEqual([
+      "Tutorat hybride e2e",
+      "Tutorat presentiel e2e"
+    ]);
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/search/resources?postalCode=H2X1Y4&tags=${tag}&deliveryMode=BOTH`)
+      .expect(400);
+
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          in: ["tutorat.remote@local.test", "tutorat.hybride@local.test", "tutorat.presentiel@local.test"]
+        }
+      }
+    });
   });
 
   it("GET /api/v1/profiles/resource/:id expose le detail public sans contact", async () => {
@@ -382,6 +491,16 @@ describe("Smoke e2e", () => {
         html: expect.stringContaining("Un nouvel allié attend une approbation")
       })
     );
+    const legacyProfile = await prisma.resourceProfile.findFirstOrThrow({
+      where: { user: { email: "nouvel.allie@local.test" } }
+    });
+    expect(legacyProfile.serviceDeliveryMode).toBe(ResourceServiceDeliveryMode.IN_PERSON);
+    expect(
+      (legacyProfile.allyRegistration as { version: string; section3: { serviceDeliveryMode: string } }).version
+    ).toBe("2026-09-allie-v2");
+    expect(
+      (legacyProfile.allyRegistration as { section3: { serviceDeliveryMode: string } }).section3.serviceDeliveryMode
+    ).toBe(ResourceServiceDeliveryMode.IN_PERSON);
   });
 
   it("assigne automatiquement la formation apres une candidature allie complete", async () => {
@@ -395,9 +514,12 @@ describe("Smoke e2e", () => {
         postalCode: "H2X1Y4",
         city: "Montreal",
         region: "QC",
-        allyType: AllyType.GARDIENS,
+        allyType: AllyType.AUTRES,
         contactPhone: "514-555-1212",
-        allyRegistration: validAllyRegistration()
+        allyRegistration: validAllyRegistration({
+          version: "2026-09-allie-v2",
+          serviceDeliveryMode: ResourceServiceDeliveryMode.REMOTE
+        })
       })
       .expect(201);
 
@@ -411,6 +533,12 @@ describe("Smoke e2e", () => {
     expect(enrollment?.emailLogs.map((log) => log.type).sort()).toEqual(
       ["ASSIGNMENT", "DAY_3", "DAY_7", "DAY_14"].sort()
     );
+    const remoteTutor = await prisma.resourceProfile.findFirstOrThrow({
+      where: { user: { email: "formation.assignment@local.test" } }
+    });
+    expect(remoteTutor.serviceDeliveryMode).toBe(ResourceServiceDeliveryMode.REMOTE);
+    expect(remoteTutor.skillsTags).toContain("tutorat à distance");
+    expect((remoteTutor.allyRegistration as { version: string }).version).toBe("2026-09-allie-v2");
   });
 
   it("POST /api/v1/auth/register notifie l'equipe quand une famille s'inscrit", async () => {
@@ -1118,6 +1246,135 @@ describe("Smoke e2e", () => {
     expect(updated.verificationStatus).toBe(ResourceVerificationStatus.REJECTED);
     expect(updated.publishStatus).toBe(ResourcePublishStatus.SUSPENDED);
     expect(updated.backgroundCheckStatus).toBe(BackgroundCheckStatus.RECEIVED);
+  });
+
+  it("reserve le statut de test interne aux admins et bloque toute validation ou publication", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const familyToken = await loginAs("FAMILLE");
+    const testUser = await prisma.user.create({
+      data: {
+        email: "profil.test.interne@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
+        resourceProfile: {
+          create: {
+            displayName: "Profil test interne e2e",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            skillsTags: ["profil-test-interne-e2e"],
+            verificationStatus: ResourceVerificationStatus.VERIFIED,
+            publishStatus: ResourcePublishStatus.PUBLISHED,
+            onboardingState: ResourceOnboardingState.PUBLISHED
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+    const resourceId = testUser.resourceProfile!.id;
+    await app.get(TrainingService).ensureEnrollment(resourceId);
+    const emailCallsBeforeToggle = emailSendMock.mock.calls.length;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${resourceId}/internal-test`)
+      .set("Authorization", `Bearer ${familyToken}`)
+      .send({ isInternalTest: true })
+      .expect(403);
+
+    const enabled = await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${resourceId}/internal-test`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ isInternalTest: true })
+      .expect(200);
+    expect(enabled.body).toEqual(
+      expect.objectContaining({
+        isInternalTest: true,
+        changed: true,
+        verificationStatus: ResourceVerificationStatus.PENDING_VERIFICATION,
+        publishStatus: ResourcePublishStatus.HIDDEN,
+        onboardingState: ResourceOnboardingState.PENDING_VERIFICATION
+      })
+    );
+    expect(emailSendMock.mock.calls).toHaveLength(emailCallsBeforeToggle);
+
+    const idempotent = await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${resourceId}/internal-test`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ isInternalTest: true })
+      .expect(200);
+    expect(idempotent.body.changed).toBe(false);
+
+    const blocked = await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${resourceId}/moderation`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        verificationStatus: ResourceVerificationStatus.VERIFIED,
+        publishStatus: ResourcePublishStatus.PUBLISHED,
+        onboardingState: ResourceOnboardingState.PUBLISHED
+      })
+      .expect(400);
+    expect(blocked.body.message).toContain("test interne");
+
+    await request(app.getHttpServer())
+      .patch("/api/v1/profiles/resources/moderation/bulk")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        resourceIds: [resourceId],
+        verificationStatus: ResourceVerificationStatus.VERIFIED,
+        publishStatus: ResourcePublishStatus.PUBLISHED,
+        onboardingState: ResourceOnboardingState.PUBLISHED
+      })
+      .expect(400);
+
+    await request(app.getHttpServer()).get(`/api/v1/profiles/resource/${resourceId}`).expect(404);
+    const publicSearch = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4&tags=profil-test-interne-e2e")
+      .expect(200);
+    expect(publicSearch.body.totalFound).toBe(0);
+
+    const defaultAdminList = await request(app.getHttpServer())
+      .get("/api/v1/profiles/resources/admin?query=Profil%20test%20interne%20e2e")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(defaultAdminList.body.total).toBe(0);
+    const testAdminList = await request(app.getHttpServer())
+      .get("/api/v1/profiles/resources/admin?query=Profil%20test%20interne%20e2e&testProfile=only")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(testAdminList.body.total).toBe(1);
+    expect(testAdminList.body.items[0].isInternalTest).toBe(true);
+
+    const defaultTrainingList = await request(app.getHttpServer())
+      .get("/api/v1/training/admin/enrollments?query=Profil%20test%20interne%20e2e")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(defaultTrainingList.body.total).toBe(0);
+    const testTrainingList = await request(app.getHttpServer())
+      .get("/api/v1/training/admin/enrollments?query=Profil%20test%20interne%20e2e&testProfile=only")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(testTrainingList.body.total).toBe(1);
+    expect(testTrainingList.body.items[0].isInternalTest).toBe(true);
+
+    const disabled = await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${resourceId}/internal-test`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ isInternalTest: false })
+      .expect(200);
+    expect(disabled.body).toEqual(
+      expect.objectContaining({ isInternalTest: false, publishStatus: ResourcePublishStatus.HIDDEN })
+    );
+    expect(emailSendMock.mock.calls).toHaveLength(emailCallsBeforeToggle);
+
+    const actions = await prisma.adminAuditLog.findMany({
+      where: { targetId: resourceId },
+      select: { action: true }
+    });
+    expect(actions.map((item) => item.action)).toEqual(
+      expect.arrayContaining(["RESOURCE_INTERNAL_TEST_ENABLED", "RESOURCE_INTERNAL_TEST_DISABLED"])
+    );
   });
 
   it("GET/PATCH /api/v1/users admin liste familles, statuts et audit", async () => {
@@ -2485,15 +2742,17 @@ function answersWithCorrectCount(correctAnswers: Record<string, number>, correct
 
 function validAllyRegistration(
   overrides: {
+    version?: string;
     hourlyRateSuggested?: string;
     rateType?: "HOURLY" | "FLAT";
+    serviceDeliveryMode?: ResourceServiceDeliveryMode;
     repitNuit?: boolean;
     nightlyRateSuggested?: string;
     dailyRateSuggested?: string;
   } = {}
 ) {
   return {
-    version: "2025-03-repit-v1",
+    version: overrides.version ?? "2025-03-repit-v1",
     section1: {
       sectorServiced: "Montreal",
       streetAddress: "123 rue Test",
@@ -2518,6 +2777,7 @@ function validAllyRegistration(
       age12p: true,
       maxChildren: "2",
       serviceRadius: "25",
+      ...(overrides.serviceDeliveryMode ? { serviceDeliveryMode: overrides.serviceDeliveryMode } : {}),
       rateType: overrides.rateType ?? "HOURLY",
       hourlyRateSuggested: overrides.hourlyRateSuggested ?? "32",
       ...(overrides.nightlyRateSuggested

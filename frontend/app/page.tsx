@@ -65,6 +65,7 @@ export default function HomePage() {
   const router = useRouter();
   const [postalCode, setPostalCode] = useState("");
   const [tags, setTags] = useState("");
+  const [deliveryMode, setDeliveryMode] = useState<"IN_PERSON" | "REMOTE">("IN_PERSON");
   const [error, setError] = useState<string | null>(null);
 
   const normalizedPostal = normalizePostalCode(postalCode);
@@ -84,7 +85,7 @@ export default function HomePage() {
       return;
     }
 
-    const params = new URLSearchParams({ postalCode: normalizedPostal });
+    const params = new URLSearchParams({ postalCode: normalizedPostal, deliveryMode });
     if (tags.trim()) params.set("tags", tags.trim());
     router.push(`/search?${params.toString()}`);
   };
@@ -246,7 +247,7 @@ export default function HomePage() {
             <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#3567b7]">Pour les familles</p>
             <h3 className="mt-3 text-2xl font-semibold leading-tight">Vous cherchez déjà du soutien?</h3>
             <p className="mt-3 text-sm leading-6 text-[#625a7d]">
-              Entrez un code postal pour voir les alliés disponibles près de chez vous.
+              Cherchez un service près de chez vous ou du tutorat à distance partout au Québec.
             </p>
             <div className="mt-5 grid gap-3">
               <Input
@@ -257,6 +258,15 @@ export default function HomePage() {
                 maxLength={7}
                 className="!border-[#d7d2ea] !bg-white !text-[#21183f] placeholder:!text-[#6f688e] focus:!border-[#62beab] focus:!ring-[#62beab]/30"
               />
+              <select
+                aria-label="Mode de prestation"
+                value={deliveryMode}
+                onChange={(event) => setDeliveryMode(event.target.value as "IN_PERSON" | "REMOTE")}
+                className="rounded-xl border border-[#d7d2ea] bg-white px-3 py-2.5 text-sm text-[#21183f] focus:border-[#62beab] focus:outline-none focus:ring-2 focus:ring-[#62beab]/30"
+              >
+                <option value="IN_PERSON">Services en personne</option>
+                <option value="REMOTE">Tutorat à distance</option>
+              </select>
               <Input
                 type="text"
                 value={tags}
@@ -269,7 +279,7 @@ export default function HomePage() {
                 disabled={!isPostalValid}
                 className="!rounded-xl !bg-[#3567b7] !px-5 !py-3 !font-semibold hover:!bg-[#2f5da6]"
               >
-                Voir les alliés près de moi
+                {deliveryMode === "REMOTE" ? "Voir les tuteurs à distance" : "Voir les alliés près de moi"}
               </Button>
             </div>
             {error ? <p className="mt-3 text-sm text-[#b95035]">{error}</p> : null}

@@ -73,6 +73,7 @@ test("confirme l'adresse puis active et met en pause les courriels d'un seul all
               lastActivityAt: null,
               completedAt: null,
               emailVerified: true,
+              isInternalTest: true,
               emailAutomationEnabledAt: enabledAt,
               attemptsUsed: 0,
               attemptsRemaining: 3,
@@ -101,6 +102,8 @@ test("confirme l'adresse puis active et met en pause les courriels d'un seul all
 
   await page.goto("/admin");
   await page.getByRole("button", { name: "Parcours alliés" }).click();
+  await page.getByLabel("Type de parcours").selectOption("only");
+  await expect(page.getByText("Test interne", { exact: true })).toBeVisible();
   await expect(page.getByText("Courriels verrouillés", { exact: true })).toBeVisible();
 
   page.once("dialog", async (dialog) => {

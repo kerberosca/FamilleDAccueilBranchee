@@ -10,6 +10,7 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
 import { BulkModerateResourceDto } from "./dto/bulk-moderate-resource.dto";
 import { ModerateResourceDto } from "./dto/moderate-resource.dto";
+import { SetResourceTestStatusDto } from "./dto/set-resource-test-status.dto";
 import { UpdateFamilyProfileDto } from "./dto/update-family-profile.dto";
 import { UpdateResourceProfileDto } from "./dto/update-resource-profile.dto";
 import { ProfilesService } from "./profiles.service";
@@ -54,7 +55,8 @@ export class ProfilesController {
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
     @Query("sortBy") sortBy?: string,
-    @Query("sortOrder") sortOrder?: string
+    @Query("sortOrder") sortOrder?: string,
+    @Query("testProfile") testProfile?: string
   ) {
     return this.profilesService.listResourcesForAdmin({
       query,
@@ -64,7 +66,8 @@ export class ProfilesController {
       page: Number(page ?? 1),
       pageSize: Number(pageSize ?? 10),
       sortBy,
-      sortOrder
+      sortOrder,
+      testProfile
     });
   }
 
@@ -82,6 +85,18 @@ export class ProfilesController {
   @Delete("resource/:resourceId")
   async deleteResource(@CurrentUser() user: JwtPayload, @Param("resourceId") resourceId: string) {
     return this.profilesService.deleteResourceByAdmin(resourceId, user.sub);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Patch("resource/:resourceId/internal-test")
+  async setInternalTestStatus(
+    @CurrentUser() user: JwtPayload,
+    @Param("resourceId") resourceId: string,
+    @Body() dto: SetResourceTestStatusDto
+  ) {
+    return this.profilesService.setInternalTestStatus(resourceId, dto.isInternalTest, user.sub);
   }
 
   @ApiBearerAuth()

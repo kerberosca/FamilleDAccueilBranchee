@@ -1,5 +1,6 @@
 /** Doit correspondre à `ALLY_REGISTRATION_VERSION` côté API. */
-export const ALLY_REGISTRATION_VERSION = "2025-03-repit-v1";
+export const ALLY_REGISTRATION_VERSION = "2026-09-allie-v2";
+const LEGACY_ALLY_REGISTRATION_VERSION = "2025-03-repit-v1";
 
 export type AllyRegistrationPayload = {
   version: string;
@@ -29,6 +30,7 @@ export type AllyRegistrationPayload = {
     age12p: boolean;
     maxChildren: string;
     serviceRadius: "10" | "25" | "50" | "more";
+    serviceDeliveryMode: "IN_PERSON" | "REMOTE" | "BOTH";
     rateType: "HOURLY" | "FLAT";
     hourlyRateSuggested: string;
     nightlyRateSuggested?: string;
@@ -79,6 +81,7 @@ export function emptyAllyRegistration(): AllyRegistrationPayload {
       age12p: false,
       maxChildren: "",
       serviceRadius: "25",
+      serviceDeliveryMode: "IN_PERSON",
       rateType: "HOURLY",
       hourlyRateSuggested: "",
       nightlyRateSuggested: undefined,
@@ -106,13 +109,24 @@ export function emptyAllyRegistration(): AllyRegistrationPayload {
 export function parseAllyRegistrationFromApi(raw: unknown): AllyRegistrationPayload | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as AllyRegistrationPayload;
-  if (o.version !== ALLY_REGISTRATION_VERSION || !o.section1 || !o.section2 || !o.section3 || !o.section4) {
+  if (
+    (o.version !== ALLY_REGISTRATION_VERSION && o.version !== LEGACY_ALLY_REGISTRATION_VERSION) ||
+    !o.section1 ||
+    !o.section2 ||
+    !o.section3 ||
+    !o.section4
+  ) {
     return null;
   }
+  const serviceDeliveryMode = ["IN_PERSON", "REMOTE", "BOTH"].includes(o.section3.serviceDeliveryMode)
+    ? o.section3.serviceDeliveryMode
+    : "IN_PERSON";
   return {
     ...o,
+    version: ALLY_REGISTRATION_VERSION,
     section3: {
       ...o.section3,
+      serviceDeliveryMode,
       rateType: o.section3.rateType === "FLAT" ? "FLAT" : "HOURLY"
     }
   };

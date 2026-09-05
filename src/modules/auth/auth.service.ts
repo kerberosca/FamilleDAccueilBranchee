@@ -13,6 +13,7 @@ import {
 	  AllyType,
 	  Prisma,
   ResourceRateType,
+  ResourceServiceDeliveryMode,
   ResourceOnboardingState,
   ResourcePublishStatus,
   ResourceVerificationStatus,
@@ -114,6 +115,10 @@ export class AuthService {
           skillsTags,
           hourlyRate: hourlyRaw,
           rateType: reg.section3.rateType ?? ResourceRateType.HOURLY,
+          serviceDeliveryMode:
+            input.allyType === AllyType.AUTRES
+              ? reg.section3.serviceDeliveryMode
+              : ResourceServiceDeliveryMode.IN_PERSON,
           availability,
           contactEmail: reg.section1.contactEmail,
           contactPhone: input.contactPhone!.trim(),

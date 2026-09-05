@@ -371,16 +371,28 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async listForAdmin(filters: { query?: string; status?: string; page?: number; pageSize?: number }) {
+  async listForAdmin(filters: {
+    query?: string;
+    status?: string;
+    page?: number;
+    pageSize?: number;
+    testProfile?: string;
+  }) {
     const page = Math.max(1, Math.floor(filters.page ?? 1));
     const pageSize = Math.min(50, Math.max(1, Math.floor(filters.pageSize ?? 20)));
     const query = (filters.query ?? "").trim();
     const status = isTrainingStatus(filters.status) ? filters.status : undefined;
+    const testProfile = filters.testProfile === "only" ? "only" : filters.testProfile === "all" ? "all" : "exclude";
+    const resourceProfileScope: Prisma.ResourceProfileWhereInput =
+      testProfile === "only" ? { isInternalTest: true } : testProfile === "exclude" ? { isInternalTest: false } : {};
+    const scopeWhere: Prisma.TrainingEnrollmentWhereInput = { resourceProfile: resourceProfileScope };
     const where: Prisma.TrainingEnrollmentWhereInput = {
+      ...scopeWhere,
       ...(status ? { status } : {}),
       ...(query
         ? {
             resourceProfile: {
+              ...resourceProfileScope,
               OR: [
                 { displayName: { contains: query, mode: "insensitive" } },
                 { user: { email: { contains: query, mode: "insensitive" } } }
@@ -405,12 +417,15 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
         take: pageSize
       }),
       this.prisma.trainingEnrollment.groupBy({
+        where: scopeWhere,
         by: ["status"],
         orderBy: { status: "asc" },
         _count: { status: true }
       }),
-      this.prisma.trainingEnrollment.count(),
-      this.prisma.trainingEnrollment.count({ where: { emailAutomationEnabledAt: { not: null } } })
+      this.prisma.trainingEnrollment.count({ where: scopeWhere }),
+      this.prisma.trainingEnrollment.count({
+        where: { ...scopeWhere, emailAutomationEnabledAt: { not: null } }
+      })
     ]);
     const stats: Record<string, number> = Object.fromEntries(Object.values(TrainingStatus).map((value) => [value, 0]));
     grouped.forEach((item) => (stats[item.status] = (item._count as { status: number }).status));
@@ -808,6 +823,7 @@ export class TrainingService implements OnModuleInit, OnModuleDestroy {
       displayName: enrollment.resourceProfile.displayName,
       email: enrollment.resourceProfile.user.email,
       resourceProfileId: enrollment.resourceProfileId,
+      isInternalTest: Boolean(enrollment.resourceProfile.isInternalTest),
       publishStatus: enrollment.resourceProfile.publishStatus,
       verificationStatus: enrollment.resourceProfile.verificationStatus,
       progressPercent: progressPercent(enrollment.lessonProgress),

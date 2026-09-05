@@ -1,8 +1,9 @@
 import { BadRequestException } from "@nestjs/common";
-import { AllyType, ResourceRateType } from "@prisma/client";
+import { AllyType, ResourceRateType, ResourceServiceDeliveryMode } from "@prisma/client";
 
 /** Version du schéma — incrémenter si les champs obligatoires changent. */
-export const ALLY_REGISTRATION_VERSION = "2025-03-repit-v1";
+export const ALLY_REGISTRATION_VERSION = "2026-09-allie-v2";
+const LEGACY_ALLY_REGISTRATION_VERSION = "2025-03-repit-v1";
 
 export type AllyRegistrationPayload = {
   version: string;
@@ -32,6 +33,7 @@ export type AllyRegistrationPayload = {
     age12p: boolean;
     maxChildren: string;
     serviceRadius: "10" | "25" | "50" | "more";
+    serviceDeliveryMode: ResourceServiceDeliveryMode;
     rateType: ResourceRateType;
     hourlyRateSuggested: string;
     nightlyRateSuggested?: string;
@@ -78,8 +80,10 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
     throw new BadRequestException("allyRegistration : objet requis.");
   }
   const o = raw as Record<string, unknown>;
-  if (o.version !== ALLY_REGISTRATION_VERSION) {
-    throw new BadRequestException(`allyRegistration.version doit être "${ALLY_REGISTRATION_VERSION}".`);
+  if (o.version !== ALLY_REGISTRATION_VERSION && o.version !== LEGACY_ALLY_REGISTRATION_VERSION) {
+    throw new BadRequestException(
+      `allyRegistration.version doit être "${ALLY_REGISTRATION_VERSION}" ou "${LEGACY_ALLY_REGISTRATION_VERSION}".`
+    );
   }
 
   const s1 = o.section1 as Record<string, unknown> | undefined;
@@ -141,6 +145,17 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
   if (radius !== "10" && radius !== "25" && radius !== "50" && radius !== "more") {
     throw new BadRequestException("Section 3 : secteur desservi (distance) invalide.");
   }
+  const requestedDeliveryMode = s3.serviceDeliveryMode;
+  const validDeliveryMode = Object.values(ResourceServiceDeliveryMode).includes(
+    requestedDeliveryMode as ResourceServiceDeliveryMode
+  );
+  if (allyType === AllyType.AUTRES && o.version === ALLY_REGISTRATION_VERSION && !validDeliveryMode) {
+    throw new BadRequestException("Section 3 : mode de prestation du tutorat invalide.");
+  }
+  const serviceDeliveryMode =
+    allyType === AllyType.AUTRES && validDeliveryMode
+      ? (requestedDeliveryMode as ResourceServiceDeliveryMode)
+      : ResourceServiceDeliveryMode.IN_PERSON;
   const rateType =
     allyType === AllyType.MENAGE && s3.rateType === ResourceRateType.FLAT
       ? ResourceRateType.FLAT
@@ -228,6 +243,7 @@ export function parseAndValidateAllyRegistration(raw: unknown, allyType: AllyTyp
           ? String(s3.maxChildren).trim()
           : "",
       serviceRadius: radius as "10" | "25" | "50" | "more",
+      serviceDeliveryMode,
       rateType,
       hourlyRateSuggested: String(s3.hourlyRateSuggested).trim(),
       nightlyRateSuggested:
@@ -275,6 +291,20 @@ export function buildSkillsTagsFromRegistration(
   if (reg.section3.repitNuit) tags.add(labels[1]);
   if (reg.section3.repitWeekend) tags.add(labels[2]);
   if (reg.section3.repitUrgence) tags.add(labels[3]);
+  if (allyType === AllyType.AUTRES) {
+    if (
+      reg.section3.serviceDeliveryMode === ResourceServiceDeliveryMode.IN_PERSON ||
+      reg.section3.serviceDeliveryMode === ResourceServiceDeliveryMode.BOTH
+    ) {
+      tags.add("tutorat en personne");
+    }
+    if (
+      reg.section3.serviceDeliveryMode === ResourceServiceDeliveryMode.REMOTE ||
+      reg.section3.serviceDeliveryMode === ResourceServiceDeliveryMode.BOTH
+    ) {
+      tags.add("tutorat à distance");
+    }
+  }
   if (allyType === AllyType.GARDIENS) {
     if (reg.section3.age0_5) tags.add("0-5 ans");
     if (reg.section3.age6_12) tags.add("6-12 ans");
@@ -293,6 +323,7 @@ export function buildAvailabilityFromRegistration(reg: AllyRegistrationPayload):
     finDeSemaine: reg.section3.dispoWeekend || reg.section3.repitWeekend,
     flexible: reg.section3.dispoFlexible,
     rayonKm: reg.section3.serviceRadius,
+    modePrestation: reg.section3.serviceDeliveryMode,
     maxEnfants: reg.section3.maxChildren,
     ...(reg.section3.nightlyRateSuggested
       ? { tarifParNuit: reg.section3.nightlyRateSuggested }
