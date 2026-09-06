@@ -1828,6 +1828,9 @@ describe("Smoke e2e", () => {
     const certificateSource = certificateBuffer.toString("latin1");
     expect(certificateSource).toContain("1 1 1 rg 0 0 792 612 re f");
     expect(certificateSource).not.toContain("0.05 0.04 0.12 rg 0 0 792 612 re f");
+    expect(certificateSource).toContain("/Subtype /Image");
+    expect(certificateSource).toContain("/Sig 6 0 R");
+    expect(certificateSource).toContain("Andr\u00e9e Bouchard");
 
     const stored = await prisma.trainingCertificate.count({ where: { enrollmentId: blocked.body.id } });
     const successEmails = await prisma.trainingEmailLog.count({
