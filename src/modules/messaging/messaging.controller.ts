@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Header, Param, Post, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Role } from "@prisma/client";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -19,21 +19,25 @@ export class MessagingController {
   constructor(private readonly messagingService: MessagingService) {}
 
   @Post("conversations")
+  @Header("Cache-Control", "private, no-store")
   async createConversation(@CurrentUser() user: JwtPayload, @Body() dto: CreateConversationDto) {
     return this.messagingService.createConversation(user, dto);
   }
 
   @Get("conversations")
+  @Header("Cache-Control", "private, no-store")
   async listConversations(@CurrentUser() user: JwtPayload) {
     return this.messagingService.listConversations(user);
   }
 
   @Get("conversations/:conversationId")
+  @Header("Cache-Control", "private, no-store")
   async getConversation(@CurrentUser() user: JwtPayload, @Param("conversationId") conversationId: string) {
     return this.messagingService.getConversationById(user, conversationId);
   }
 
   @Post("conversations/:conversationId/messages")
+  @Header("Cache-Control", "private, no-store")
   async sendMessage(
     @CurrentUser() user: JwtPayload,
     @Param("conversationId") conversationId: string,

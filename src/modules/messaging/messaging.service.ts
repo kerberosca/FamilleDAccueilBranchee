@@ -1,10 +1,57 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { ResourceOnboardingState, ResourcePublishStatus, ResourceVerificationStatus, Role } from "@prisma/client";
+import {
+  Prisma,
+  ResourceOnboardingState,
+  ResourcePublishStatus,
+  ResourceVerificationStatus,
+  Role,
+  UserStatus
+} from "@prisma/client";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SubscriptionAccessService } from "../billing/subscription-access.service";
 import { CreateConversationDto } from "./dto/create-conversation.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
+
+const participantViewSelect = {
+  id: true,
+  displayName: true
+} as const;
+
+const participantInternalSelect = {
+  id: true,
+  displayName: true,
+  userId: true
+} as const;
+
+const conversationListSelect = {
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  family: { select: participantViewSelect },
+  resource: { select: participantViewSelect },
+  _count: { select: { messages: true } }
+} satisfies Prisma.ConversationSelect;
+
+const conversationDetailSelect = {
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  family: { select: participantInternalSelect },
+  resource: { select: participantInternalSelect },
+  messages: {
+    select: {
+      id: true,
+      content: true,
+      createdAt: true,
+      senderUserId: true
+    },
+    orderBy: { createdAt: "asc" }
+  }
+} satisfies Prisma.ConversationSelect;
+
+type ConversationListRecord = Prisma.ConversationGetPayload<{ select: typeof conversationListSelect }>;
+type ConversationDetailRecord = Prisma.ConversationGetPayload<{ select: typeof conversationDetailSelect }>;
 
 @Injectable()
 export class MessagingService {
@@ -14,6 +61,7 @@ export class MessagingService {
   ) {}
 
   async createConversation(currentUser: JwtPayload, dto: CreateConversationDto) {
+    await this.assertCurrentMessagingUser(currentUser);
     if (currentUser.role !== Role.FAMILY) {
       throw new ForbiddenException("Seul un compte famille peut démarrer une conversation.");
     }
@@ -22,11 +70,22 @@ export class MessagingService {
       throw new ForbiddenException("Un abonnement famille actif est requis pour contacter un allié.");
     }
 
-    const family = await this.prisma.familyProfile.findUnique({ where: { userId: currentUser.sub } });
+    const family = await this.prisma.familyProfile.findUnique({
+      where: { userId: currentUser.sub },
+      select: { id: true }
+    });
     if (!family) {
       throw new NotFoundException("Profil de famille introuvable.");
     }
-    const resource = await this.prisma.resourceProfile.findUnique({ where: { id: dto.resourceProfileId } });
+    const resource = await this.prisma.resourceProfile.findUnique({
+      where: { id: dto.resourceProfileId },
+      select: {
+        id: true,
+        publishStatus: true,
+        verificationStatus: true,
+        onboardingState: true
+      }
+    });
     if (!resource) {
       throw new NotFoundException("Allié introuvable.");
     }
@@ -36,7 +95,7 @@ export class MessagingService {
       (resource.onboardingState !== ResourceOnboardingState.VERIFIED &&
         resource.onboardingState !== ResourceOnboardingState.PUBLISHED)
     ) {
-      throw new ForbiddenException("Cet allié n'est pas disponible pour être contacté.");
+      throw new NotFoundException("Allié introuvable.");
     }
 
     const conversation = await this.prisma.conversation.upsert({
@@ -50,7 +109,8 @@ export class MessagingService {
       create: {
         familyId: family.id,
         resourceId: resource.id
-      }
+      },
+      select: { id: true }
     });
 
     await this.prisma.message.create({
@@ -58,59 +118,29 @@ export class MessagingService {
         conversationId: conversation.id,
         senderUserId: currentUser.sub,
         content: dto.initialMessage
-      }
+      },
+      select: { id: true }
     });
 
-    return this.getConversationById(currentUser, conversation.id);
+    return this.findAccessibleConversationDetail(currentUser, conversation.id);
   }
 
   async listConversations(currentUser: JwtPayload) {
-    if (currentUser.role === Role.ADMIN) {
-      return this.prisma.conversation.findMany({
-        include: {
-          family: true,
-          resource: true,
-          messages: { orderBy: { createdAt: "asc" }, take: 50 }
-        },
-        orderBy: { updatedAt: "desc" }
-      });
-    }
-    if (currentUser.role === Role.FAMILY) {
-      const family = await this.prisma.familyProfile.findUnique({ where: { userId: currentUser.sub } });
-      if (!family) {
-        return [];
-      }
-      return this.prisma.conversation.findMany({
-        where: { familyId: family.id },
-        include: {
-          resource: true,
-          messages: { orderBy: { createdAt: "asc" }, take: 50 }
-        },
-        orderBy: { updatedAt: "desc" }
-      });
-    }
-    if (currentUser.role === Role.RESOURCE) {
-      const resource = await this.prisma.resourceProfile.findUnique({ where: { userId: currentUser.sub } });
-      if (!resource) {
-        return [];
-      }
-      return this.prisma.conversation.findMany({
-        where: { resourceId: resource.id },
-        include: {
-          family: true,
-          messages: { orderBy: { createdAt: "asc" }, take: 50 }
-        },
-        orderBy: { updatedAt: "desc" }
-      });
-    }
-    return [];
+    await this.assertCurrentMessagingUser(currentUser);
+    const conversations = await this.prisma.conversation.findMany({
+      where: this.buildParticipantWhere(currentUser),
+      select: conversationListSelect,
+      orderBy: { updatedAt: "desc" }
+    });
+    return conversations.map((conversation) => this.toConversationListView(conversation));
   }
 
   async sendMessage(currentUser: JwtPayload, conversationId: string, dto: SendMessageDto) {
+    await this.assertCurrentMessagingUser(currentUser);
     if (currentUser.role === Role.ADMIN) {
       throw new ForbiddenException("Les comptes administrateur ont un accès en lecture seule aux conversations");
     }
-    const conversation = await this.getConversationById(currentUser, conversationId);
+    const conversation = await this.findAccessibleConversationDetail(currentUser, conversationId);
     if (currentUser.role === Role.FAMILY) {
       const premium = await this.subscriptionAccessService.hasActiveFamilySubscription(currentUser.sub);
       if (!premium) {
@@ -122,30 +152,101 @@ export class MessagingService {
         conversationId: conversation.id,
         senderUserId: currentUser.sub,
         content: dto.content
-      }
+      },
+      select: { id: true }
     });
-    return this.getConversationById(currentUser, conversationId);
+    return this.findAccessibleConversationDetail(currentUser, conversationId);
   }
 
   async getConversationById(currentUser: JwtPayload, conversationId: string) {
-    const conversation = await this.prisma.conversation.findUnique({
-      where: { id: conversationId },
-      include: {
-        family: true,
-        resource: true,
-        messages: { orderBy: { createdAt: "asc" } }
-      }
+    await this.assertCurrentMessagingUser(currentUser);
+    return this.findAccessibleConversationDetail(currentUser, conversationId);
+  }
+
+  private async findAccessibleConversationDetail(currentUser: JwtPayload, conversationId: string) {
+    const conversation = await this.prisma.conversation.findFirst({
+      where: {
+        id: conversationId,
+        ...this.buildParticipantWhere(currentUser)
+      },
+      select: conversationDetailSelect
     });
     if (!conversation) {
       throw new NotFoundException("Conversation introuvable.");
     }
+    return this.toConversationDetailView(conversation);
+  }
 
-    const isAdmin = currentUser.role === Role.ADMIN;
-    const isFamilyOwner = conversation.family.userId === currentUser.sub;
-    const isResourceOwner = conversation.resource.userId === currentUser.sub;
-    if (!isAdmin && !isFamilyOwner && !isResourceOwner) {
-      throw new ForbiddenException("Vous ne participez pas à cette conversation.");
+  private async assertCurrentMessagingUser(currentUser: JwtPayload) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: currentUser.sub },
+      select: { role: true, status: true }
+    });
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException("Votre compte est désactivé.");
     }
-    return conversation;
+    if (user.role !== currentUser.role) {
+      throw new ForbiddenException("Votre session ne correspond plus à votre compte.");
+    }
+  }
+
+  private buildParticipantWhere(currentUser: JwtPayload): Prisma.ConversationWhereInput {
+    if (currentUser.role === Role.ADMIN) {
+      return {};
+    }
+    if (currentUser.role === Role.FAMILY) {
+      return { family: { is: { userId: currentUser.sub } } };
+    }
+    if (currentUser.role === Role.RESOURCE) {
+      return { resource: { is: { userId: currentUser.sub } } };
+    }
+    throw new ForbiddenException("Vous ne pouvez pas accéder aux conversations.");
+  }
+
+  private toConversationListView(conversation: ConversationListRecord) {
+    return {
+      id: conversation.id,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      family: this.toParticipantView(conversation.family),
+      resource: this.toParticipantView(conversation.resource),
+      messageCount: conversation._count.messages
+    };
+  }
+
+  private toConversationDetailView(conversation: ConversationDetailRecord) {
+    return {
+      id: conversation.id,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      family: this.toParticipantView(conversation.family),
+      resource: this.toParticipantView(conversation.resource),
+      messages: conversation.messages.map((message) => ({
+        id: message.id,
+        content: message.content,
+        createdAt: message.createdAt,
+        senderRole: this.resolveSenderRole(message.senderUserId, conversation)
+      }))
+    };
+  }
+
+  private toParticipantView(participant: { id: string; displayName: string }) {
+    return {
+      id: participant.id,
+      displayName: participant.displayName
+    };
+  }
+
+  private resolveSenderRole(
+    senderUserId: string,
+    conversation: Pick<ConversationDetailRecord, "family" | "resource">
+  ): "FAMILY" | "RESOURCE" {
+    if (senderUserId === conversation.family.userId) {
+      return Role.FAMILY;
+    }
+    if (senderUserId === conversation.resource.userId) {
+      return Role.RESOURCE;
+    }
+    throw new ForbiddenException("L'auteur de ce message ne participe pas à la conversation.");
   }
 }

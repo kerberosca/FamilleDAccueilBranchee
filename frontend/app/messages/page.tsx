@@ -10,16 +10,15 @@ import { RequireAuth } from "../../components/require-auth";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 
-type MeResponse = { id: string; email: string; role: string; status: string };
+type MeResponse = { role: "FAMILY" | "RESOURCE" | "ADMIN" };
 
 type ConversationListItem = {
   id: string;
-  familyId: string;
-  resourceId: string;
+  createdAt: string;
+  updatedAt: string;
   family: { id: string; displayName: string };
   resource: { id: string; displayName: string };
-  messages: Array<{ id: string; content: string; createdAt: string; senderUserId: string }>;
-  updatedAt: string;
+  messageCount: number;
 };
 
 function MessagesContent() {
@@ -160,7 +159,7 @@ function MessagesContent() {
                         href={`/messages/${c.id}`}
                         className="block rounded-xl border border-[#4f476f] bg-[#110d2a] px-3 py-2 text-sm text-[#b9ccff] no-underline transition-colors hover:bg-[#1a1438] hover:text-[#d3dfff]"
                       >
-                        Avec {label ?? "-"} - {c.messages?.length ?? 0} message(s)
+                        Avec {label ?? "-"} - {c.messageCount} message(s)
                       </Link>
                     </li>
                   );
@@ -187,4 +186,3 @@ export default function MessagesPage() {
     </Suspense>
   );
 }
-

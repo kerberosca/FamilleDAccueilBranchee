@@ -1436,130 +1436,448 @@ describe("Smoke e2e", () => {
     expect(audit.body.items.some((item: { action: string }) => item.action === "USER_STATUS_BULK_UPDATED")).toBe(true);
   });
 
-  it("POST/GET /api/v1/messaging couvre conversation famille-ressource", async () => {
-    const authService = app.get(AuthService);
-    const adminToken = await loginAs("ADMIN");
-    const familyUser = await prisma.user.create({
-      data: {
-        email: "e2e_message_family@local.test",
-        passwordHash: "hash",
-        role: Role.FAMILY,
-        status: UserStatus.ACTIVE,
-        familyProfile: {
-          create: {
-            displayName: "Famille message e2e",
-            postalCode: "H2X1Y4",
-            city: "Montreal",
-            region: "QC",
-            bio: "e2e",
-            needsTags: []
+  describe("protection des renseignements dans la messagerie", () => {
+    const initialMessage = "Bonjour, etes-vous disponible samedi?";
+    const resourceReply = "Oui, je suis disponible.";
+    const familyReply = "Parfait, merci pour votre reponse.";
+    const totalMessageCount = 54;
+    const privateSentinels = [
+      "private-family-login@messaging.test",
+      "PRIVATE_FAMILY_POSTAL_9Z9",
+      "PRIVATE_FAMILY_CITY",
+      "PRIVATE_FAMILY_REGION",
+      "PRIVATE_FAMILY_BIO",
+      "PRIVATE_FAMILY_NEED",
+      "PRIVATE_FAMILY_AVAILABILITY",
+      "private-resource-login@messaging.test",
+      "PRIVATE_RESOURCE_POSTAL_8Y8",
+      "PRIVATE_RESOURCE_CITY",
+      "PRIVATE_RESOURCE_REGION",
+      "PRIVATE_RESOURCE_STREET_ADDRESS",
+      "PRIVATE_RESOURCE_BIO",
+      "PRIVATE_RESOURCE_SKILL",
+      "9876.54",
+      "PRIVATE_RESOURCE_AVAILABILITY",
+      "private-resource-contact@messaging.test",
+      "PRIVATE_RESOURCE_PHONE_555_4242",
+      "PRIVATE_RESOURCE_QUESTIONNAIRE",
+      "PRIVATE_RESOURCE_APPLICATION",
+      "PRIVATE_RESOURCE_DOCUMENT_ORIGINAL.pdf",
+      "PRIVATE_RESOURCE_DOCUMENT_STORED.pdf"
+    ];
+
+    let familyToken: string;
+    let resourceToken: string;
+    let adminToken: string;
+    let outsiderFamilyToken: string;
+    let outsiderResourceToken: string;
+    let noSubscriptionFamilyToken: string;
+    let familyUserIdForMessaging: string;
+    let resourceUserIdForMessaging: string;
+    let familyProfileId: string;
+    let resourceProfileId: string;
+    let conversationId: string;
+    let createdBody: unknown;
+    let createdCacheControl: string | undefined;
+    let resourceReplyBody: unknown;
+    let resourceReplyCacheControl: string | undefined;
+    let familyReplyBody: unknown;
+    let familyReplyCacheControl: string | undefined;
+
+    beforeAll(async () => {
+      const authService = app.get(AuthService);
+      adminToken = await loginAs("ADMIN");
+      outsiderFamilyToken = await loginAs("FAMILLE");
+      outsiderResourceToken = await loginAs("RESSOURCE");
+
+      const familyUser = await prisma.user.create({
+        data: {
+          email: privateSentinels[0],
+          passwordHash: "PRIVATE_FAMILY_PASSWORD_HASH",
+          role: Role.FAMILY,
+          status: UserStatus.ACTIVE,
+          emailVerifiedAt: new Date("2031-01-02T03:04:05.000Z"),
+          familyProfile: {
+            create: {
+              displayName: "Famille message e2e",
+              postalCode: privateSentinels[1],
+              city: privateSentinels[2],
+              region: privateSentinels[3],
+              bio: privateSentinels[4],
+              needsTags: [privateSentinels[5]],
+              availability: { privateMarker: privateSentinels[6] }
+            }
+          },
+          subscriptions: {
+            create: {
+              status: SubscriptionStatus.ACTIVE,
+              stripeCustomerId: "PRIVATE_STRIPE_CUSTOMER_MESSAGE_FAMILY",
+              stripeSubscriptionId: "PRIVATE_STRIPE_SUBSCRIPTION_MESSAGE_FAMILY"
+            }
           }
         },
-        subscriptions: {
-          create: {
-            status: SubscriptionStatus.ACTIVE,
-            stripeCustomerId: "cus_message_family",
-            stripeSubscriptionId: "sub_message_family"
+        include: { familyProfile: true }
+      });
+      const resourceUser = await prisma.user.create({
+        data: {
+          email: privateSentinels[7],
+          passwordHash: "PRIVATE_RESOURCE_PASSWORD_HASH",
+          role: Role.RESOURCE,
+          status: UserStatus.ACTIVE,
+          emailVerifiedAt: new Date("2032-02-03T04:05:06.000Z"),
+          resourceProfile: {
+            create: {
+              allyType: AllyType.AUTRES,
+              displayName: "Ressource Message e2e",
+              postalCode: privateSentinels[8],
+              city: privateSentinels[9],
+              region: privateSentinels[10],
+              streetAddress: privateSentinels[11],
+              bio: privateSentinels[12],
+              skillsTags: [privateSentinels[13]],
+              hourlyRate: 9876.54,
+              serviceDeliveryMode: ResourceServiceDeliveryMode.REMOTE,
+              availability: { privateMarker: privateSentinels[15] },
+              verificationStatus: ResourceVerificationStatus.VERIFIED,
+              publishStatus: ResourcePublishStatus.PUBLISHED,
+              onboardingState: ResourceOnboardingState.PUBLISHED,
+              contactEmail: privateSentinels[16],
+              contactPhone: privateSentinels[17],
+              questionnaireAnswers: { privateMarker: privateSentinels[18] },
+              allyRegistration: { privateMarker: privateSentinels[19] },
+              allyDeclarationsAcceptedAt: new Date("2033-03-04T05:06:07.000Z"),
+              backgroundCheckStatus: BackgroundCheckStatus.RECEIVED
+            }
+          }
+        },
+        include: { resourceProfile: true }
+      });
+      familyUserIdForMessaging = familyUser.id;
+      resourceUserIdForMessaging = resourceUser.id;
+      familyProfileId = familyUser.familyProfile!.id;
+      resourceProfileId = resourceUser.resourceProfile!.id;
+      privateSentinels.push(
+        familyUserIdForMessaging,
+        resourceUserIdForMessaging,
+        "PRIVATE_FAMILY_PASSWORD_HASH",
+        "PRIVATE_RESOURCE_PASSWORD_HASH",
+        "PRIVATE_STRIPE_CUSTOMER_MESSAGE_FAMILY",
+        "PRIVATE_STRIPE_SUBSCRIPTION_MESSAGE_FAMILY"
+      );
+
+      await prisma.resourceDocument.create({
+        data: {
+          resourceProfileId,
+          type: ResourceDocumentType.CV,
+          originalName: privateSentinels[20],
+          storedName: privateSentinels[21],
+          mimeType: "application/private-messaging-test",
+          sizeBytes: 424242
+        }
+      });
+
+      const noSubscriptionFamily = await prisma.user.create({
+        data: {
+          email: "e2e_message_no_sub@local.test",
+          passwordHash: "hash",
+          role: Role.FAMILY,
+          status: UserStatus.ACTIVE,
+          familyProfile: {
+            create: {
+              displayName: "Famille message sans abo e2e",
+              postalCode: "H2X1Y4",
+              city: "Montreal",
+              region: "QC",
+              bio: "e2e",
+              needsTags: []
+            }
           }
         }
+      });
+      ({ accessToken: familyToken } = await authService.issueTokensForUser(familyUser.id));
+      ({ accessToken: resourceToken } = await authService.issueTokensForUser(resourceUser.id));
+      ({ accessToken: noSubscriptionFamilyToken } = await authService.issueTokensForUser(noSubscriptionFamily.id));
+
+      const created = await request(app.getHttpServer())
+        .post("/api/v1/messaging/conversations")
+        .set("Authorization", `Bearer ${familyToken}`)
+        .send({ resourceProfileId, initialMessage })
+        .expect(201);
+      createdBody = created.body;
+      createdCacheControl = created.headers["cache-control"];
+      conversationId = (created.body as { id: string }).id;
+
+      const historicalStart = Date.now() - 60_000;
+      await prisma.message.createMany({
+        data: Array.from({ length: 51 }, (_, index) => ({
+          conversationId,
+          senderUserId: index % 2 === 0 ? familyUser.id : resourceUser.id,
+          content: `Message historique ${index + 1}`,
+          createdAt: new Date(historicalStart + index)
+        }))
+      });
+
+      const replyFromResource = await request(app.getHttpServer())
+        .post(`/api/v1/messaging/conversations/${conversationId}/messages`)
+        .set("Authorization", `Bearer ${resourceToken}`)
+        .send({ content: resourceReply })
+        .expect(201);
+      resourceReplyBody = replyFromResource.body;
+      resourceReplyCacheControl = replyFromResource.headers["cache-control"];
+
+      const replyFromFamily = await request(app.getHttpServer())
+        .post(`/api/v1/messaging/conversations/${conversationId}/messages`)
+        .set("Authorization", `Bearer ${familyToken}`)
+        .send({ content: familyReply })
+        .expect(201);
+      familyReplyBody = replyFromFamily.body;
+      familyReplyCacheControl = replyFromFamily.headers["cache-control"];
+    });
+
+    it("limite exactement la reponse de creation et les reponses envoyees", () => {
+      expect(createdCacheControl).toBe("private, no-store");
+      expectMessagingConversationDetail(createdBody, {
+        familyProfileId,
+        resourceProfileId,
+        familyDisplayName: "Famille message e2e",
+        resourceDisplayName: "Ressource Message e2e",
+        expectedMessageCount: 1,
+        privateSentinels
+      });
+      expectMessageWithRole(createdBody, initialMessage, Role.FAMILY);
+
+      expect(resourceReplyCacheControl).toBe("private, no-store");
+      expectMessagingConversationDetail(resourceReplyBody, {
+        familyProfileId,
+        resourceProfileId,
+        familyDisplayName: "Famille message e2e",
+        resourceDisplayName: "Ressource Message e2e",
+        expectedMessageCount: totalMessageCount - 1,
+        privateSentinels
+      });
+      expectMessageWithRole(resourceReplyBody, resourceReply, Role.RESOURCE);
+
+      expect(familyReplyCacheControl).toBe("private, no-store");
+      expectMessagingConversationDetail(familyReplyBody, {
+        familyProfileId,
+        resourceProfileId,
+        familyDisplayName: "Famille message e2e",
+        resourceDisplayName: "Ressource Message e2e",
+        expectedMessageCount: totalMessageCount,
+        privateSentinels
+      });
+      expectMessageWithRole(familyReplyBody, familyReply, Role.FAMILY);
+    });
+
+    it.each([
+      ["Famille", () => familyToken],
+      ["Allie", () => resourceToken],
+      ["Administrateur", () => adminToken]
+    ])("retourne une liste minimale a %s avec le nombre total de messages", async (_label, getToken) => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/messaging/conversations")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .expect(200);
+
+      expect(response.headers["cache-control"]).toBe("private, no-store");
+      expect(Array.isArray(response.body)).toBe(true);
+      const conversation = (response.body as Array<{ id: string }>).find((item) => item.id === conversationId);
+      expect(conversation).toBeDefined();
+      expectMessagingConversationSummary(conversation, {
+        familyProfileId,
+        resourceProfileId,
+        familyDisplayName: "Famille message e2e",
+        resourceDisplayName: "Ressource Message e2e",
+        expectedMessageCount: totalMessageCount,
+        privateSentinels
+      });
+    });
+
+    it.each([
+      ["Famille", () => familyToken],
+      ["Allie", () => resourceToken],
+      ["Administrateur", () => adminToken]
+    ])("retourne un detail minimal a %s avec le role de chaque auteur", async (_label, getToken) => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/messaging/conversations/${conversationId}`)
+        .set("Authorization", `Bearer ${getToken()}`)
+        .expect(200);
+
+      expect(response.headers["cache-control"]).toBe("private, no-store");
+      expectMessagingConversationDetail(response.body, {
+        familyProfileId,
+        resourceProfileId,
+        familyDisplayName: "Famille message e2e",
+        resourceDisplayName: "Ressource Message e2e",
+        expectedMessageCount: totalMessageCount,
+        privateSentinels
+      });
+      expectMessageWithRole(response.body, initialMessage, Role.FAMILY);
+      expectMessageWithRole(response.body, resourceReply, Role.RESOURCE);
+      expectMessageWithRole(response.body, familyReply, Role.FAMILY);
+    });
+
+    it("refuse les non-participants et ne revele pas la conversation dans leurs listes", async () => {
+      for (const token of [outsiderFamilyToken, outsiderResourceToken]) {
+        const list = await request(app.getHttpServer())
+          .get("/api/v1/messaging/conversations")
+          .set("Authorization", `Bearer ${token}`)
+          .expect(200);
+        expect((list.body as Array<{ id: string }>).some((item) => item.id === conversationId)).toBe(false);
+
+        await request(app.getHttpServer())
+          .get(`/api/v1/messaging/conversations/${conversationId}`)
+          .set("Authorization", `Bearer ${token}`)
+          .expect(404);
+        await request(app.getHttpServer())
+          .post(`/api/v1/messaging/conversations/${conversationId}/messages`)
+          .set("Authorization", `Bearer ${token}`)
+          .send({ content: "Message non-participant interdit" })
+          .expect(404);
       }
     });
-    const resourceUser = await prisma.user.create({
-      data: {
-        email: "e2e_message_resource@local.test",
-        passwordHash: "hash",
-        role: Role.RESOURCE,
-        status: UserStatus.ACTIVE,
-        resourceProfile: {
-          create: {
-            displayName: "Ressource Message e2e",
-            postalCode: "H2X1Y4",
-            city: "Montreal",
-            region: "QC",
-            bio: "e2e",
-            skillsTags: ["repit"],
-            hourlyRate: 30,
-            verificationStatus: ResourceVerificationStatus.VERIFIED,
-            publishStatus: ResourcePublishStatus.PUBLISHED,
-            onboardingState: ResourceOnboardingState.PUBLISHED,
-            contactEmail: "message-resource@local.test",
-            contactPhone: "514-555-4242"
-          }
+
+    it.each([
+      ["Famille", Role.FAMILY, Role.ADMIN, "stale-family@messaging.test"],
+      ["Allie", Role.RESOURCE, Role.FAMILY, "stale-resource@messaging.test"],
+      ["Administrateur", Role.ADMIN, Role.RESOURCE, "stale-admin@messaging.test"]
+    ])("refuse le jeton %s devenu obsolete apres bannissement ou changement de role", async (
+      _label,
+      originalRole,
+      changedRole,
+      email
+    ) => {
+      const authService = app.get(AuthService);
+      const user = await prisma.user.create({
+        data: {
+          email,
+          passwordHash: "hash",
+          role: originalRole,
+          status: UserStatus.ACTIVE,
+          emailVerifiedAt: new Date()
         }
-      },
-      include: { resourceProfile: true }
+      });
+      const { accessToken } = await authService.issueTokensForUser(user.id);
+
+      try {
+        await prisma.user.update({ where: { id: user.id }, data: { status: UserStatus.BANNED } });
+        await request(app.getHttpServer())
+          .get("/api/v1/messaging/conversations")
+          .set("Authorization", `Bearer ${accessToken}`)
+          .expect(403);
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { status: UserStatus.ACTIVE, role: changedRole }
+        });
+        await request(app.getHttpServer())
+          .get("/api/v1/messaging/conversations")
+          .set("Authorization", `Bearer ${accessToken}`)
+          .expect(403);
+      } finally {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { status: UserStatus.ACTIVE, role: originalRole }
+        });
+      }
+
+      await request(app.getHttpServer())
+        .get("/api/v1/messaging/conversations")
+        .set("Authorization", `Bearer ${accessToken}`)
+        .expect(200);
     });
-    const { accessToken: familyToken } = await authService.issueTokensForUser(familyUser.id);
-    const { accessToken: resourceToken } = await authService.issueTokensForUser(resourceUser.id);
-    const resource = resourceUser.resourceProfile!;
 
-    const created = await request(app.getHttpServer())
-      .post("/api/v1/messaging/conversations")
-      .set("Authorization", `Bearer ${familyToken}`)
-      .send({
-        resourceProfileId: resource.id,
-        initialMessage: "Bonjour, etes-vous disponible samedi?"
-      })
-      .expect(201);
-
-    expect(created.body.resource.id).toBe(resource.id);
-    expect(created.body.messages).toHaveLength(1);
-    expect(created.body.messages[0].content).toContain("samedi");
-    const conversationId = created.body.id as string;
-
-    const familyList = await request(app.getHttpServer())
-      .get("/api/v1/messaging/conversations")
-      .set("Authorization", `Bearer ${familyToken}`)
-      .expect(200);
-    expect(familyList.body.some((conversation: { id: string }) => conversation.id === conversationId)).toBe(true);
-
-    const reply = await request(app.getHttpServer())
-      .post(`/api/v1/messaging/conversations/${conversationId}/messages`)
-      .set("Authorization", `Bearer ${resourceToken}`)
-      .send({ content: "Oui, je suis disponible." })
-      .expect(201);
-    expect(reply.body.messages).toHaveLength(2);
-
-    const adminRead = await request(app.getHttpServer())
-      .get(`/api/v1/messaging/conversations/${conversationId}`)
-      .set("Authorization", `Bearer ${adminToken}`)
-      .expect(200);
-    expect(adminRead.body.messages).toHaveLength(2);
-
-    await request(app.getHttpServer())
-      .post(`/api/v1/messaging/conversations/${conversationId}/messages`)
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({ content: "Message admin interdit" })
-      .expect(403);
-
-    const noSubFamily = await prisma.user.create({
-      data: {
-        email: "e2e_message_no_sub@local.test",
-        passwordHash: "hash",
-        role: Role.FAMILY,
-        status: UserStatus.ACTIVE,
-        familyProfile: {
-          create: {
-            displayName: "Famille message sans abo e2e",
-            postalCode: "H2X1Y4",
-            city: "Montreal",
-            region: "QC",
-            bio: "e2e",
-            needsTags: []
+    it("rend un allie masque indistinguable d'un identifiant inexistant a la creation", async () => {
+      const hiddenResourceUser = await prisma.user.create({
+        data: {
+          email: "hidden-resource@messaging.test",
+          passwordHash: "hash",
+          role: Role.RESOURCE,
+          status: UserStatus.ACTIVE,
+          emailVerifiedAt: new Date(),
+          resourceProfile: {
+            create: {
+              displayName: "PRIVATE_HIDDEN_RESOURCE_NAME",
+              postalCode: "PRIVATE_HIDDEN_RESOURCE_POSTAL",
+              city: "PRIVATE_HIDDEN_RESOURCE_CITY",
+              region: "PRIVATE_HIDDEN_RESOURCE_REGION",
+              skillsTags: ["PRIVATE_HIDDEN_RESOURCE_SKILL"],
+              verificationStatus: ResourceVerificationStatus.VERIFIED,
+              publishStatus: ResourcePublishStatus.HIDDEN,
+              onboardingState: ResourceOnboardingState.VERIFIED,
+              contactEmail: "private-hidden-resource@messaging.test",
+              contactPhone: "PRIVATE_HIDDEN_RESOURCE_PHONE"
+            }
           }
-        }
+        },
+        include: { resourceProfile: true }
+      });
+      const hiddenResourceId = hiddenResourceUser.resourceProfile!.id;
+      const nonexistentResourceId = "nonexistent-resource-profile-messaging-e2e";
+
+      const hidden = await request(app.getHttpServer())
+        .post("/api/v1/messaging/conversations")
+        .set("Authorization", `Bearer ${familyToken}`)
+        .send({ resourceProfileId: hiddenResourceId, initialMessage: "Tentative vers un profil masque" })
+        .expect(404);
+      const nonexistent = await request(app.getHttpServer())
+        .post("/api/v1/messaging/conversations")
+        .set("Authorization", `Bearer ${familyToken}`)
+        .send({ resourceProfileId: nonexistentResourceId, initialMessage: "Tentative vers un profil inexistant" })
+        .expect(404);
+
+      expect(hidden.body.statusCode).toBe(404);
+      expect(hidden.body.message).toBe(nonexistent.body.message);
+      expect(JSON.stringify(hidden.body)).not.toContain(hiddenResourceId);
+      expect(JSON.stringify(hidden.body)).not.toContain("PRIVATE_HIDDEN_RESOURCE");
+      expect(await prisma.conversation.count({ where: { resourceId: hiddenResourceId } })).toBe(0);
+    });
+
+    it("refuse tous les acces anonymes a la messagerie", async () => {
+      await request(app.getHttpServer()).get("/api/v1/messaging/conversations").expect(401);
+      await request(app.getHttpServer())
+        .post("/api/v1/messaging/conversations")
+        .send({ resourceProfileId, initialMessage: "Message anonyme interdit" })
+        .expect(401);
+      await request(app.getHttpServer()).get(`/api/v1/messaging/conversations/${conversationId}`).expect(401);
+      await request(app.getHttpServer())
+        .post(`/api/v1/messaging/conversations/${conversationId}/messages`)
+        .send({ content: "Message anonyme interdit" })
+        .expect(401);
+    });
+
+    it("maintient l'administrateur en lecture seule et exige l'abonnement pour demarrer", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/messaging/conversations/${conversationId}/messages`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ content: "Message admin interdit" })
+        .expect(403);
+      await request(app.getHttpServer())
+        .post("/api/v1/messaging/conversations")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ resourceProfileId, initialMessage: "Conversation admin interdite" })
+        .expect(403);
+      await request(app.getHttpServer())
+        .post("/api/v1/messaging/conversations")
+        .set("Authorization", `Bearer ${noSubscriptionFamilyToken}`)
+        .send({ resourceProfileId, initialMessage: "Tentative sans abonnement" })
+        .expect(403);
+    });
+
+    it("reserve les coordonnees a la fiche premium de l'allie", async () => {
+      const profile = await request(app.getHttpServer())
+        .get(`/api/v1/profiles/resource/${resourceProfileId}`)
+        .set("Authorization", `Bearer ${familyToken}`)
+        .expect(200);
+
+      expect(profile.body.contactEmail).toBe(privateSentinels[16]);
+      expect(profile.body.contactPhone).toBe(privateSentinels[17]);
+      expect(profile.body.canContact).toBe(true);
+
+      for (const payload of [createdBody, resourceReplyBody, familyReplyBody]) {
+        expectSerializedPayloadToExclude(payload, privateSentinels);
       }
     });
-    const { accessToken: noSubToken } = await authService.issueTokensForUser(noSubFamily.id);
-
-    await request(app.getHttpServer())
-      .post("/api/v1/messaging/conversations")
-      .set("Authorization", `Bearer ${noSubToken}`)
-      .send({
-        resourceProfileId: resource.id,
-        initialMessage: "Tentative sans abonnement"
-      })
-      .expect(403);
   });
 
   it("GET/POST/DELETE /api/v1/resource-documents couvre upload, download et audit admin", async () => {
@@ -2670,6 +2988,87 @@ describe("Smoke e2e", () => {
     return res.body.accessToken as string;
   }
 });
+
+type MessagingContractExpectation = {
+  familyProfileId: string;
+  resourceProfileId: string;
+  familyDisplayName: string;
+  resourceDisplayName: string;
+  expectedMessageCount: number;
+  privateSentinels: readonly string[];
+};
+
+function expectMessagingConversationSummary(payload: unknown, expected: MessagingContractExpectation) {
+  expectExactObjectKeys(payload, ["id", "createdAt", "updatedAt", "family", "resource", "messageCount"]);
+  const conversation = payload as {
+    id: unknown;
+    createdAt: unknown;
+    updatedAt: unknown;
+    family: unknown;
+    resource: unknown;
+    messageCount: unknown;
+  };
+  expect(conversation.id).toEqual(expect.any(String));
+  expect(conversation.createdAt).toEqual(expect.any(String));
+  expect(conversation.updatedAt).toEqual(expect.any(String));
+  expect(conversation.messageCount).toBe(expected.expectedMessageCount);
+  expectMessagingParticipant(conversation.family, expected.familyProfileId, expected.familyDisplayName);
+  expectMessagingParticipant(conversation.resource, expected.resourceProfileId, expected.resourceDisplayName);
+  expectSerializedPayloadToExclude(payload, expected.privateSentinels);
+}
+
+function expectMessagingConversationDetail(payload: unknown, expected: MessagingContractExpectation) {
+  expectExactObjectKeys(payload, ["id", "createdAt", "updatedAt", "family", "resource", "messages"]);
+  const conversation = payload as {
+    id: unknown;
+    createdAt: unknown;
+    updatedAt: unknown;
+    family: unknown;
+    resource: unknown;
+    messages: unknown;
+  };
+  expect(conversation.id).toEqual(expect.any(String));
+  expect(conversation.createdAt).toEqual(expect.any(String));
+  expect(conversation.updatedAt).toEqual(expect.any(String));
+  expectMessagingParticipant(conversation.family, expected.familyProfileId, expected.familyDisplayName);
+  expectMessagingParticipant(conversation.resource, expected.resourceProfileId, expected.resourceDisplayName);
+  expect(Array.isArray(conversation.messages)).toBe(true);
+  expect(conversation.messages).toHaveLength(expected.expectedMessageCount);
+  for (const message of conversation.messages as unknown[]) {
+    expectExactObjectKeys(message, ["id", "content", "createdAt", "senderRole"]);
+    expect((message as { id: unknown }).id).toEqual(expect.any(String));
+    expect((message as { content: unknown }).content).toEqual(expect.any(String));
+    expect((message as { createdAt: unknown }).createdAt).toEqual(expect.any(String));
+    expect([Role.FAMILY, Role.RESOURCE]).toContain((message as { senderRole: unknown }).senderRole);
+  }
+  expectSerializedPayloadToExclude(payload, expected.privateSentinels);
+}
+
+function expectMessagingParticipant(payload: unknown, id: string, displayName: string) {
+  expectExactObjectKeys(payload, ["id", "displayName"]);
+  expect(payload).toEqual({ id, displayName });
+}
+
+function expectMessageWithRole(payload: unknown, content: string, senderRole: Role) {
+  const messages = (payload as { messages: Array<{ content: string; senderRole: Role }> }).messages;
+  expect(messages.find((message) => message.content === content)).toEqual(
+    expect.objectContaining({ content, senderRole })
+  );
+}
+
+function expectExactObjectKeys(payload: unknown, keys: readonly string[]) {
+  expect(payload).not.toBeNull();
+  expect(typeof payload).toBe("object");
+  expect(Array.isArray(payload)).toBe(false);
+  expect(Object.keys(payload as Record<string, unknown>).sort()).toEqual([...keys].sort());
+}
+
+function expectSerializedPayloadToExclude(payload: unknown, sentinels: readonly string[]) {
+  const serialized = JSON.stringify(payload);
+  for (const sentinel of sentinels) {
+    expect(serialized).not.toContain(sentinel);
+  }
+}
 
 function refreshTokenFromSetCookie(res: { headers: Record<string, string | string[] | undefined> }): string | null {
   const raw = res.headers["set-cookie"];

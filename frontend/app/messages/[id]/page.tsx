@@ -10,18 +10,22 @@ import { RequireAuth } from "../../../components/require-auth";
 import { apiGet, apiPost } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
 
-type MeResponse = { id: string; email: string; role: string };
+type MeResponse = { role: "FAMILY" | "RESOURCE" | "ADMIN" };
 
-type Message = { id: string; content: string; createdAt: string; senderUserId: string };
+type Message = {
+  id: string;
+  content: string;
+  createdAt: string;
+  senderRole: "FAMILY" | "RESOURCE";
+};
 
 type ConversationDetail = {
   id: string;
-  familyId: string;
-  resourceId: string;
+  createdAt: string;
+  updatedAt: string;
   family: { id: string; displayName: string };
   resource: { id: string; displayName: string };
   messages: Message[];
-  updatedAt: string;
 };
 
 export default function ConversationPage() {
@@ -126,7 +130,9 @@ export default function ConversationPage() {
               <Card className="flex max-h-[70vh] flex-col border-[#4e4771] bg-[#171134]/75 p-0 backdrop-blur-sm">
                 <div className="flex-1 space-y-2 overflow-y-auto p-3">
                   {conversation.messages?.map((msg) => {
-                    const isMe = Boolean(me && msg.senderUserId === me.id);
+                    const isMe = me?.role === msg.senderRole;
+                    const senderLabel =
+                      me?.role === "ADMIN" ? (msg.senderRole === "FAMILY" ? "Famille" : "Allié") : isMe ? "Vous" : "Autre";
                     return (
                       <div
                         key={msg.id}
@@ -136,7 +142,7 @@ export default function ConversationPage() {
                             : "mr-8 border-[#4f476f] bg-[#110d2a]"
                         }`}
                       >
-                        <span className="font-medium text-white">{isMe ? "Vous" : "Autre"}</span>
+                        <span className="font-medium text-white">{senderLabel}</span>
                         <span className="ml-2 text-slate-200">{msg.content}</span>
                         <p className="mt-1 text-xs text-slate-400">{new Date(msg.createdAt).toLocaleString("fr-CA")}</p>
                       </div>
@@ -186,4 +192,3 @@ export default function ConversationPage() {
     </main>
   );
 }
-
