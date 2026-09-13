@@ -2639,6 +2639,16 @@ describe("Smoke e2e", () => {
       expect.arrayContaining([ResourceDocumentType.BACKGROUND_CHECK, ResourceDocumentType.RCR_PROOF])
     );
 
+    const malformedMultipart = await request(app.getHttpServer())
+      .post(`/api/v1/resource-documents/me?type=${ResourceDocumentType.BACKGROUND_CHECK}`)
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .field("items[4294967294]", "x")
+      .field("items[]", "y");
+    expect(malformedMultipart.status).toBeGreaterThanOrEqual(400);
+    expect(malformedMultipart.status).toBeLessThan(600);
+
+    await request(app.getHttpServer()).get("/api/v1/health").expect(200);
+
     await request(app.getHttpServer())
       .post(`/api/v1/resource-documents/me?type=${ResourceDocumentType.BACKGROUND_CHECK}`)
       .set("Authorization", `Bearer ${resourceToken}`)
