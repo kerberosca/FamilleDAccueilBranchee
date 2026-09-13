@@ -16,8 +16,8 @@ Document de planification du parcours d’inscription et de gestion des **allié
 
 ## Contexte actuel (résumé)
 
-- Inscription avec rôle **RESOURCE** : formulaire (email, mot de passe, nom, code postal, ville, région, bio, tags) → compte + `ResourceProfile` créés, état **PENDING_PAYMENT**.
-- Ensuite : étape « Payer les frais d’inscription » (Stripe). Après paiement → **PENDING_VERIFICATION**.
+- Inscription avec rôle **RESOURCE** : formulaire (email, mot de passe, nom, code postal, ville, région, bio, tags) → compte + `ResourceProfile` créés, état **PENDING_VERIFICATION**. L'inscription allié est gratuite.
+- Ensuite : passage direct vers la candidature, les documents, la formation et la validation. Aucun paiement allié.
 - **Objectif** : inscription **gratuite** pour les alliés, choix du **type** (Ménage, Gardiens, Autres), puis **questionnaire** et **demande de vérification d’antécédents judiciaires**.
 
 ---

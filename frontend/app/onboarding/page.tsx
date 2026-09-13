@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { Card } from "../../components/ui/card";
+import { useFamilyReadiness } from "../../lib/family-readiness";
 
 const PATHS = [
   {
     title: "Famille",
-    description: "Créer un compte FAMILY puis activer l'abonnement.",
+    description: "Créer un compte famille et préparer votre profil.",
     href: "/onboarding/family",
     badgeClass: "bg-[#f17d55]",
   },
@@ -26,6 +27,8 @@ const PATHS = [
 ];
 
 export default function OnboardingPage() {
+  const { isOpen } = useFamilyReadiness();
+
   return (
     <main className="relative isolate overflow-hidden px-4 pb-16 pt-8 sm:px-6 lg:px-8">
       <div className="pointer-events-none absolute inset-0 -z-10">
@@ -56,7 +59,11 @@ export default function OnboardingPage() {
                 {index + 1}
               </span>
               <h2 className="mt-3 text-lg font-semibold text-white">{item.title}</h2>
-              <p className="mt-2 text-sm text-slate-300">{item.description}</p>
+              <p className="mt-2 text-sm text-slate-300">
+                {item.title === "Famille" && !isOpen
+                  ? "Créez votre compte préparatoire, complétez votre profil et consultez un aperçu des alliés."
+                  : item.description}
+              </p>
               <Link
                 className="mt-4 inline-flex rounded-xl border border-[#6f8fe2]/45 bg-[#1d1840] px-4 py-2 text-sm font-medium text-[#b9ccff] no-underline hover:bg-[#292358] hover:text-[#d4dfff]"
                 href={item.href}

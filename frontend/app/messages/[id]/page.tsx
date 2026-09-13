@@ -9,6 +9,7 @@ import { Card } from "../../../components/ui/card";
 import { RequireAuth } from "../../../components/require-auth";
 import { apiGet, apiPost } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
+import { FamilySubscriptionSummary, useFamilyReadiness } from "../../../lib/family-readiness";
 
 type MeResponse = { role: "FAMILY" | "RESOURCE" | "ADMIN" };
 
@@ -33,7 +34,9 @@ export default function ConversationPage() {
   const router = useRouter();
   const conversationId = typeof params.id === "string" ? params.id : "";
   const { accessToken, isAuthLoading } = useAuth();
+  const { isOpen: isFamilyBillingOpen } = useFamilyReadiness();
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [familySubscription, setFamilySubscription] = useState<FamilySubscriptionSummary | null>(null);
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,11 +50,15 @@ export default function ConversationPage() {
       setLoading(true);
       setError(null);
       try {
-        const [meData, convData] = await Promise.all([
-          apiGet<MeResponse>("/users/me", { token: accessToken }),
+        const meData = await apiGet<MeResponse>("/users/me", { token: accessToken });
+        const [convData, subscription] = await Promise.all([
           apiGet<ConversationDetail>(`/messaging/conversations/${conversationId}`, { token: accessToken }),
+          meData.role === "FAMILY"
+            ? apiGet<FamilySubscriptionSummary>("/billing/family/subscription", { token: accessToken })
+            : Promise.resolve(null),
         ]);
         setMe(meData);
+        setFamilySubscription(subscription);
         setConversation(convData);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Conversation introuvable.");
@@ -84,6 +91,13 @@ export default function ConversationPage() {
       setSending(false);
     }
   };
+
+  const familyCanReply = me?.role !== "FAMILY" || Boolean(familySubscription?.hasPremiumAccess);
+  const familyAccessMessage = familySubscription?.needsAdminReview
+    ? "Votre ancien abonnement doit être vérifié par l'équipe FAB avant de reprendre les échanges."
+    : isFamilyBillingOpen
+      ? "Votre abonnement famille doit être actif pour envoyer un message. La conversation demeure accessible en lecture."
+      : "L'envoi de messages sera accessible à l'ouverture des abonnements famille. La conversation demeure accessible en lecture.";
 
   return (
     <main className="relative isolate overflow-hidden px-4 pb-16 pt-8 sm:px-6 lg:px-8">
@@ -154,6 +168,10 @@ export default function ConversationPage() {
                 {me?.role === "ADMIN" ? (
                   <div className="border-t border-[#4f476f] p-3">
                     <Alert tone="info">Lecture seule : les administrateurs ne peuvent pas envoyer de messages ici.</Alert>
+                  </div>
+                ) : me?.role === "FAMILY" && !familyCanReply ? (
+                  <div className="border-t border-[#4f476f] p-3">
+                    <Alert tone="info">{familyAccessMessage}</Alert>
                   </div>
                 ) : (
                   <form onSubmit={onSubmitMessage} className="flex gap-2 border-t border-[#4f476f] p-3">

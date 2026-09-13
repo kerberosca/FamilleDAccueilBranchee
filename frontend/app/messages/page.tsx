@@ -9,6 +9,7 @@ import { Card } from "../../components/ui/card";
 import { RequireAuth } from "../../components/require-auth";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
+import { FamilySubscriptionSummary, useFamilyReadiness } from "../../lib/family-readiness";
 
 type MeResponse = { role: "FAMILY" | "RESOURCE" | "ADMIN" };
 
@@ -26,7 +27,9 @@ function MessagesContent() {
   const searchParams = useSearchParams();
   const contactResourceId = searchParams.get("contact");
   const { accessToken, isAuthLoading } = useAuth();
+  const { isOpen: isFamilyBillingOpen } = useFamilyReadiness();
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [familySubscription, setFamilySubscription] = useState<FamilySubscriptionSummary | null>(null);
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,11 +42,15 @@ function MessagesContent() {
       setLoading(true);
       setError(null);
       try {
-        const [meData, convData] = await Promise.all([
-          apiGet<MeResponse>("/users/me", { token: accessToken }),
+        const meData = await apiGet<MeResponse>("/users/me", { token: accessToken });
+        const [convData, subscription] = await Promise.all([
           apiGet<ConversationListItem[]>("/messaging/conversations", { token: accessToken }),
+          meData.role === "FAMILY"
+            ? apiGet<FamilySubscriptionSummary>("/billing/family/subscription", { token: accessToken })
+            : Promise.resolve(null),
         ]);
         setMe(meData);
+        setFamilySubscription(subscription);
         setConversations(Array.isArray(convData) ? convData : []);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erreur lors du chargement.");
@@ -71,6 +78,13 @@ function MessagesContent() {
       setSending(false);
     }
   };
+
+  const familyCanMessage = me?.role !== "FAMILY" || Boolean(familySubscription?.hasPremiumAccess);
+  const familyAccessMessage = familySubscription?.needsAdminReview
+    ? "Votre ancien abonnement doit être vérifié par l'équipe FAB avant de reprendre les échanges."
+    : isFamilyBillingOpen
+      ? "Un abonnement famille actif est requis pour écrire à un allié. Vous pouvez gérer votre abonnement dans Mon profil."
+      : "La messagerie avec les alliés sera accessible à l'ouverture des abonnements famille. Vous pouvez déjà compléter votre profil et consulter le répertoire en aperçu.";
 
   return (
     <main className="relative isolate overflow-hidden px-4 pb-16 pt-8 sm:px-6 lg:px-8">
@@ -101,11 +115,14 @@ function MessagesContent() {
           {me?.role === "ADMIN" && !loading ? (
             <Alert tone="info">En tant qu’administrateur, vous voyez toutes les conversations ; l’envoi de messages n’est pas disponible depuis ce compte.</Alert>
           ) : null}
+          {me?.role === "FAMILY" && !familyCanMessage && !loading ? (
+            <Alert tone="info">{familyAccessMessage}</Alert>
+          ) : null}
 
           {contactResourceId && me && !loading ? (
             <Card className="space-y-3 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
               <h2 className="text-lg font-medium text-white">Nouvelle conversation</h2>
-              {me.role === "FAMILY" ? (
+              {me.role === "FAMILY" && familyCanMessage ? (
                 <form onSubmit={onSubmitNewConversation} className="grid gap-3">
                   <textarea
                     className="min-h-28 w-full rounded-md border border-[#4f476f] bg-[#0f0b24] px-3 py-2 text-sm text-slate-100 placeholder:text-[#8b84ad] focus:border-[#6f8fe2] focus:outline-none focus:ring-1 focus:ring-[#6f8fe2]/35"
@@ -132,6 +149,8 @@ function MessagesContent() {
                     </Button>
                   </div>
                 </form>
+              ) : me.role === "FAMILY" ? (
+                <p className="text-sm text-slate-300">{familyAccessMessage}</p>
               ) : me.role === "ADMIN" ? (
                 <Alert tone="info">Les administrateurs ne peuvent pas ouvrir une nouvelle conversation depuis cette page.</Alert>
               ) : (

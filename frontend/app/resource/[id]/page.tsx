@@ -7,6 +7,7 @@ import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { ApiError, apiGet } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
+import { useFamilyReadiness } from "../../../lib/family-readiness";
 
 type ResourceDetail = {
   id: string;
@@ -31,6 +32,7 @@ export default function ResourceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { accessToken, isAuthenticated, isAuthLoading } = useAuth();
+  const { isOpen: isFamilyBillingOpen } = useFamilyReadiness();
   const resourceId = typeof params.id === "string" ? params.id : "";
   const [resource, setResource] = useState<ResourceDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -142,16 +144,20 @@ export default function ResourceDetailPage() {
             {resource.contactPhone ? <p>Téléphone de contact : {resource.contactPhone}</p> : null}
           </div>
         ) : (
-          <Alert tone="info">Coordonnées visibles avec un abonnement famille actif.</Alert>
+          <Alert tone="info">
+            {isFamilyBillingOpen
+              ? "Les coordonnées sont visibles avec un abonnement famille actif."
+              : "Les coordonnées et la prise de contact seront accessibles à l'ouverture des abonnements famille."}
+          </Alert>
         )}
 
-        {!isAuthenticated ? (
-          <div className="pt-2">
-            <Button onClick={handleContact}>Se connecter pour contacter</Button>
-          </div>
-        ) : canContact ? (
+        {canContact ? (
           <div className="pt-2">
             <Button onClick={handleContact}>Contacter cet allié</Button>
+          </div>
+        ) : !isFamilyBillingOpen ? null : !isAuthenticated ? (
+          <div className="pt-2">
+            <Button onClick={handleContact}>Se connecter pour contacter</Button>
           </div>
         ) : (
           <Alert tone="info">Activez un abonnement famille pour contacter cet allié.</Alert>

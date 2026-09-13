@@ -9,6 +9,7 @@ import { Input } from "../../../components/ui/input";
 import { PasswordStrength } from "../../../components/ui/password-strength";
 import { apiPost } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
+import { useFamilyReadiness } from "../../../lib/family-readiness";
 
 type RegisterResponse = {
   accessToken: string;
@@ -16,13 +17,9 @@ type RegisterResponse = {
   user: { id: string; role: string; email: string };
 };
 
-type CheckoutResponse = {
-  checkoutUrl: string;
-  sessionId: string;
-};
-
 export default function FamilyOnboardingPage() {
   const { accessToken, setTokens } = useAuth();
+  const { isOpen } = useFamilyReadiness();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -33,7 +30,6 @@ export default function FamilyOnboardingPage() {
   const [tags, setTags] = useState("");
   const [acceptPolicy, setAcceptPolicy] = useState(false);
   const [loadingRegister, setLoadingRegister] = useState(false);
-  const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -64,30 +60,15 @@ export default function FamilyOnboardingPage() {
         },
       });
       setTokens(response.accessToken, response.refreshToken ?? null);
-      setSuccess("Compte famille créé. Vous pouvez maintenant lancer le paiement d’abonnement.");
+      setSuccess(
+        isOpen
+          ? "Votre compte famille est créé. Un courriel de confirmation vous a été envoyé. Confirmez votre adresse, puis consultez l'offre dans votre profil."
+          : "Votre compte préparatoire est créé. Un courriel de confirmation vous a été envoyé. Vous pouvez maintenant compléter votre profil et consulter un aperçu des alliés. Aucun paiement n'est possible pour le moment."
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
       setLoadingRegister(false);
-    }
-  };
-
-  const onCheckout = async () => {
-    if (!accessToken) {
-      setError("Session introuvable. Inscrivez-vous d’abord.");
-      return;
-    }
-    setError(null);
-    setLoadingCheckout(true);
-    try {
-      const session = await apiPost<CheckoutResponse>("/billing/family/checkout-session", {
-        token: accessToken,
-      });
-      window.location.href = session.checkoutUrl;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur inconnue");
-    } finally {
-      setLoadingCheckout(false);
     }
   };
 
@@ -108,9 +89,19 @@ export default function FamilyOnboardingPage() {
         <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
           <h1 className="text-2xl font-semibold sm:text-3xl">Inscription famille</h1>
           <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
-            Créez votre espace puis activez l'abonnement pour contacter les alliés.
+            {isOpen
+              ? "Créez votre espace puis choisissez votre abonnement pour contacter les alliés."
+              : "Créez votre compte préparatoire et découvrez les alliés disponibles dans votre secteur."}
           </p>
         </section>
+
+        {!isOpen ? (
+          <Alert tone="info">
+            Vous pouvez créer votre compte, confirmer votre courriel, compléter votre profil et consulter un aperçu
+            des alliés. Les abonnements, les coordonnées et la messagerie seront accessibles prochainement. Aucun
+            paiement n'est possible pour le moment.
+          </Alert>
+        ) : null}
 
         <p className="text-sm text-slate-200">
           Vos données seront enregistrées pour la mise en relation. Vous pourrez supprimer votre compte depuis « Mon
@@ -205,15 +196,18 @@ export default function FamilyOnboardingPage() {
         </Card>
 
         <Card className="space-y-2 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
-          <p className="text-sm text-slate-300">Étape suivante : activer l’abonnement famille via Stripe.</p>
-          <Button
-            type="button"
-            onClick={onCheckout}
-            disabled={loadingCheckout || !accessToken}
-            className="!rounded-xl !bg-[#3567b7] !font-semibold hover:!bg-[#2f5da6]"
+          <p className="text-sm text-slate-300">
+            {isOpen
+              ? "Étape suivante : confirmez votre courriel. L'offre et le paiement sécurisé seront ensuite présentés dans votre profil."
+              : "Étape suivante : confirmez votre courriel, puis complétez les informations de votre famille dans votre profil."}
+          </p>
+          <Link
+            href="/me"
+            aria-disabled={!accessToken}
+            className={`inline-flex rounded-xl bg-[#3567b7] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2f5da6] ${!accessToken ? "pointer-events-none opacity-50" : ""}`}
           >
-            {loadingCheckout ? "Redirection…" : "Activer l’abonnement famille"}
-          </Button>
+            Continuer vers mon profil
+          </Link>
         </Card>
 
         {success ? <Alert tone="info">{success}</Alert> : null}

@@ -22,8 +22,16 @@ type FamilyItem = {
   email: string;
   role: string;
   status: "ACTIVE" | "BANNED";
-  profile: { displayName: string; city: string; region: string; postalCode: string } | null;
-  subscription: { status: string; currentPeriodEnd?: string | null } | null;
+  profile: { displayName: string; city: string; region: string; postalCode: string; isInternalTest: boolean } | null;
+  subscription: {
+    status: string;
+    environment: "LEGACY" | "TEST" | "LIVE";
+    currentPeriodEnd?: string | null;
+    cancelAtPeriodEnd: boolean;
+    paymentFailedAt?: string | null;
+    lastSyncedAt?: string | null;
+    lastSyncError?: string | null;
+  } | null;
 };
 type FamiliesResponse = PageMeta & { items: FamilyItem[] };
 
@@ -119,8 +127,13 @@ const ACCOUNT_STATUS_LABELS: Record<string, string> = {
 const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
   ACTIVE: "Actif",
   INACTIVE: "Inactif",
+  INCOMPLETE: "Paiement incomplet",
+  INCOMPLETE_EXPIRED: "Paiement expiré",
+  TRIALING: "Actif",
   PAST_DUE: "Paiement en retard",
-  CANCELED: "Annulé"
+  CANCELED: "Annulé",
+  UNPAID: "Impayé",
+  PAUSED: "En pause"
 };
 const VERIFICATION_STATUS_LABELS: Record<string, string> = {
   DRAFT: "Brouillon",
@@ -211,6 +224,7 @@ export default function AdminPage() {
 
   const [familyQuery, setFamilyQuery] = useState("");
   const [familyStatus, setFamilyStatus] = useState("");
+  const [familyTestProfileFilter, setFamilyTestProfileFilter] = useState("exclude");
   const [familySortBy, setFamilySortBy] = useState("createdAt");
   const [familySortOrder, setFamilySortOrder] = useState("desc");
 
@@ -251,8 +265,17 @@ export default function AdminPage() {
     if (familyStatus) {
       params.set("status", familyStatus);
     }
+    params.set("testProfile", familyTestProfileFilter);
     return `/users/families?${params.toString()}`;
-  }, [familiesMeta.page, familiesMeta.pageSize, familySortBy, familySortOrder, familyQuery, familyStatus]);
+  }, [
+    familiesMeta.page,
+    familiesMeta.pageSize,
+    familySortBy,
+    familySortOrder,
+    familyQuery,
+    familyStatus,
+    familyTestProfileFilter
+  ]);
 
   const resourcesUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -513,6 +536,42 @@ export default function AdminPage() {
     }
   };
 
+  const setFamilyInternalTest = async (family: FamilyItem) => {
+    if (!accessToken || !family.profile) return;
+    const enable = !family.profile.isInternalTest;
+    const message = enable
+      ? `Marquer « ${family.profile.displayName} » (${family.email}) comme famille de test interne?\n\nElle pourra utiliser Stripe uniquement lorsque FAB sera en mode TEST. Elle sera toujours bloquée en mode LIVE.`
+      : `Retirer le statut de test interne de « ${family.profile.displayName} »?\n\nElle ne pourra plus utiliser les paiements de sandbox.`;
+    if (!window.confirm(message)) return;
+    setBusyId(`family-test-${family.id}`);
+    setError(null);
+    try {
+      await apiPatch(`/users/families/${family.id}/internal-test`, {
+        token: accessToken,
+        body: { isInternalTest: enable }
+      });
+      await refreshCurrentTab();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Le statut de test n'a pas pu être modifié.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const resyncFamilySubscription = async (family: FamilyItem) => {
+    if (!accessToken) return;
+    setBusyId(`family-sync-${family.id}`);
+    setError(null);
+    try {
+      await apiPost(`/billing/admin/families/${family.id}/resync`, { token: accessToken });
+      await refreshCurrentTab();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "L'abonnement n'a pas pu être resynchronisé.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const setResourceInternalTest = async (resource: ResourceItem) => {
     if (!accessToken) return;
     const enable = !resource.isInternalTest;
@@ -657,7 +716,7 @@ export default function AdminPage() {
 
             {tab === "families" ? (
               <Card className={`space-y-3 ${ADMIN_CARD_CLASS}`}>
-                <div className="grid min-w-0 gap-2 md:grid-cols-5">
+                <div className="grid min-w-0 gap-2 md:grid-cols-2 xl:grid-cols-6">
                   <Input placeholder="Recherche courriel, nom, ville, code postal" value={familyQuery} onChange={(e) => setFamilyQuery(e.target.value)} />
                   <select className={SELECT_CLASS} value={familyStatus} onChange={(e) => setFamilyStatus(e.target.value)}>
                     <option value="">Tous les statuts</option>
@@ -702,7 +761,12 @@ export default function AdminPage() {
                         <input type="checkbox" checked={selectedFamilyIds.includes(family.id)} onChange={() => toggleFamilySelection(family.id)} />
                         <div className={`text-sm ${ADMIN_TEXT_CLASS}`}>
                           <p>
-                            <strong>{family.profile?.displayName ?? "(sans profil)"}</strong> - {family.email}
+                            <strong>{family.profile?.displayName ?? "(sans profil)"}</strong> - {family.email}{" "}
+                            {family.profile?.isInternalTest ? (
+                              <span className="ml-1 rounded-full bg-violet-500/20 px-2 py-0.5 text-xs font-medium text-violet-200">
+                                Test interne
+                              </span>
+                            ) : null}
                           </p>
                           <p>
                             Statut du compte : {formatLabel(ACCOUNT_STATUS_LABELS, family.status)} | Abonnement :{" "}
@@ -711,6 +775,26 @@ export default function AdminPage() {
                           <p>
                             Localisation: {family.profile?.city ?? "-"}, {family.profile?.region ?? "-"} ({family.profile?.postalCode ?? "-"})
                           </p>
+                          {family.subscription ? (
+                            <p className="text-xs text-slate-400">
+                              Environnement : {family.subscription.environment}
+                              {family.subscription.currentPeriodEnd
+                                ? ` · Fin de période : ${new Date(family.subscription.currentPeriodEnd).toLocaleDateString("fr-CA")}`
+                                : ""}
+                              {family.subscription.cancelAtPeriodEnd ? " · Annulation planifiée" : ""}
+                              {family.subscription.paymentFailedAt ? " · Dernier paiement échoué" : ""}
+                            </p>
+                          ) : null}
+                          {family.subscription?.environment === "LEGACY" ? (
+                            <p className="text-xs font-medium text-amber-200">
+                              Ancien abonnement en quarantaine : révision administrative requise.
+                            </p>
+                          ) : null}
+                          {family.subscription?.lastSyncError ? (
+                            <p className="text-xs text-rose-300">
+                              Erreur de synchronisation : {family.subscription.lastSyncError}
+                            </p>
+                          ) : null}
                         </div>
                       </label>
                       <div className="flex flex-wrap items-center gap-2">
@@ -733,6 +817,22 @@ export default function AdminPage() {
                         <Button disabled={busyId === family.id || family.status === "BANNED"} onClick={() => void updateFamilyStatus(family.id, "BANNED")}>
                           Bannir
                         </Button>
+                        <Button
+                          variant="secondary"
+                          disabled={!family.profile || busyId === `family-test-${family.id}`}
+                          onClick={() => void setFamilyInternalTest(family)}
+                        >
+                          {family.profile?.isInternalTest ? "Retirer le statut test" : "Marquer comme test interne"}
+                        </Button>
+                        {family.subscription && family.subscription.environment !== "LEGACY" ? (
+                          <Button
+                            variant="secondary"
+                            disabled={busyId === `family-sync-${family.id}`}
+                            onClick={() => void resyncFamilySubscription(family)}
+                          >
+                            Resynchroniser Stripe
+                          </Button>
+                        ) : null}
                         <Button
                           variant="secondary"
                           disabled={busyId === `delete-family-${family.id}`}
@@ -780,6 +880,16 @@ export default function AdminPage() {
                     <option value="HIDDEN">Masqué</option>
                     <option value="PUBLISHED">Publié</option>
                     <option value="SUSPENDED">Suspendu</option>
+                  </select>
+                  <select
+                    aria-label="Type de profil famille"
+                    className={SELECT_CLASS}
+                    value={familyTestProfileFilter}
+                    onChange={(e) => setFamilyTestProfileFilter(e.target.value)}
+                  >
+                    <option value="exclude">Familles opérationnelles</option>
+                    <option value="only">Tests internes</option>
+                    <option value="all">Toutes les familles</option>
                   </select>
                   <select aria-label="Type de profil allié" className={SELECT_CLASS} value={testProfileFilter} onChange={(e) => setTestProfileFilter(e.target.value)}>
                     <option value="exclude">Profils opérationnels</option>

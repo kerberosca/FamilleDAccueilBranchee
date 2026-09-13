@@ -8,6 +8,7 @@ import { RolesGuard } from "../../common/guards/roles.guard";
 import { JwtPayload } from "../../common/types/jwt-payload.type";
 import { BulkUpdateUserStatusDto } from "./dto/bulk-update-user-status.dto";
 import { DeleteFamilyDto } from "./dto/delete-family.dto";
+import { SetFamilyTestStatusDto } from "./dto/set-family-test-status.dto";
 import { UpdateUserRoleDto } from "./dto/update-user-role.dto";
 import { UpdateUserStatusDto } from "./dto/update-user-status.dto";
 import { UsersService } from "./users.service";
@@ -41,7 +42,8 @@ export class UsersController {
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
     @Query("sortBy") sortBy?: string,
-    @Query("sortOrder") sortOrder?: string
+    @Query("sortOrder") sortOrder?: string,
+    @Query("testProfile") testProfile?: string
   ) {
     return this.usersService.listFamilies({
       query,
@@ -49,7 +51,8 @@ export class UsersController {
       page: Number(page ?? 1),
       pageSize: Number(pageSize ?? 10),
       sortBy,
-      sortOrder
+      sortOrder,
+      testProfile
     });
   }
 
@@ -69,6 +72,16 @@ export class UsersController {
   @Patch(":userId/role")
   async updateRole(@CurrentUser() user: JwtPayload, @Param("userId") userId: string, @Body() body: UpdateUserRoleDto) {
     return this.usersService.updateRole(userId, body.role, user.sub);
+  }
+
+  @Roles(Role.ADMIN)
+  @Patch("families/:userId/internal-test")
+  async setFamilyInternalTest(
+    @CurrentUser() user: JwtPayload,
+    @Param("userId") userId: string,
+    @Body() body: SetFamilyTestStatusDto
+  ) {
+    return this.usersService.setFamilyInternalTest(userId, body.isInternalTest, user.sub);
   }
 
   @Roles(Role.ADMIN)

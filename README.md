@@ -93,5 +93,12 @@ Exemple:
 ## Webhooks Stripe
 Endpoint: `POST /api/v1/billing/stripe/webhook`.
 
-En production, configurer le body brut pour verification de signature Stripe.
-Le code actuel contient la logique metier de mapping evenements, avec fallback dev.
+La facturation est fermée par défaut (`STRIPE_BILLING_MODE=DISABLED` et
+`STRIPE_CHECKOUT_ENABLED=false`). En mode `TEST`, seuls les comptes famille marqués
+« Test interne » peuvent ouvrir Stripe Checkout. En mode `LIVE`, ces comptes tests sont
+toujours bloqués. Le webhook utilise le corps HTTP brut, valide obligatoirement la
+signature Stripe et reste actif lorsque seul l'interrupteur des nouveaux checkouts est fermé.
+
+L'offre doit être un prix Stripe actif, mensuel et en dollars canadiens. Le montant affiché
+par FAB est lu depuis Stripe. Les anciens abonnements locaux sont classés `LEGACY` et ne
+donnent jamais accès automatiquement aux fonctions premium.

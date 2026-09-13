@@ -42,9 +42,32 @@ enum ResourceOnboardingState {
 
 enum SubscriptionStatus {
   INACTIVE
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
   ACTIVE
   PAST_DUE
   CANCELED
+  UNPAID
+  PAUSED
+}
+
+enum StripeEnvironment {
+  LEGACY
+  TEST
+  LIVE
+}
+
+enum StripeWebhookEventStatus {
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum StripeCheckoutSessionStatus {
+  OPEN
+  COMPLETED
+  EXPIRED
 }
 
 enum AllyType {
@@ -156,21 +179,25 @@ model PasswordResetToken {
 }
 
 model FamilyProfile {
-  id           String   @id @default(cuid())
-  userId       String   @unique
-  displayName  String
-  postalCode   String
-  city         String
-  region       String
-  bio          String?
-  needsTags    String[]
-  availability Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  displayName    String
+  postalCode     String
+  city           String
+  region         String
+  bio            String?
+  needsTags      String[]
+  availability   Json?
+  isInternalTest Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  conversations Conversation[] @relation("ConversationFamily")
+  conversations   Conversation[]         @relation("ConversationFamily")
+  stripeCustomers FamilyStripeCustomer[]
+
+  @@index([isInternalTest])
 }
 
 model ResourceProfile {
@@ -323,16 +350,81 @@ model ResourceDocument {
 }
 
 model Subscription {
-  id                   String             @id @default(cuid())
-  userId               String
-  status               SubscriptionStatus @default(INACTIVE)
-  stripeCustomerId     String?
-  stripeSubscriptionId String?            @unique
-  currentPeriodEnd     DateTime?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  id                     String             @id @default(cuid())
+  userId                 String
+  status                 SubscriptionStatus @default(INACTIVE)
+  environment            StripeEnvironment  @default(LEGACY)
+  stripeCustomerId       String?
+  stripeCustomerRecordId String?
+  stripeSubscriptionId   String?            @unique
+  stripePriceId          String?
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean            @default(false)
+  canceledAt             DateTime?
+  paymentFailedAt        DateTime?
+  lastSyncedAt           DateTime?
+  lastSyncError          String?
+  lastStripeEventAt      DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerRecord FamilyStripeCustomer? @relation(fields: [stripeCustomerRecordId], references: [id], onDelete: SetNull)
+
+  @@index([userId, environment, status])
+  @@index([stripeCustomerRecordId])
+  @@index([lastSyncedAt])
+}
+
+model FamilyStripeCustomer {
+  id               String            @id @default(cuid())
+  familyProfileId  String
+  environment      StripeEnvironment
+  stripeCustomerId String            @unique
+  billingReference String            @unique
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  familyProfile    FamilyProfile           @relation(fields: [familyProfileId], references: [id], onDelete: Cascade)
+  subscriptions    Subscription[]
+  checkoutSessions StripeCheckoutSession[]
+
+  @@unique([familyProfileId, environment])
+  @@index([environment])
+}
+
+model StripeCheckoutSession {
+  id                      String                      @id @default(cuid())
+  familyStripeCustomerId  String
+  environment             StripeEnvironment
+  stripeCheckoutSessionId String?                     @unique
+  activeKey               String?                     @unique
+  status                  StripeCheckoutSessionStatus @default(OPEN)
+  expiresAt               DateTime?
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+
+  familyStripeCustomer FamilyStripeCustomer @relation(fields: [familyStripeCustomerId], references: [id], onDelete: Cascade)
+
+  @@index([familyStripeCustomerId, status, expiresAt])
+}
+
+model StripeWebhookEvent {
+  id             String                   @id
+  environment    StripeEnvironment
+  type           String
+  livemode       Boolean
+  status         StripeWebhookEventStatus @default(PROCESSING)
+  objectId       String?
+  eventCreatedAt DateTime
+  receivedAt     DateTime                 @default(now())
+  processedAt    DateTime?
+  error          String?
+  updatedAt      DateTime                 @updatedAt
+
+  @@index([status, receivedAt])
+  @@index([environment, eventCreatedAt])
 }
 
 model Conversation {

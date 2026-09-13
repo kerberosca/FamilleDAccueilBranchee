@@ -10,6 +10,7 @@ import { Input } from "../../components/ui/input";
 import { RequireAuth } from "../../components/require-auth";
 import { ResourceDocumentsPanel } from "../../components/resource-documents-panel";
 import { TrainingSummaryCard } from "../../components/training-summary-card";
+import { FamilyBillingCard } from "../../components/family-billing-card";
 import { apiDelete, apiGet, apiPatch, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
 
@@ -564,7 +565,9 @@ export default function MePage() {
                 </span>
               </p>
               <p className="mt-1 text-xs text-slate-400">
-                Cette adresse sert à vous connecter et à recevoir les messages liés à votre compte et à votre formation.
+                {me.role === "RESOURCE"
+                  ? "Cette adresse sert à vous connecter et à recevoir les messages liés à votre compte et à votre formation."
+                  : "Cette adresse sert à vous connecter et à recevoir les communications liées à votre compte."}
               </p>
               {!me.emailVerifiedAt ? (
                 <Button type="button" variant="secondary" className="mt-3" disabled={resendingVerification} onClick={() => void resendEmailVerification()}>
@@ -581,6 +584,8 @@ export default function MePage() {
         {me?.role === "ADMIN" ? <Alert tone="info">Le rôle administrateur n&apos;a pas de profil éditable dans cette version.</Alert> : null}
 
         {me?.role === "RESOURCE" ? <TrainingSummaryCard /> : null}
+
+        {me?.role === "FAMILY" ? <FamilyBillingCard /> : null}
 
         {me?.role === "FAMILY" ? (
           <Card className="space-y-5 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">

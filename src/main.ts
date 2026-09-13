@@ -5,7 +5,7 @@ import { AppModule } from "./app.module";
 import { setupApp } from "./app.setup";
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   // Express v5 : conserver le parseur « extended » pour query params (objets/tableaux)
   app.set("query parser", "extended");
   setupApp(app);

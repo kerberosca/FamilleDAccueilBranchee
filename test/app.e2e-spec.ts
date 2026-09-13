@@ -10,6 +10,7 @@ import {
   ResourceServiceDeliveryMode,
   ResourceVerificationStatus,
   Role,
+  StripeEnvironment,
   SubscriptionStatus,
   TrainingEmailStatus,
   TrainingReminderType,
@@ -20,6 +21,7 @@ import * as argon2 from "argon2";
 import { execSync } from "node:child_process";
 import { join } from "node:path";
 import request from "supertest";
+import Stripe from "stripe";
 import { setupApp } from "../src/app.setup";
 import { AuthService } from "../src/modules/auth/auth.service";
 import { StripeService } from "../src/modules/billing/stripe.service";
@@ -34,11 +36,61 @@ describe("Smoke e2e", () => {
   let prisma: PrismaService;
   let familyUserId: string;
 
-  const stripeCreateSessionMock = jest.fn(async () => ({
-    url: "https://stripe.local/checkout/session-test",
-    id: "cs_test_123"
+  let stripeCustomerCounter = 0;
+  let stripeCheckoutCounter = 0;
+  const stripePrice = {
+    id: "price_family_mock",
+    object: "price",
+    active: true,
+    currency: "cad",
+    livemode: false,
+    type: "recurring",
+    unit_amount: 1900,
+    recurring: { interval: "month", interval_count: 1 }
+  } as unknown as Stripe.Price;
+  const stripeCreateCustomerMock = jest.fn(async (params: Stripe.CustomerCreateParams) => ({
+    id: `cus_test_${++stripeCustomerCounter}`,
+    metadata: params.metadata ?? {}
   }));
+  const stripeCreateSessionMock = jest.fn(async () => {
+    const number = ++stripeCheckoutCounter;
+    return {
+      url: `https://stripe.local/checkout/session-${number}`,
+      id: `cs_test_${number}`,
+      expires_at: Math.floor(Date.now() / 1000) + 1800
+    };
+  });
+  const stripeRetrieveSessionMock = jest.fn(async (id: string) => ({
+    id,
+    status: "open",
+    url: `https://stripe.local/checkout/${id}`
+  }));
+  const stripeExpireSessionMock = jest.fn(async (id: string) => ({ id, status: "expired" }));
+  const stripeSubscriptionRetrieveMock = jest.fn(async (id: string) => stripeSubscriptionFixture(id));
+  const stripeSubscriptionCancelMock = jest.fn(async (id: string) =>
+    stripeSubscriptionFixture(id, { status: "canceled", canceledAt: Math.floor(Date.now() / 1000) })
+  );
+  const stripePortalMock = jest.fn(async () => ({ url: "https://stripe.local/portal/session-test" }));
+  const stripeWebhookClient = new Stripe("sk_test_mock", {
+    apiVersion: "2026-03-25.dahlia" as Stripe.LatestApiVersion
+  });
   const emailSendMock = jest.fn(async () => ({ ok: true }));
+
+  const sendSignedStripeEvent = async (
+    id: string,
+    type: string,
+    object: Record<string, unknown>,
+    created?: number
+  ) => {
+    const payload = stripeEventPayload(id, type, object, created);
+    const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_e2e_stripe" });
+    return request(app.getHttpServer())
+      .post("/api/v1/billing/stripe/webhook")
+      .set("Content-Type", "application/json")
+      .set("stripe-signature", signature)
+      .send(payload)
+      .expect(200, { received: true });
+  };
 
   beforeAll(async () => {
     configureTestEnv();
@@ -50,14 +102,28 @@ describe("Smoke e2e", () => {
     })
       .overrideProvider(StripeService)
       .useValue({
+        mode: "TEST",
+        checkoutEnabled: true,
+        taxMode: "AUTOMATIC",
+        priceId: "price_family_mock",
+        webhookSecret: "whsec_e2e_stripe",
         client: {
+          prices: { retrieve: jest.fn(async () => stripePrice) },
+          customers: { create: stripeCreateCustomerMock },
           checkout: {
             sessions: {
-              create: stripeCreateSessionMock
+              create: stripeCreateSessionMock,
+              retrieve: stripeRetrieveSessionMock,
+              expire: stripeExpireSessionMock
             }
           },
+          billingPortal: { sessions: { create: stripePortalMock } },
+          subscriptions: {
+            retrieve: stripeSubscriptionRetrieveMock,
+            cancel: stripeSubscriptionCancelMock
+          },
           webhooks: {
-            constructEvent: jest.fn()
+            constructEvent: stripeWebhookClient.webhooks.constructEvent.bind(stripeWebhookClient.webhooks)
           }
         }
       })
@@ -67,7 +133,7 @@ describe("Smoke e2e", () => {
       })
       .compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication({ rawBody: true });
     setupApp(app);
     await app.init();
 
@@ -144,6 +210,30 @@ describe("Smoke e2e", () => {
 
     expect(res.body.totalFound).toBeGreaterThan(0);
     expect(res.body.results[0].displayName).toBe("Ressource Locale");
+  });
+
+  it("refuse une configuration Stripe incohérente et reste fermé sans clé en mode DISABLED", () => {
+    const disabled = new StripeService(
+      new ConfigService({
+        STRIPE_BILLING_MODE: "DISABLED",
+        STRIPE_CHECKOUT_ENABLED: "false"
+      })
+    );
+    expect(disabled.mode).toBe("DISABLED");
+    expect(() => disabled.client).toThrow("désactivée");
+
+    expect(
+      () =>
+        new StripeService(
+          new ConfigService({
+            STRIPE_BILLING_MODE: "LIVE",
+            STRIPE_CHECKOUT_ENABLED: "true",
+            STRIPE_SECRET_KEY: "sk_test_mauvais_environnement",
+            STRIPE_FAMILY_SUBSCRIPTION_PRICE_ID: "price_live",
+            STRIPE_WEBHOOK_SECRET: "whsec_live"
+          })
+        )
+    ).toThrow("ne correspond pas au mode LIVE");
   });
 
   it("recherche le tutorat a distance partout au Quebec et conserve la recherche locale en personne", async () => {
@@ -748,111 +838,652 @@ describe("Smoke e2e", () => {
     expect(res.body.results[0].contactPhone).toBeUndefined();
   });
 
-  it("POST /billing/.../checkout-session renvoie une URL mockee", async () => {
+  it("expose l'offre mensuelle CAD sans identifiants Stripe", async () => {
+    const readiness = await request(app.getHttpServer()).get("/api/v1/billing/family/readiness").expect(200);
+    expect(readiness.body).toEqual({ state: "PREPARATORY" });
+
     const familyToken = await loginAs("FAMILLE");
-    const resourceToken = await loginAs("RESSOURCE");
-
-    const familyCheckout = await request(app.getHttpServer())
-      .post("/api/v1/billing/family/checkout-session")
+    const offer = await request(app.getHttpServer())
+      .get("/api/v1/billing/family/offer")
       .set("Authorization", `Bearer ${familyToken}`)
-      .expect(201);
-    expect(familyCheckout.body.checkoutUrl).toContain("https://stripe.local/checkout/");
-    expect(familyCheckout.body.sessionId).toBeDefined();
+      .expect(200);
 
-    const resourceCheckout = await request(app.getHttpServer())
-      .post("/api/v1/billing/resource/checkout-session")
-      .set("Authorization", `Bearer ${resourceToken}`)
-      .expect(201);
-    expect(resourceCheckout.body.checkoutUrl).toContain("https://stripe.local/checkout/");
-    expect(resourceCheckout.body.sessionId).toBeDefined();
-    expect(stripeCreateSessionMock).toHaveBeenCalled();
-  });
-
-  it("POST /api/v1/billing/stripe/webhook accepte un payload mock en test", async () => {
-    const webhookPayload = {
-      type: "checkout.session.completed",
-      data: {
-        object: {
-          metadata: {
-            kind: "FAMILY_SUBSCRIPTION",
-            userId: familyUserId
-          },
-          customer: "cus_test_123",
-          subscription: "sub_test_123"
-        }
-      }
-    };
-
-    const res = await request(app.getHttpServer()).post("/api/v1/billing/stripe/webhook").send(webhookPayload).expect(201);
-
-    expect(res.body).toEqual({ received: true, validated: false, mocked: true });
-
-    const createdSub = await prisma.subscription.findUnique({
-      where: { stripeSubscriptionId: "sub_test_123" }
+    expect(offer.body).toMatchObject({
+      available: true,
+      amount: 1900,
+      currency: "CAD",
+      interval: "month",
+      taxes: "AUTOMATIC",
+      publicState: "PREPARATORY"
     });
-    expect(createdSub?.status).toBe(SubscriptionStatus.ACTIVE);
+    expect(JSON.stringify(offer.body)).not.toContain("price_family_mock");
+
+    const resourceToken = await loginAs("RESSOURCE");
+    await request(app.getHttpServer())
+      .get("/api/v1/billing/family/offer")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(403);
   });
 
-  it("POST /api/v1/billing/stripe/webhook ressource met le profil en attente verification", async () => {
-    const resourceUser = await prisma.user.create({
+  it("réserve le Checkout TEST aux familles internes et réutilise un double clic", async () => {
+    const authService = app.get(AuthService);
+    const family = await prisma.user.create({
       data: {
-        email: "e2e_webhook_resource@local.test",
+        email: "stripe.checkout@local.test",
         passwordHash: "hash",
-        role: Role.RESOURCE,
+        role: Role.FAMILY,
         status: UserStatus.ACTIVE,
-        resourceProfile: {
+        emailVerifiedAt: new Date(),
+        familyProfile: {
           create: {
-            displayName: "Ressource webhook e2e",
+            displayName: "Famille Checkout Stripe",
             postalCode: "H2X1Y4",
-            city: "Montreal",
+            city: "Montréal",
             region: "QC",
-            bio: "e2e",
-            skillsTags: ["Tutorat"],
-            hourlyRate: 30,
-            verificationStatus: ResourceVerificationStatus.DRAFT,
-            publishStatus: ResourcePublishStatus.HIDDEN,
-            onboardingState: ResourceOnboardingState.PENDING_PAYMENT,
-            contactEmail: "e2e_webhook_resource@local.test",
-            contactPhone: "514-555-1234"
+            needsTags: [],
+            isInternalTest: true
           }
         }
       }
     });
-    const webhookPayload = {
-      type: "checkout.session.completed",
-      data: {
-        object: {
-          metadata: {
-            kind: "RESOURCE_ONBOARDING",
-            userId: resourceUser.id
-          },
-          customer: "cus_resource_test"
-        }
-      }
-    };
+    const { accessToken } = await authService.issueTokensForUser(family.id);
+    stripeCreateSessionMock.mockClear();
 
-    const res = await request(app.getHttpServer()).post("/api/v1/billing/stripe/webhook").send(webhookPayload).expect(201);
-    expect(res.body).toEqual({ received: true, validated: false, mocked: true });
-
-    const profile = await prisma.resourceProfile.findUnique({ where: { userId: resourceUser.id } });
-    expect(profile?.onboardingState).toBe(ResourceOnboardingState.PENDING_VERIFICATION);
-    expect(profile?.verificationStatus).toBe(ResourceVerificationStatus.PENDING_VERIFICATION);
-    expect(profile?.publishStatus).toBe(ResourcePublishStatus.HIDDEN);
-  });
-
-  it("POST /api/v1/billing/family/mock-activate exige une famille connectee", async () => {
-    await request(app.getHttpServer())
-      .post("/api/v1/billing/family/mock-activate")
-      .send({ userId: familyUserId })
-      .expect((res) => expect([401, 403]).toContain(res.status));
-
-    const familyToken = await loginAs("FAMILLE");
-    const res = await request(app.getHttpServer())
-      .post("/api/v1/billing/family/mock-activate")
-      .set("Authorization", `Bearer ${familyToken}`)
+    const first = await request(app.getHttpServer())
+      .post("/api/v1/billing/family/checkout-session")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(201);
+    const second = await request(app.getHttpServer())
+      .post("/api/v1/billing/family/checkout-session")
+      .set("Authorization", `Bearer ${accessToken}`)
       .expect(201);
 
-    expect(res.body.success).toBe(true);
+    expect(first.body.checkoutUrl).toContain("https://stripe.local/checkout/");
+    expect(first.body.sessionId).toBeUndefined();
+    expect(second.body.checkoutUrl).toContain("https://stripe.local/checkout/");
+    expect(stripeCreateSessionMock).toHaveBeenCalledTimes(1);
+    await expect(prisma.stripeCheckoutSession.count({ where: { environment: StripeEnvironment.TEST } })).resolves.toBe(1);
+    const pendingCheckout = await prisma.stripeCheckoutSession.findFirstOrThrow({
+      where: { environment: StripeEnvironment.TEST }
+    });
+    await sendSignedStripeEvent("evt_checkout_expired", "checkout.session.expired", {
+      id: pendingCheckout.stripeCheckoutSessionId,
+      object: "checkout.session",
+      livemode: false
+    });
+    await expect(prisma.stripeCheckoutSession.findUnique({ where: { id: pendingCheckout.id } })).resolves.toMatchObject({
+      status: "EXPIRED",
+      activeKey: null
+    });
+
+    const ordinaryFamily = await prisma.user.create({
+      data: {
+        email: "stripe.blocked@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
+        familyProfile: {
+          create: {
+            displayName: "Famille non test",
+            postalCode: "H2X1Y4",
+            city: "Montréal",
+            region: "QC",
+            needsTags: []
+          }
+        }
+      }
+    });
+    const ordinaryToken = await authService.issueTokensForUser(ordinaryFamily.id);
+    const ordinaryOffer = await request(app.getHttpServer())
+      .get("/api/v1/billing/family/offer")
+      .set("Authorization", `Bearer ${ordinaryToken.accessToken}`)
+      .expect(200);
+    expect(ordinaryOffer.body).toMatchObject({ available: false, publicState: "PREPARATORY" });
+    expect(ordinaryOffer.body.reason).toContain("pas encore ouvert au public");
+    expect(ordinaryOffer.body.reason).not.toContain("test");
+
+    await request(app.getHttpServer())
+      .post("/api/v1/billing/family/checkout-session")
+      .set("Authorization", `Bearer ${ordinaryToken.accessToken}`)
+      .expect(403);
+
+    const unverifiedFamily = await prisma.user.create({
+      data: {
+        email: "stripe.unverified@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille non confirmée",
+            postalCode: "H2X1Y4",
+            city: "Montréal",
+            region: "QC",
+            needsTags: [],
+            isInternalTest: true
+          }
+        }
+      }
+    });
+    const unverifiedToken = await authService.issueTokensForUser(unverifiedFamily.id);
+    await request(app.getHttpServer())
+      .post("/api/v1/billing/family/checkout-session")
+      .set("Authorization", `Bearer ${unverifiedToken.accessToken}`)
+      .expect(403);
+
+    const resourceToken = await loginAs("RESSOURCE");
+    const resourceCheckout = await request(app.getHttpServer())
+      .post("/api/v1/billing/resource/checkout-session")
+      .set("Authorization", `Bearer ${resourceToken}`)
+      .expect(410);
+    expect(resourceCheckout.body.message).toContain("gratuite");
+  });
+
+  it("exige la signature réelle du corps brut Stripe et ignore un événement en double", async () => {
+    const family = await prisma.user.findUniqueOrThrow({
+      where: { id: familyUserId },
+      include: { familyProfile: true }
+    });
+    const customer = await prisma.familyStripeCustomer.create({
+      data: {
+        familyProfileId: family.familyProfile!.id,
+        environment: StripeEnvironment.TEST,
+        stripeCustomerId: "cus_signed_webhook",
+        billingReference: "billing-signed-webhook"
+      }
+    });
+    stripeSubscriptionRetrieveMock.mockImplementationOnce(async (id: string) =>
+      stripeSubscriptionFixture(id, {
+        customerId: customer.stripeCustomerId,
+        billingReference: customer.billingReference
+      })
+    );
+
+    const payload = stripeEventPayload("evt_signed_checkout", "checkout.session.completed", {
+      id: "cs_signed_checkout",
+      object: "checkout.session",
+      customer: customer.stripeCustomerId,
+      subscription: "sub_signed_checkout",
+      livemode: false
+    });
+    const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_e2e_stripe" });
+
+    await request(app.getHttpServer())
+      .post("/api/v1/billing/stripe/webhook")
+      .set("Content-Type", "application/json")
+      .set("stripe-signature", signature)
+      .send(payload)
+      .expect(200, { received: true });
+
+    const callsAfterFirstDelivery = stripeSubscriptionRetrieveMock.mock.calls.length;
+    await request(app.getHttpServer())
+      .post("/api/v1/billing/stripe/webhook")
+      .set("Content-Type", "application/json")
+      .set("stripe-signature", signature)
+      .send(payload)
+      .expect(200, { received: true });
+    expect(stripeSubscriptionRetrieveMock.mock.calls.length).toBe(callsAfterFirstDelivery);
+    await expect(prisma.stripeWebhookEvent.count({ where: { id: "evt_signed_checkout" } })).resolves.toBe(1);
+    await expect(
+      prisma.subscription.findUnique({ where: { stripeSubscriptionId: "sub_signed_checkout" } })
+    ).resolves.toMatchObject({ status: SubscriptionStatus.ACTIVE, environment: StripeEnvironment.TEST });
+
+    await request(app.getHttpServer())
+      .post("/api/v1/billing/stripe/webhook")
+      .set("Content-Type", "application/json")
+      .set("stripe-signature", "signature-invalide")
+      .send(payload)
+      .expect(400);
+    await request(app.getHttpServer())
+      .post("/api/v1/billing/stripe/webhook")
+      .set("Content-Type", "application/json")
+      .set("stripe-signature", signature)
+      .send(payload.replace("sub_signed_checkout", "sub_corps_modifie"))
+      .expect(400);
+
+    const livePayload = stripeEventPayload("evt_wrong_mode", "checkout.session.expired", {
+      id: "cs_live_wrong_mode",
+      object: "checkout.session",
+      livemode: true
+    }).replace('"livemode":false', '"livemode":true');
+    const liveSignature = Stripe.webhooks.generateTestHeaderString({
+      payload: livePayload,
+      secret: "whsec_e2e_stripe"
+    });
+    await request(app.getHttpServer())
+      .post("/api/v1/billing/stripe/webhook")
+      .set("Content-Type", "application/json")
+      .set("stripe-signature", liveSignature)
+      .send(livePayload)
+      .expect(400);
+  });
+
+  it("refuse un abonnement Stripe lié au mauvais prix", async () => {
+    const family = await prisma.user.create({
+      data: {
+        email: "stripe.wrong-price@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
+        familyProfile: {
+          create: {
+            displayName: "Famille mauvais prix",
+            postalCode: "H2X1Y4",
+            city: "Montréal",
+            region: "QC",
+            needsTags: [],
+            isInternalTest: true
+          }
+        }
+      },
+      include: { familyProfile: true }
+    });
+    const customer = await prisma.familyStripeCustomer.create({
+      data: {
+        familyProfileId: family.familyProfile!.id,
+        environment: StripeEnvironment.TEST,
+        stripeCustomerId: "cus_wrong_price",
+        billingReference: "billing-wrong-price"
+      }
+    });
+    stripeSubscriptionRetrieveMock.mockImplementationOnce(async (id: string) =>
+      stripeSubscriptionFixture(id, {
+        customerId: customer.stripeCustomerId,
+        billingReference: customer.billingReference,
+        priceId: "price_not_allowed"
+      })
+    );
+    const payload = stripeEventPayload("evt_wrong_price", "customer.subscription.created", {
+      id: "sub_wrong_price",
+      object: "subscription",
+      livemode: false
+    });
+    const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_e2e_stripe" });
+    await request(app.getHttpServer())
+      .post("/api/v1/billing/stripe/webhook")
+      .set("Content-Type", "application/json")
+      .set("stripe-signature", signature)
+      .send(payload)
+      .expect(400);
+
+    await expect(prisma.subscription.findUnique({ where: { stripeSubscriptionId: "sub_wrong_price" } })).resolves.toBeNull();
+    await expect(prisma.stripeWebhookEvent.findUnique({ where: { id: "evt_wrong_price" } })).resolves.toMatchObject({
+      status: "FAILED"
+    });
+  });
+
+  it("journalise un remboursement sans modifier automatiquement l'accès", async () => {
+    const before = await prisma.subscription.findUniqueOrThrow({
+      where: { stripeSubscriptionId: "sub_seed_family" }
+    });
+    await sendSignedStripeEvent("evt_manual_refund", "charge.refunded", {
+      id: "ch_manual_refund",
+      object: "charge",
+      livemode: false
+    });
+    const after = await prisma.subscription.findUniqueOrThrow({
+      where: { stripeSubscriptionId: "sub_seed_family" }
+    });
+    expect(after.status).toBe(before.status);
+    await expect(prisma.stripeWebhookEvent.findUnique({ where: { id: "evt_manual_refund" } })).resolves.toMatchObject({
+      status: "PROCESSED"
+    });
+  });
+
+  it("bloque l'accès au premier paiement échoué et le restaure après invoice.paid", async () => {
+    const authService = app.get(AuthService);
+    const family = await prisma.user.create({
+      data: {
+        email: "stripe.invoice@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
+        familyProfile: {
+          create: {
+            displayName: "Famille Facture Stripe",
+            postalCode: "H2X1Y4",
+            city: "Montréal",
+            region: "QC",
+            needsTags: [],
+            isInternalTest: true
+          }
+        }
+      },
+      include: { familyProfile: true }
+    });
+    const customer = await prisma.familyStripeCustomer.create({
+      data: {
+        familyProfileId: family.familyProfile!.id,
+        environment: StripeEnvironment.TEST,
+        stripeCustomerId: "cus_invoice_cycle",
+        billingReference: "billing-invoice-cycle"
+      }
+    });
+    stripeSubscriptionRetrieveMock
+      .mockImplementationOnce(async (id: string) =>
+        stripeSubscriptionFixture(id, {
+          customerId: customer.stripeCustomerId,
+          billingReference: customer.billingReference,
+          status: "active"
+        })
+      )
+      .mockImplementationOnce(async (id: string) =>
+        stripeSubscriptionFixture(id, {
+          customerId: customer.stripeCustomerId,
+          billingReference: customer.billingReference,
+          status: "active"
+        })
+      );
+
+    await sendSignedStripeEvent("evt_invoice_failed", "invoice.payment_failed", {
+      id: "in_failed",
+      object: "invoice",
+      livemode: false,
+      parent: { type: "subscription_details", subscription_details: { subscription: "sub_invoice_cycle" } }
+    });
+    await expect(
+      prisma.subscription.findUnique({ where: { stripeSubscriptionId: "sub_invoice_cycle" } })
+    ).resolves.toMatchObject({ status: SubscriptionStatus.PAST_DUE });
+    const familyToken = await authService.issueTokensForUser(family.id);
+    const suspendedSubscription = await request(app.getHttpServer())
+      .get("/api/v1/billing/family/subscription")
+      .set("Authorization", `Bearer ${familyToken.accessToken}`)
+      .expect(200);
+    expect(suspendedSubscription.body).toMatchObject({
+      status: SubscriptionStatus.PAST_DUE,
+      hasPremiumAccess: false
+    });
+    const blockedSearch = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${familyToken.accessToken}`)
+      .expect(200);
+    expect(blockedSearch.body.limitedPreview).toBe(true);
+
+    await sendSignedStripeEvent("evt_invoice_paid", "invoice.paid", {
+      id: "in_paid",
+      object: "invoice",
+      livemode: false,
+      parent: { type: "subscription_details", subscription_details: { subscription: "sub_invoice_cycle" } }
+    });
+    await expect(
+      prisma.subscription.findUnique({ where: { stripeSubscriptionId: "sub_invoice_cycle" } })
+    ).resolves.toMatchObject({ status: SubscriptionStatus.ACTIVE, paymentFailedAt: null });
+    const restoredSearch = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${familyToken.accessToken}`)
+      .expect(200);
+    expect(restoredSearch.body.limitedPreview).toBe(false);
+    const restoredSubscription = await request(app.getHttpServer())
+      .get("/api/v1/billing/family/subscription")
+      .set("Authorization", `Bearer ${familyToken.accessToken}`)
+      .expect(200);
+    expect(restoredSubscription.body).toMatchObject({
+      status: SubscriptionStatus.ACTIVE,
+      hasPremiumAccess: true
+    });
+
+    stripeSubscriptionRetrieveMock.mockImplementationOnce(async (id: string) =>
+      stripeSubscriptionFixture(id, {
+        customerId: customer.stripeCustomerId,
+        billingReference: customer.billingReference,
+        status: "active"
+      })
+    );
+    await sendSignedStripeEvent(
+      "evt_invoice_failed_delayed",
+      "invoice.payment_failed",
+      {
+        id: "in_failed_delayed",
+        object: "invoice",
+        livemode: false,
+        parent: { type: "subscription_details", subscription_details: { subscription: "sub_invoice_cycle" } }
+      },
+      Math.floor(Date.now() / 1000) - 60
+    );
+    await expect(
+      prisma.subscription.findUnique({ where: { stripeSubscriptionId: "sub_invoice_cycle" } })
+    ).resolves.toMatchObject({ status: SubscriptionStatus.ACTIVE, paymentFailedAt: null });
+  });
+
+  it("conserve l'accès jusqu'à la fin d'une annulation planifiée puis le retire à la suppression Stripe", async () => {
+    const authService = app.get(AuthService);
+    const family = await prisma.user.create({
+      data: {
+        email: "stripe.cancellation@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
+        familyProfile: {
+          create: {
+            displayName: "Famille annulation Stripe",
+            postalCode: "H2X1Y4",
+            city: "Montréal",
+            region: "QC",
+            needsTags: [],
+            isInternalTest: true
+          }
+        }
+      },
+      include: { familyProfile: true }
+    });
+    const customer = await prisma.familyStripeCustomer.create({
+      data: {
+        familyProfileId: family.familyProfile!.id,
+        environment: StripeEnvironment.TEST,
+        stripeCustomerId: "cus_cancellation_cycle",
+        billingReference: "billing-cancellation-cycle"
+      }
+    });
+    const periodEnd = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
+    stripeSubscriptionRetrieveMock.mockImplementationOnce(async (id: string) =>
+      stripeSubscriptionFixture(id, {
+        customerId: customer.stripeCustomerId,
+        billingReference: customer.billingReference,
+        status: "active",
+        cancelAtPeriodEnd: true,
+        currentPeriodEnd: periodEnd
+      })
+    );
+    await sendSignedStripeEvent("evt_subscription_cancel_scheduled", "customer.subscription.updated", {
+      id: "sub_cancellation_cycle",
+      object: "subscription",
+      livemode: false
+    });
+    const familyToken = await authService.issueTokensForUser(family.id);
+    const beforeEnd = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${familyToken.accessToken}`)
+      .expect(200);
+    expect(beforeEnd.body.limitedPreview).toBe(false);
+    await expect(
+      prisma.subscription.findUnique({ where: { stripeSubscriptionId: "sub_cancellation_cycle" } })
+    ).resolves.toMatchObject({ status: SubscriptionStatus.ACTIVE, cancelAtPeriodEnd: true });
+
+    stripeSubscriptionRetrieveMock.mockImplementationOnce(async (id: string) =>
+      stripeSubscriptionFixture(id, {
+        customerId: customer.stripeCustomerId,
+        billingReference: customer.billingReference,
+        status: "canceled",
+        canceledAt: Math.floor(Date.now() / 1000)
+      })
+    );
+    await sendSignedStripeEvent("evt_subscription_deleted", "customer.subscription.deleted", {
+      id: "sub_cancellation_cycle",
+      object: "subscription",
+      livemode: false
+    });
+    const afterEnd = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${familyToken.accessToken}`)
+      .expect(200);
+    expect(afterEnd.body.limitedPreview).toBe(true);
+  });
+
+  it("réserve le statut Famille test à l'administration et le journalise", async () => {
+    const authService = app.get(AuthService);
+    const adminToken = await loginAs("ADMIN");
+    const family = await prisma.user.create({
+      data: {
+        email: "family.internal-test@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
+        familyProfile: {
+          create: {
+            displayName: "Famille statut test",
+            postalCode: "H2X1Y4",
+            city: "Montréal",
+            region: "QC",
+            needsTags: []
+          }
+        }
+      },
+      include: { familyProfile: true }
+    });
+    const familyToken = await authService.issueTokensForUser(family.id);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/users/families/${family.id}/internal-test`)
+      .set("Authorization", `Bearer ${familyToken.accessToken}`)
+      .send({ isInternalTest: true })
+      .expect(403);
+
+    const updated = await request(app.getHttpServer())
+      .patch(`/api/v1/users/families/${family.id}/internal-test`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ isInternalTest: true })
+      .expect(200);
+    expect(updated.body).toMatchObject({ isInternalTest: true });
+
+    const testFamilies = await request(app.getHttpServer())
+      .get("/api/v1/users/families?testProfile=only&query=family.internal-test")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(testFamilies.body.items).toHaveLength(1);
+    expect(testFamilies.body.items[0].profile.isInternalTest).toBe(true);
+    await expect(
+      prisma.adminAuditLog.findFirst({
+        where: { action: "FAMILY_INTERNAL_TEST_ENABLED", targetId: family.familyProfile?.id }
+      })
+    ).resolves.toBeTruthy();
+  });
+
+  it("ouvre le portail Stripe sans exposer l'identifiant client", async () => {
+    const authService = app.get(AuthService);
+    const adminToken = await loginAs("ADMIN");
+    const family = await prisma.user.create({
+      data: {
+        email: "family.portal@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
+        familyProfile: {
+          create: {
+            displayName: "Famille portail",
+            postalCode: "H2X1Y4",
+            city: "Montréal",
+            region: "QC",
+            needsTags: [],
+            isInternalTest: true
+          }
+        }
+      },
+      include: { familyProfile: true }
+    });
+    const customer = await prisma.familyStripeCustomer.create({
+      data: {
+        familyProfileId: family.familyProfile!.id,
+        environment: StripeEnvironment.TEST,
+        stripeCustomerId: "cus_portal_family",
+        billingReference: "billing-portal-family"
+      }
+    });
+    await prisma.subscription.create({
+      data: {
+        userId: family.id,
+        environment: StripeEnvironment.TEST,
+        status: SubscriptionStatus.ACTIVE,
+        stripeCustomerId: customer.stripeCustomerId,
+        stripeCustomerRecordId: customer.id,
+        stripeSubscriptionId: "sub_portal_family",
+        stripePriceId: "price_family_mock"
+      }
+    });
+    const familyToken = await authService.issueTokensForUser(family.id);
+    const portal = await request(app.getHttpServer())
+      .post("/api/v1/billing/family/portal-session")
+      .set("Authorization", `Bearer ${familyToken.accessToken}`)
+      .expect(201);
+    expect(portal.body).toEqual({ portalUrl: "https://stripe.local/portal/session-test" });
+    expect(JSON.stringify(portal.body)).not.toContain("cus_portal_family");
+
+    stripeSubscriptionRetrieveMock.mockImplementationOnce(async (id: string) =>
+      stripeSubscriptionFixture(id, {
+        customerId: customer.stripeCustomerId,
+        billingReference: customer.billingReference
+      })
+    );
+    await request(app.getHttpServer())
+      .post(`/api/v1/billing/admin/families/${family.id}/resync`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(201);
+    await expect(
+      prisma.adminAuditLog.findFirst({ where: { action: "FAMILY_SUBSCRIPTION_RESYNCED", targetId: family.id } })
+    ).resolves.toBeTruthy();
+  });
+
+  it("ne donne jamais l'accès premium à un ancien abonnement LEGACY actif", async () => {
+    const authService = app.get(AuthService);
+    const family = await prisma.user.create({
+      data: {
+        email: "family.legacy@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
+        familyProfile: {
+          create: {
+            displayName: "Famille abonnement historique",
+            postalCode: "H2X1Y4",
+            city: "Montréal",
+            region: "QC",
+            needsTags: []
+          }
+        },
+        subscriptions: {
+          create: {
+            status: SubscriptionStatus.ACTIVE,
+            stripeCustomerId: "cus_legacy_active",
+            stripeSubscriptionId: "sub_legacy_active",
+            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          }
+        }
+      }
+    });
+    const familyToken = await authService.issueTokensForUser(family.id);
+    const search = await request(app.getHttpServer())
+      .get("/api/v1/search/resources?postalCode=H2X1Y4")
+      .set("Authorization", `Bearer ${familyToken.accessToken}`)
+      .expect(200);
+    expect(search.body.limitedPreview).toBe(true);
+    expect(search.body.results[0].contactEmail).toBeUndefined();
+
+    const subscription = await request(app.getHttpServer())
+      .get("/api/v1/billing/family/subscription")
+      .set("Authorization", `Bearer ${familyToken.accessToken}`)
+      .expect(200);
+    expect(subscription.body).toMatchObject({
+      status: "LEGACY",
+      canManage: false,
+      hasPremiumAccess: false,
+      needsAdminReview: true
+    });
   });
 
   it("DELETE /api/v1/users/families/:userId supprime une famille et cree un audit log", async () => {
@@ -872,16 +1503,38 @@ describe("Smoke e2e", () => {
             bio: "e2e",
             needsTags: []
           }
-        },
-        subscriptions: {
-          create: {
-            status: SubscriptionStatus.ACTIVE,
-            stripeCustomerId: "cus_delete_family",
-            stripeSubscriptionId: "sub_delete_family"
-          }
         }
+      },
+      include: { familyProfile: true }
+    });
+    const customer = await prisma.familyStripeCustomer.create({
+      data: {
+        familyProfileId: family.familyProfile!.id,
+        environment: StripeEnvironment.TEST,
+        stripeCustomerId: "cus_delete_family",
+        billingReference: "billing-delete-family"
       }
     });
+    await prisma.subscription.create({
+      data: {
+        userId: family.id,
+        environment: StripeEnvironment.TEST,
+        status: SubscriptionStatus.ACTIVE,
+        stripeCustomerId: customer.stripeCustomerId,
+        stripeCustomerRecordId: customer.id,
+        stripeSubscriptionId: "sub_delete_family",
+        stripePriceId: "price_family_mock",
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      }
+    });
+    stripeSubscriptionCancelMock.mockImplementationOnce(async (id: string) =>
+      stripeSubscriptionFixture(id, {
+        customerId: customer.stripeCustomerId,
+        billingReference: customer.billingReference,
+        status: "canceled",
+        canceledAt: Math.floor(Date.now() / 1000)
+      })
+    );
 
     const res = await request(app.getHttpServer())
       .delete(`/api/v1/users/families/${family.id}`)
@@ -890,6 +1543,10 @@ describe("Smoke e2e", () => {
       .expect(200);
 
     expect(res.body).toEqual({ success: true });
+    expect(stripeSubscriptionCancelMock).toHaveBeenCalledWith("sub_delete_family", {
+      invoice_now: false,
+      prorate: false
+    });
     await expect(prisma.user.findUnique({ where: { id: family.id } })).resolves.toBeNull();
     await expect(prisma.familyProfile.findUnique({ where: { userId: family.id } })).resolves.toBeNull();
     await expect(prisma.subscription.findMany({ where: { userId: family.id } })).resolves.toEqual([]);
@@ -1505,14 +2162,18 @@ describe("Smoke e2e", () => {
               region: privateSentinels[3],
               bio: privateSentinels[4],
               needsTags: [privateSentinels[5]],
-              availability: { privateMarker: privateSentinels[6] }
+              availability: { privateMarker: privateSentinels[6] },
+              isInternalTest: true
             }
           },
           subscriptions: {
             create: {
               status: SubscriptionStatus.ACTIVE,
+              environment: StripeEnvironment.TEST,
               stripeCustomerId: "PRIVATE_STRIPE_CUSTOMER_MESSAGE_FAMILY",
-              stripeSubscriptionId: "PRIVATE_STRIPE_SUBSCRIPTION_MESSAGE_FAMILY"
+              stripeSubscriptionId: "PRIVATE_STRIPE_SUBSCRIPTION_MESSAGE_FAMILY",
+              stripePriceId: "price_family_mock",
+              currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
             }
           }
         },
@@ -1877,6 +2538,62 @@ describe("Smoke e2e", () => {
       for (const payload of [createdBody, resourceReplyBody, familyReplyBody]) {
         expectSerializedPayloadToExclude(payload, privateSentinels);
       }
+    });
+  });
+
+  it("suspend la suppression locale si Stripe refuse l'annulation", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const family = await prisma.user.create({
+      data: {
+        email: "e2e_delete_stripe_failure@local.test",
+        passwordHash: "hash",
+        role: Role.FAMILY,
+        status: UserStatus.ACTIVE,
+        familyProfile: {
+          create: {
+            displayName: "Famille suppression Stripe impossible",
+            postalCode: "H2X1Y4",
+            city: "Montréal",
+            region: "QC",
+            needsTags: [],
+            isInternalTest: true
+          }
+        }
+      },
+      include: { familyProfile: true }
+    });
+    const customer = await prisma.familyStripeCustomer.create({
+      data: {
+        familyProfileId: family.familyProfile!.id,
+        environment: StripeEnvironment.TEST,
+        stripeCustomerId: "cus_delete_failure",
+        billingReference: "billing-delete-failure"
+      }
+    });
+    const subscription = await prisma.subscription.create({
+      data: {
+        userId: family.id,
+        environment: StripeEnvironment.TEST,
+        status: SubscriptionStatus.ACTIVE,
+        stripeCustomerId: customer.stripeCustomerId,
+        stripeCustomerRecordId: customer.id,
+        stripeSubscriptionId: "sub_delete_failure",
+        stripePriceId: "price_family_mock"
+      }
+    });
+    stripeSubscriptionCancelMock.mockRejectedValueOnce(new Error("Stripe temporairement indisponible"));
+    stripeSubscriptionRetrieveMock.mockRejectedValueOnce(new Error("Stripe temporairement indisponible"));
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/users/families/${family.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ reason: "Demande de suppression" })
+      .expect(503);
+
+    await expect(prisma.user.findUnique({ where: { id: family.id } })).resolves.toBeTruthy();
+    await expect(prisma.subscription.findUnique({ where: { id: subscription.id } })).resolves.toMatchObject({
+      status: SubscriptionStatus.ACTIVE,
+      lastSyncError: "Stripe temporairement indisponible"
     });
   });
 
@@ -3070,6 +3787,58 @@ function expectSerializedPayloadToExclude(payload: unknown, sentinels: readonly 
   }
 }
 
+function stripeSubscriptionFixture(
+  id: string,
+  overrides: {
+    customerId?: string;
+    billingReference?: string;
+    status?: Stripe.Subscription.Status;
+    canceledAt?: number | null;
+    cancelAtPeriodEnd?: boolean;
+    currentPeriodEnd?: number;
+    priceId?: string;
+  } = {}
+): Stripe.Subscription {
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    id,
+    object: "subscription",
+    customer: overrides.customerId ?? "cus_test_fixture",
+    status: overrides.status ?? "active",
+    metadata: overrides.billingReference ? { billingReference: overrides.billingReference } : {},
+    cancel_at_period_end: overrides.cancelAtPeriodEnd ?? false,
+    canceled_at: overrides.canceledAt ?? null,
+    items: {
+      object: "list",
+      data: [
+        {
+          id: `si_${id}`,
+          object: "subscription_item",
+          current_period_start: now,
+          current_period_end: overrides.currentPeriodEnd ?? now + 30 * 24 * 60 * 60,
+          price: { id: overrides.priceId ?? "price_family_mock" }
+        }
+      ],
+      has_more: false,
+      url: "/v1/subscription_items"
+    }
+  } as unknown as Stripe.Subscription;
+}
+
+function stripeEventPayload(id: string, type: string, object: Record<string, unknown>, created?: number): string {
+  return JSON.stringify({
+    id,
+    object: "event",
+    api_version: "2026-03-25.dahlia",
+    created: created ?? Math.floor(Date.now() / 1000),
+    data: { object },
+    livemode: false,
+    pending_webhooks: 1,
+    request: null,
+    type
+  });
+}
+
 function refreshTokenFromSetCookie(res: { headers: Record<string, string | string[] | undefined> }): string | null {
   const raw = res.headers["set-cookie"];
   if (!raw) return null;
@@ -3091,8 +3860,12 @@ function configureTestEnv() {
   process.env.JWT_ACCESS_EXPIRES_IN = "15m";
   process.env.JWT_REFRESH_EXPIRES_IN = "30d";
   process.env.STRIPE_SECRET_KEY = "sk_test_mock";
-  process.env.STRIPE_RESOURCE_ONBOARDING_PRICE_ID = "price_resource_mock";
+  process.env.STRIPE_BILLING_MODE = "TEST";
+  process.env.STRIPE_CHECKOUT_ENABLED = "true";
+  process.env.STRIPE_TAX_MODE = "AUTOMATIC";
   process.env.STRIPE_FAMILY_SUBSCRIPTION_PRICE_ID = "price_family_mock";
+  process.env.STRIPE_WEBHOOK_SECRET = "whsec_e2e_stripe";
+  process.env.STRIPE_RECONCILIATION_INTERVAL_MS = "60000";
   process.env.APP_FRONTEND_URL = "http://localhost:5173";
   process.env.ADMIN_EMAIL = "admin@fab.local";
   process.env.ADMIN_PASSWORD = "ChangeMe123!";
@@ -3212,7 +3985,10 @@ async function cleanDatabase(prisma: PrismaService) {
   await prisma.resourceDocument.deleteMany();
   await prisma.message.deleteMany();
   await prisma.conversation.deleteMany();
+  await prisma.stripeWebhookEvent.deleteMany();
+  await prisma.stripeCheckoutSession.deleteMany();
   await prisma.subscription.deleteMany();
+  await prisma.familyStripeCustomer.deleteMany();
   await prisma.passwordResetToken.deleteMany();
   await prisma.adminAuditLog.deleteMany();
   await prisma.familyProfile.deleteMany();
@@ -3246,7 +4022,8 @@ async function seedDevUsers(prisma: PrismaService) {
           city: "Montreal",
           region: "QC",
           bio: "Profile e2e",
-          needsTags: ["repit"]
+          needsTags: ["repit"],
+          isInternalTest: true
         }
       }
     }
@@ -3256,8 +4033,11 @@ async function seedDevUsers(prisma: PrismaService) {
     data: {
       userId: familyUser.id,
       status: SubscriptionStatus.ACTIVE,
+      environment: StripeEnvironment.TEST,
       stripeCustomerId: "cus_seed_family",
-      stripeSubscriptionId: "sub_seed_family"
+      stripeSubscriptionId: "sub_seed_family",
+      stripePriceId: "price_family_mock",
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     }
   });
 

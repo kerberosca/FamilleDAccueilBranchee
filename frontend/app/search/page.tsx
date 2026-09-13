@@ -9,6 +9,7 @@ import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth-context";
+import { useFamilyReadiness } from "../../lib/family-readiness";
 
 type SearchResponse = {
   totalFound?: number;
@@ -48,6 +49,7 @@ const FULL_POSTAL_REGEX = /^[A-Z][0-9][A-Z][0-9][A-Z][0-9]$/;
 
 export default function SearchPage() {
   const { accessToken } = useAuth();
+  const { isOpen: isFamilyBillingOpen } = useFamilyReadiness();
   const initialized = useRef(false);
   const queryRef = useRef<SearchQuery>(DEFAULT_QUERY);
   const [formPostalCode, setFormPostalCode] = useState(DEFAULT_QUERY.postalCode);
@@ -297,8 +299,9 @@ export default function SearchPage() {
 
         {isPreview ? (
           <Alert tone="info">
-            Mode aperçu actif : seuls quelques alliés sont visibles. Passez à un abonnement actif pour la pagination et
-            les contacts.
+            {isFamilyBillingOpen
+              ? "Mode aperçu actif : seuls quelques alliés sont visibles. Passez à un abonnement actif pour la pagination complète et les coordonnées."
+              : "Mode aperçu actif : seuls quelques alliés sont visibles. La pagination complète, les coordonnées et la messagerie seront accessibles à l'ouverture des abonnements famille."}
           </Alert>
         ) : null}
 

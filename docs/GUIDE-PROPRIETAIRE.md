@@ -135,9 +135,11 @@ Ce journal aide à savoir qui a fait quoi, et quand.
 
 Le site utilise Stripe pour :
 
-- les paiements liés à l'inscription ou au parcours allié;
-- les abonnements famille;
+- les abonnements mensuels des familles seulement;
+- le portail Stripe permettant aux familles de gérer leur carte, leurs factures et leur annulation;
 - les webhooks qui mettent à jour l'état des abonnements.
+
+Les alliés ne paient aucun frais d'inscription dans FAB.
 
 Le backend contient un endpoint de webhook Stripe :
 

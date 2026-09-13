@@ -1,4 +1,4 @@
-import { Controller, Headers, Post, Req, UseGuards } from "@nestjs/common";
+import { Controller, Get, Headers, HttpCode, Param, Post, RawBodyRequest, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Role } from "@prisma/client";
 import { Request } from "express";
@@ -15,6 +15,12 @@ import { BillingService } from "./billing.service";
 export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 
+  @Public()
+  @Get("family/readiness")
+  getFamilyReadiness() {
+    return this.billingService.getPublicFamilyReadiness();
+  }
+
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.RESOURCE)
@@ -26,23 +32,47 @@ export class BillingController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.FAMILY)
-  @Post("family/checkout-session")
-  async createFamilyCheckoutSession(@CurrentUser() user: JwtPayload) {
-    return this.billingService.createFamilySubscriptionCheckoutSession(user.sub);
-  }
-
-  @Public()
-  @Post("stripe/webhook")
-  async handleWebhook(@Req() req: Request, @Headers("stripe-signature") signature?: string) {
-    const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body ?? {}), "utf-8");
-    return this.billingService.handleStripeWebhook(body, signature);
+  @Get("family/offer")
+  async getFamilyOffer(@CurrentUser() user: JwtPayload) {
+    return this.billingService.getFamilyOffer(user.sub);
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.FAMILY)
-  @Post("family/mock-activate")
-  async mockActivate(@CurrentUser() user: JwtPayload) {
-    return this.billingService.mockActivateFamilySubscription(user.sub);
+  @Get("family/subscription")
+  async getFamilySubscription(@CurrentUser() user: JwtPayload) {
+    return this.billingService.getFamilySubscription(user.sub);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.FAMILY)
+  @Post("family/checkout-session")
+  async createFamilyCheckoutSession(@CurrentUser() user: JwtPayload) {
+    return this.billingService.createFamilySubscriptionCheckoutSession(user.sub);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.FAMILY)
+  @Post("family/portal-session")
+  async createFamilyPortalSession(@CurrentUser() user: JwtPayload) {
+    return this.billingService.createFamilyPortalSession(user.sub);
+  }
+
+  @Public()
+  @Post("stripe/webhook")
+  @HttpCode(200)
+  async handleWebhook(@Req() req: RawBodyRequest<Request>, @Headers("stripe-signature") signature?: string) {
+    return this.billingService.handleStripeWebhook(req.rawBody ?? Buffer.alloc(0), signature);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Post("admin/families/:userId/resync")
+  async resyncFamilySubscription(@CurrentUser() user: JwtPayload, @Param("userId") userId: string) {
+    return this.billingService.resyncFamilySubscription(userId, user.sub);
   }
 }

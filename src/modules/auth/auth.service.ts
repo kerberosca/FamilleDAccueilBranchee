@@ -24,6 +24,7 @@ import {
 import * as argon2 from "argon2";
 import { createHash, randomBytes } from "crypto";
 import { AllyWebhooksService } from "../ally-webhooks/ally-webhooks.service";
+import { BillingService } from "../billing/billing.service";
 import {
   buildAllyWelcomeEmail,
   buildEmailVerificationEmail,
@@ -63,7 +64,8 @@ export class AuthService {
     private readonly allyWebhooksService: AllyWebhooksService,
     private readonly maintenanceService: MaintenanceService,
     private readonly resourceDocumentsService: ResourceDocumentsService,
-    private readonly trainingService: TrainingService
+    private readonly trainingService: TrainingService,
+    private readonly billingService: BillingService
   ) {}
 
   async register(input: RegisterDto) {
@@ -271,6 +273,7 @@ export class AuthService {
 
   /** Supprime définitivement le compte de l'utilisateur connecté (cascade: profil, messages, abonnements, etc.). */
   async deleteMyAccount(userId: string) {
+    await this.billingService.cancelFamilySubscriptionsBeforeDeletion(userId);
     const resourceProfile = await this.prisma.resourceProfile.findUnique({ where: { userId } });
     if (resourceProfile) {
       await this.resourceDocumentsService.deleteFilesForResourceProfile(resourceProfile.id);

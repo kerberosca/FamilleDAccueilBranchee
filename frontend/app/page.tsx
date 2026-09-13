@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { useFamilyReadiness } from "../lib/family-readiness";
 
 const ALLY_TYPES = [
   {
@@ -63,6 +64,7 @@ function isValidPostalCode(value: string): boolean {
 
 export default function HomePage() {
   const router = useRouter();
+  const { isOpen: isFamilyBillingOpen } = useFamilyReadiness();
   const [postalCode, setPostalCode] = useState("");
   const [tags, setTags] = useState("");
   const [deliveryMode, setDeliveryMode] = useState<"IN_PERSON" | "REMOTE">("IN_PERSON");
@@ -249,6 +251,12 @@ export default function HomePage() {
             <p className="mt-3 text-sm leading-6 text-[#625a7d]">
               Cherchez un service près de chez vous ou du tutorat à distance partout au Québec.
             </p>
+            {!isFamilyBillingOpen ? (
+              <p className="mt-3 rounded-xl border border-[#d8d1ee] bg-[#f2effb] px-3 py-2 text-sm leading-6 text-[#554c76]">
+                Le répertoire est accessible en aperçu. Les coordonnées et la messagerie seront offertes à
+                l'ouverture des abonnements famille.
+              </p>
+            ) : null}
             <div className="mt-5 grid gap-3">
               <Input
                 type="text"

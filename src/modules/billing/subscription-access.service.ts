@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { SubscriptionStatus } from "@prisma/client";
+import { StripeEnvironment, SubscriptionStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
@@ -7,14 +7,30 @@ export class SubscriptionAccessService {
   constructor(private readonly prisma: PrismaService) {}
 
   async hasActiveFamilySubscription(userId: string): Promise<boolean> {
-    const sub = await this.prisma.subscription.findFirst({
+    const family = await this.prisma.familyProfile.findUnique({
+      where: { userId },
+      select: { isInternalTest: true }
+    });
+    if (!family) {
+      return false;
+    }
+    const environment = family.isInternalTest ? StripeEnvironment.TEST : StripeEnvironment.LIVE;
+    const subscription = await this.prisma.subscription.findFirst({
       where: {
         userId,
-        status: SubscriptionStatus.ACTIVE,
-        OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { gt: new Date() } }]
+        environment
       },
       orderBy: { updatedAt: "desc" }
     });
-    return Boolean(sub);
+    if (
+      !subscription ||
+      (subscription.status !== SubscriptionStatus.ACTIVE && subscription.status !== SubscriptionStatus.TRIALING)
+    ) {
+      return false;
+    }
+    if (subscription.currentPeriodEnd && subscription.currentPeriodEnd <= new Date()) {
+      return false;
+    }
+    return true;
   }
 }
