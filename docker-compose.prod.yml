@@ -58,6 +58,9 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    mem_limit: 256m
+    memswap_limit: 384m
+    pids_limit: 96
     restart: unless-stopped
 
 volumes:
