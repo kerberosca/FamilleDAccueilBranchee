@@ -1,5 +1,6 @@
 # Backend API - production
-FROM node:20-bullseye-slim AS builder
+ARG NODE_BASE_IMAGE=node:20-bullseye-slim
+FROM ${NODE_BASE_IMAGE} AS builder
 
 WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
@@ -11,7 +12,7 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-FROM node:20-bullseye-slim
+FROM ${NODE_BASE_IMAGE}
 WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 

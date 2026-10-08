@@ -22,7 +22,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api.prod
-    mem_limit: 384m
+      args:
+        NODE_BASE_IMAGE: node:22-bookworm-slim
+    mem_limit: 512m
     pids_limit: 128
     env_file: .env.demo
     environment:

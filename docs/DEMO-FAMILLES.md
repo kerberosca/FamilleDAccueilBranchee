@@ -37,6 +37,7 @@ Dans `/root/fab-demo`, copier `.env.demo.example` en `.env.demo`, créer des sec
 
 Les ports démo sont liés seulement à `127.0.0.1` : `3004` pour l'API et `3005` pour le frontend. PostgreSQL n'a aucun port publié. Le nom de projet Compose `fab-demo` et le volume `demo_postgres_data` séparent la démo du déploiement principal.
 Les conteneurs démo ont également des limites de mémoire et de processus; vérifier la mémoire disponible du VPS avant et après leur démarrage dans GestionVPS.
+La construction de l'API démo utilise Node 22 sur Debian 12 pour disposer du paquet OpenSSL requis par Prisma. La valeur par défaut du Dockerfile de production reste inchangée.
 
 Dans la configuration Caddy du VPS, ajouter ce bloc distinct et conserver intact le bloc du site principal :
 
