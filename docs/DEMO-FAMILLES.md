@@ -13,11 +13,27 @@ Le code QR prêt à imprimer se trouve dans `docs/qr-demo-familles.png`. Il mèn
 
 Le site porte une bannière permanente **Démonstration**. Il demande de ne pas saisir de renseignements personnels. Les courriels, paiements, webhooks sortants et contournements de connexion de développement sont désactivés dans la configuration Docker de la démo.
 
-## Préparer le VPS
+## Préparer le VPS avec GestionVPS
+
+Le serveur actuel est administré avec le compte `linuxuser`, Plink et la clé chargée dans Pageant. Ne pas utiliser une connexion directe comme `root`. Avant d'ajouter les trois conteneurs démo, vérifier l'espace disque, la mémoire disponible et l'état des sites dans GestionVPS. Déclencher **Avant maintenance** dans la console GestionVPS et attendre la vérification hors site de la sauvegarde. Le garde `scripts/require-recent-backup.sh` doit ensuite réussir avant toute construction ou migration.
+
+Conserver le dépôt de production `/root/fab` sur sa branche `main`. Après publication de la branche `codex/demo-familles`, créer une copie de travail distincte `/root/fab-demo` depuis cette branche. Le projet Compose `fab-demo` et son volume PostgreSQL restent ainsi séparés du site principal. Mettre à jour cette copie par avance rapide uniquement; ne pas lancer `docker compose` sans le fichier `docker-compose.demo.yml`.
+
+La première installation peut se faire depuis une session administrateur autorisée sur le VPS :
+
+```bash
+cd /root/fab
+git fetch origin codex/demo-familles
+git worktree add --detach /root/fab-demo origin/codex/demo-familles
+cd /root/fab-demo
+bash scripts/require-recent-backup.sh
+```
+
+Pour les mises à jour suivantes, exécuter `git -C /root/fab fetch origin codex/demo-familles`, puis `git -C /root/fab-demo switch --detach origin/codex/demo-familles` après avoir vérifié que la copie démo ne contient pas de modifications suivies localement.
 
 Créer un enregistrement DNS `A` pour `demo.familledaccueilbranchee.ca` vers l'adresse publique du VPS. Ne pas modifier les enregistrements du domaine principal.
 
-Dans le dépôt du VPS, copier `.env.demo.example` en `.env.demo`, créer des secrets aléatoires différents pour `DEMO_POSTGRES_PASSWORD`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` et `ADMIN_PASSWORD`, puis limiter la lecture du fichier au propriétaire. Le mot de passe PostgreSQL doit être composé de caractères sûrs pour une URL (l'hexadécimal convient). **Ne jamais recopier le `.env` de production.**
+Dans `/root/fab-demo`, copier `.env.demo.example` en `.env.demo`, créer des secrets aléatoires différents pour `DEMO_POSTGRES_PASSWORD`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` et `ADMIN_PASSWORD`, puis limiter la lecture du fichier au propriétaire. Le mot de passe PostgreSQL doit être composé de caractères sûrs pour une URL (l'hexadécimal convient). **Ne jamais recopier le `.env` de production.**
 
 Les ports démo sont liés seulement à `127.0.0.1` : `3004` pour l'API et `3005` pour le frontend. PostgreSQL n'a aucun port publié. Le nom de projet Compose `fab-demo` et le volume `demo_postgres_data` séparent la démo du déploiement principal.
 
@@ -39,7 +55,7 @@ Valider Caddy avant de le recharger : `caddy validate --config /etc/caddy/Caddyf
 
 ## Démarrer ou mettre à jour la démo
 
-Depuis la copie du dépôt sur le VPS :
+Depuis `/root/fab-demo` sur le VPS, après la sauvegarde GestionVPS validée :
 
 ```bash
 docker compose --env-file .env.demo -f docker-compose.demo.yml build api-demo frontend-demo
