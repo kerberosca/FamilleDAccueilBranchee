@@ -36,6 +36,7 @@ Créer un enregistrement DNS `A` pour `demo.familledaccueilbranchee.ca` vers l'a
 Dans `/root/fab-demo`, copier `.env.demo.example` en `.env.demo`, créer des secrets aléatoires différents pour `DEMO_POSTGRES_PASSWORD`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` et `ADMIN_PASSWORD`, puis limiter la lecture du fichier au propriétaire. Le mot de passe PostgreSQL doit être composé de caractères sûrs pour une URL (l'hexadécimal convient). **Ne jamais recopier le `.env` de production.**
 
 Les ports démo sont liés seulement à `127.0.0.1` : `3004` pour l'API et `3005` pour le frontend. PostgreSQL n'a aucun port publié. Le nom de projet Compose `fab-demo` et le volume `demo_postgres_data` séparent la démo du déploiement principal.
+Les conteneurs démo ont également des limites de mémoire et de processus; vérifier la mémoire disponible du VPS avant et après leur démarrage dans GestionVPS.
 
 Dans la configuration Caddy du VPS, ajouter ce bloc distinct et conserver intact le bloc du site principal :
 
