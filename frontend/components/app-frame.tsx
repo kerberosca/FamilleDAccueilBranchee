@@ -12,6 +12,8 @@ import { useMaintenance } from "../lib/maintenance-context";
 import { CookieBanner } from "./cookie-banner";
 import { MaintenancePage } from "./maintenance-page";
 
+const IS_FAMILY_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
 function NavLink({
   href,
   children,
@@ -22,7 +24,7 @@ function NavLink({
   onClick?: (e: React.MouseEvent) => void;
 }) {
   const pathname = usePathname();
-  const active = pathname === href || (href !== "/" && pathname.startsWith(href));
+  const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
   return (
     <Link
       href={href}
@@ -78,7 +80,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
     setLoggingOut(true);
     await logout();
     setLoggingOut(false);
-    router.push(isDevMode ? "/dev" : "/login");
+    router.push(IS_FAMILY_DEMO ? "/" : isDevMode ? "/dev" : "/login");
   };
 
   const switchView = () => {
@@ -88,6 +90,11 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen">
+      {IS_FAMILY_DEMO ? (
+        <div className="bg-[#f8c27f] px-4 py-2 text-center text-xs font-semibold text-[#21183f] sm:text-sm">
+          DÉMONSTRATION FAMILLES · Profils fictifs · Aucun paiement · Comptes supprimés après environ 24 heures
+        </div>
+      ) : null}
       <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
         <div
           className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"
@@ -121,15 +128,27 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
               <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]" aria-hidden />
             </Link>
             <nav className="flex flex-wrap items-center gap-0.5 sm:gap-1" aria-label="Navigation principale">
-              <NavLink href="/" onClick={handleNavClick}>Accueil</NavLink>
-              {!isAuthenticated && <NavLink href="/onboarding" onClick={handleNavClick}>Premiers pas</NavLink>}
-              {!isAuthenticated && <NavLink href="/login" onClick={handleNavClick}>Connexion</NavLink>}
-              {isDevMode && <NavLink href="/dev" onClick={handleNavClick}>Dev</NavLink>}
-              {canUseProfile && <NavLink href="/me" onClick={handleNavClick}>Mon profil</NavLink>}
-              {userRole === "RESOURCE" && <NavLink href="/me/formation" onClick={handleNavClick}>Formation</NavLink>}
-              {canUseSearch && <NavLink href="/search" onClick={handleNavClick}>Recherche</NavLink>}
-              {canUseMessages && <NavLink href="/messages" onClick={handleNavClick}>Messages</NavLink>}
-              {canUseAdmin && <NavLink href="/admin" onClick={handleNavClick}>Admin</NavLink>}
+              {IS_FAMILY_DEMO ? (
+                <>
+                  <NavLink href="/" onClick={handleNavClick}>Accueil</NavLink>
+                  {canUseSearch && <NavLink href="/search" onClick={handleNavClick}>Recherche</NavLink>}
+                  {canUseMessages && <NavLink href="/messages" onClick={handleNavClick}>Messages</NavLink>}
+                  {canUseProfile && <NavLink href="/me" onClick={handleNavClick}>Mon profil</NavLink>}
+                  <a href="https://familledaccueilbranchee.ca/" className="px-3 py-2.5 text-sm font-medium text-slate-300 no-underline hover:text-white">Site principal ↗</a>
+                </>
+              ) : (
+                <>
+                  <NavLink href="/" onClick={handleNavClick}>Accueil</NavLink>
+                  {!isAuthenticated && <NavLink href="/onboarding" onClick={handleNavClick}>Premiers pas</NavLink>}
+                  {!isAuthenticated && <NavLink href="/login" onClick={handleNavClick}>Connexion</NavLink>}
+                  {isDevMode && <NavLink href="/dev" onClick={handleNavClick}>Dev</NavLink>}
+                  {canUseProfile && <NavLink href="/me" onClick={handleNavClick}>Mon profil</NavLink>}
+                  {userRole === "RESOURCE" && <NavLink href="/me/formation" onClick={handleNavClick}>Formation</NavLink>}
+                  {canUseSearch && <NavLink href="/search" onClick={handleNavClick}>Recherche</NavLink>}
+                  {canUseMessages && <NavLink href="/messages" onClick={handleNavClick}>Messages</NavLink>}
+                  {canUseAdmin && <NavLink href="/admin" onClick={handleNavClick}>Admin</NavLink>}
+                </>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -137,7 +156,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
               className="rounded-full border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur-sm"
               title={isAuthenticated ? "Session connectée" : "Session invitée"}
             >
-              {isAuthenticated ? "Connecté" : "Invité"}
+              {IS_FAMILY_DEMO ? isAuthenticated ? "Visite démo" : "Démo" : isAuthenticated ? "Connecté" : "Invité"}
             </span>
             {process.env.NODE_ENV !== "production" && (
               <button
@@ -168,7 +187,9 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
         <footer className="mt-auto border-t border-slate-800/80 bg-slate-950/80 px-4 py-4 backdrop-blur-sm">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center text-sm text-slate-400 sm:justify-between">
             <span>© FAB — Famille d&apos;accueil branchée</span>
-            <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1" aria-label="Liens légaux">
+            {IS_FAMILY_DEMO ? (
+              <span>Profils et messages fictifs · N&apos;entrez pas de renseignements personnels</span>
+            ) : <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1" aria-label="Liens légaux">
               <Link href="/confidentialite" className="text-slate-400 no-underline hover:text-cyan-400">
                 Confidentialité
               </Link>
@@ -190,11 +211,11 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
               <a href="mailto:info@formeduc.ca" className="text-slate-400 no-underline hover:text-cyan-400">
                 Contact
               </a>
-            </nav>
+            </nav>}
           </div>
         </footer>
       </div>
-      <CookieBanner />
+      {!IS_FAMILY_DEMO ? <CookieBanner /> : null}
     </div>
   );
 }

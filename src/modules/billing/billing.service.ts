@@ -23,6 +23,7 @@ import { randomUUID } from "crypto";
 import Stripe from "stripe";
 import { PrismaService } from "../../prisma/prisma.service";
 import { StripeService } from "./stripe.service";
+import { SubscriptionAccessService } from "./subscription-access.service";
 
 const OPEN_SUBSCRIPTION_STATUSES: SubscriptionStatus[] = [
   SubscriptionStatus.INCOMPLETE,
@@ -44,7 +45,8 @@ export class BillingService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    private readonly stripeService: StripeService
+    private readonly stripeService: StripeService,
+    private readonly subscriptionAccessService: SubscriptionAccessService
   ) {
     this.frontendUrl = this.configService.get<string>("APP_FRONTEND_URL", "http://localhost:5173");
     this.reconciliationIntervalMs = Number(
@@ -74,6 +76,7 @@ export class BillingService implements OnModuleInit, OnModuleDestroy {
   }
 
   getPublicFamilyReadiness() {
+    if (this.configService.get<string>("DEMO_MODE") === "true") return { state: "OPEN" };
     return { state: this.publicFamilyBillingState() };
   }
 
@@ -105,6 +108,17 @@ export class BillingService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getFamilySubscription(userId: string) {
+    if (this.configService.get<string>("DEMO_MODE") === "true") {
+      const hasPremiumAccess = await this.subscriptionAccessService.hasActiveFamilySubscription(userId);
+      return {
+        status: hasPremiumAccess ? SubscriptionStatus.ACTIVE : SubscriptionStatus.INACTIVE,
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+        canManage: false,
+        hasPremiumAccess,
+        needsAdminReview: false
+      };
+    }
     const family = await this.getFamilyContext(userId);
     const environment = this.currentEnvironment();
     const subscription = await this.prisma.subscription.findFirst({

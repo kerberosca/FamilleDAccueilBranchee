@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   Prisma,
   ResourceOnboardingState,
@@ -57,7 +58,8 @@ type ConversationDetailRecord = Prisma.ConversationGetPayload<{ select: typeof c
 export class MessagingService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly subscriptionAccessService: SubscriptionAccessService
+    private readonly subscriptionAccessService: SubscriptionAccessService,
+    private readonly configService: ConfigService
   ) {}
 
   async createConversation(currentUser: JwtPayload, dto: CreateConversationDto) {
@@ -83,7 +85,8 @@ export class MessagingService {
         id: true,
         publishStatus: true,
         verificationStatus: true,
-        onboardingState: true
+        onboardingState: true,
+        isInternalTest: true
       }
     });
     if (!resource) {
@@ -93,7 +96,8 @@ export class MessagingService {
       resource.publishStatus !== ResourcePublishStatus.PUBLISHED ||
       resource.verificationStatus !== ResourceVerificationStatus.VERIFIED ||
       (resource.onboardingState !== ResourceOnboardingState.VERIFIED &&
-        resource.onboardingState !== ResourceOnboardingState.PUBLISHED)
+        resource.onboardingState !== ResourceOnboardingState.PUBLISHED) ||
+      resource.isInternalTest !== (this.configService.get<string>("DEMO_MODE") === "true")
     ) {
       throw new NotFoundException("Allié introuvable.");
     }

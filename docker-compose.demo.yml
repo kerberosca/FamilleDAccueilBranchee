@@ -1,0 +1,67 @@
+name: fab-demo
+
+services:
+  postgres-demo:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: fab_demo
+      POSTGRES_PASSWORD: ${DEMO_POSTGRES_PASSWORD:?Définir DEMO_POSTGRES_PASSWORD dans .env.demo}
+      POSTGRES_DB: fab_demo
+    volumes:
+      - demo_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fab_demo -d fab_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.api.prod
+    env_file: .env.demo
+    environment:
+      NODE_ENV: production
+      DEMO_MODE: "true"
+      DEV_BYPASS_AUTH: "false"
+      DATABASE_URL: postgresql://fab_demo:${DEMO_POSTGRES_PASSWORD}@postgres-demo:5432/fab_demo?schema=public
+      CORS_ORIGINS: https://demo.familledaccueilbranchee.ca
+      APP_FRONTEND_URL: https://demo.familledaccueilbranchee.ca
+      EMAIL_DELIVERY_MODE: log
+      STRIPE_BILLING_MODE: DISABLED
+      STRIPE_CHECKOUT_ENABLED: "false"
+      STRIPE_TAX_MODE: UNCONFIRMED
+      N8N_ALLY_WEBHOOK_URL: ""
+      ALLY_TRAINING_EMAILS_ENABLED: "false"
+    ports:
+      - "127.0.0.1:3004:3000"
+    depends_on:
+      postgres-demo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  frontend-demo:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: https://demo.familledaccueilbranchee.ca/api/v1
+        NEXT_PUBLIC_DEMO_MODE: "true"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_DEMO_MODE: "true"
+    ports:
+      - "127.0.0.1:3005:3002"
+    depends_on:
+      api-demo:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  demo_postgres_data:

@@ -20,6 +20,8 @@ type FamilyOffer = {
 
 export type FamilySubscription = FamilySubscriptionSummary;
 
+const IS_FAMILY_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
 const STATUS_LABELS: Record<string, string> = {
   INACTIVE: "Aucun abonnement",
   INCOMPLETE: "Paiement à terminer",
@@ -34,6 +36,20 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function FamilyBillingCard({ compact = false }: { compact?: boolean }) {
+  if (IS_FAMILY_DEMO) {
+    return (
+      <Card className="space-y-2 border-[#4e4771] bg-[#171134]/75 backdrop-blur-sm">
+        <h2 className="text-lg font-medium text-white">Accès de démonstration activé</h2>
+        <p className="text-sm leading-6 text-slate-300">
+          Vous pouvez explorer la recherche complète et la messagerie avec les profils fictifs. Aucun paiement n&apos;est possible sur ce site.
+        </p>
+      </Card>
+    );
+  }
+  return <LiveFamilyBillingCard compact={compact} />;
+}
+
+function LiveFamilyBillingCard({ compact }: { compact: boolean }) {
   const { accessToken } = useAuth();
   const [offer, setOffer] = useState<FamilyOffer | null>(null);
   const [subscription, setSubscription] = useState<FamilySubscription | null>(null);

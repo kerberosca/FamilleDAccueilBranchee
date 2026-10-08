@@ -1,0 +1,10 @@
+services:
+  api-demo:
+    environment:
+      NODE_ENV: development
+      CORS_ORIGINS: http://localhost:3005
+      APP_FRONTEND_URL: http://localhost:3005
+  frontend-demo:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3004/api/v1

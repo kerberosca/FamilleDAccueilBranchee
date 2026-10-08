@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   AllyType,
   Prisma,
@@ -20,7 +21,8 @@ const PREVIEW_LIMIT = 3;
 export class SearchService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly subscriptionAccessService: SubscriptionAccessService
+    private readonly subscriptionAccessService: SubscriptionAccessService,
+    private readonly configService: ConfigService
   ) {}
 
   async searchResources(query: SearchResourcesDto, user?: JwtPayload) {
@@ -35,7 +37,7 @@ export class SearchService {
       publishStatus: ResourcePublishStatus.PUBLISHED,
       verificationStatus: ResourceVerificationStatus.VERIFIED,
       onboardingState: { in: [ResourceOnboardingState.VERIFIED, ResourceOnboardingState.PUBLISHED] },
-      isInternalTest: false,
+      isInternalTest: this.configService.get<string>("DEMO_MODE") === "true",
       ...(isRemoteSearch
         ? {
             allyType: AllyType.AUTRES,

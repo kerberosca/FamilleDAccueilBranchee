@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, HttpCode, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, HttpCode, NotFoundException, Post, Req, Res, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
@@ -38,6 +38,19 @@ export class AuthController {
       accessToken: result.accessToken,
       nextStepForResource: result.nextStepForResource ?? null
     };
+  }
+
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Post("demo-family")
+  async enterDemoFamily(@Res({ passthrough: true }) res: Response) {
+    if (this.configService.get<string>("DEMO_MODE") !== "true") {
+      throw new NotFoundException();
+    }
+    const result = await this.authService.createDemoFamily();
+    this.setRefreshCookie(res, result.refreshToken);
+    return { user: result.user, accessToken: result.accessToken };
   }
 
   @Public()

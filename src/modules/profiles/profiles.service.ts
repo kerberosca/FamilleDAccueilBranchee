@@ -531,7 +531,7 @@ export class ProfilesService {
     const isPublishedAndVerified =
       resource.publishStatus === ResourcePublishStatus.PUBLISHED &&
       resource.verificationStatus === ResourceVerificationStatus.VERIFIED &&
-      !resource.isInternalTest;
+      resource.isInternalTest === (this.configService.get<string>("DEMO_MODE") === "true");
     const isAdmin = currentUser?.role === Role.ADMIN;
     if (!isPublishedAndVerified && !isAdmin) {
       throw new NotFoundException("Allié introuvable.");

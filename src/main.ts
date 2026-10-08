@@ -3,8 +3,10 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 import { setupApp } from "./app.setup";
+import { assertDemoModeIsolation } from "./demo-mode.guard";
 
 async function bootstrap() {
+  assertDemoModeIsolation(process.env);
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   // Express v5 : conserver le parseur « extended » pour query params (objets/tableaux)
   app.set("query parser", "extended");

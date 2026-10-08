@@ -7,6 +7,9 @@ import { FormEvent, useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useFamilyReadiness } from "../lib/family-readiness";
+import { FamilyDemoHome } from "../components/family-demo-home";
+
+const IS_FAMILY_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
 const ALLY_TYPES = [
   {
@@ -63,6 +66,10 @@ function isValidPostalCode(value: string): boolean {
 }
 
 export default function HomePage() {
+  return IS_FAMILY_DEMO ? <FamilyDemoHome /> : <RegularHomePage />;
+}
+
+function RegularHomePage() {
   const router = useRouter();
   const { isOpen: isFamilyBillingOpen } = useFamilyReadiness();
   const [postalCode, setPostalCode] = useState("");

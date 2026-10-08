@@ -1,8 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
+  OnModuleDestroy,
+  OnModuleInit,
   ServiceUnavailableException,
   UnauthorizedException
 } from "@nestjs/common";
@@ -22,7 +25,7 @@ import {
   UserStatus
 } from "@prisma/client";
 import * as argon2 from "argon2";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import { AllyWebhooksService } from "../ally-webhooks/ally-webhooks.service";
 import { BillingService } from "../billing/billing.service";
 import {
@@ -53,8 +56,9 @@ type TokenPair = {
 };
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuthService.name);
+  private demoCleanupTimer?: NodeJS.Timeout;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -68,7 +72,93 @@ export class AuthService {
     private readonly billingService: BillingService
   ) {}
 
+  onModuleInit() {
+    if (this.configService.get<string>("DEMO_MODE") !== "true") return;
+    void this.cleanupExpiredDemoFamilies();
+    this.demoCleanupTimer = setInterval(() => void this.cleanupExpiredDemoFamilies(), 15 * 60 * 1000);
+    this.demoCleanupTimer.unref();
+  }
+
+  onModuleDestroy() {
+    if (this.demoCleanupTimer) clearInterval(this.demoCleanupTimer);
+  }
+
+  private async cleanupExpiredDemoFamilies() {
+    try {
+      await this.prisma.user.deleteMany({
+        where: {
+          email: { startsWith: "visiteur-", endsWith: "@demo.invalid" },
+          role: Role.FAMILY,
+          createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+        }
+      });
+    } catch (error) {
+      this.logger.warn(`Nettoyage des comptes démo impossible: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async createDemoFamily() {
+    if (this.configService.get<string>("DEMO_MODE") !== "true") {
+      throw new ForbiddenException("La démonstration est désactivée.");
+    }
+    const resource = await this.prisma.resourceProfile.findFirst({
+      where: {
+        isInternalTest: true,
+        publishStatus: ResourcePublishStatus.PUBLISHED,
+        verificationStatus: ResourceVerificationStatus.VERIFIED
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, userId: true }
+    });
+    if (!resource) {
+      throw new ServiceUnavailableException("La démonstration est en préparation. Réessayez bientôt.");
+    }
+    const visitorId = randomUUID();
+    const passwordHash = await argon2.hash(randomBytes(32).toString("hex"));
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: `visiteur-${visitorId}@demo.invalid`,
+          emailVerifiedAt: new Date(),
+          passwordHash,
+          role: Role.FAMILY,
+          status: UserStatus.ACTIVE,
+          familyProfile: {
+            create: {
+              displayName: "Famille de démonstration",
+              postalCode: "H2X1Y4",
+              city: "Montréal",
+              region: "QC",
+              bio: "Profil fictif créé pour découvrir FAB.",
+              needsTags: ["Gardien compétent", "Tutorat"],
+              isInternalTest: true
+            }
+          }
+        },
+        include: { familyProfile: true }
+      });
+      await tx.conversation.create({
+        data: {
+          familyId: created.familyProfile!.id,
+          resourceId: resource.id,
+          messages: {
+            create: {
+              senderUserId: resource.userId,
+              content: "Bonjour! Ceci est un échange de démonstration. Vous pouvez explorer la messagerie; aucun vrai allié ne recevra vos messages."
+            }
+          }
+        }
+      });
+      return created;
+    });
+    const tokens = await this.generateAndPersistTokens(user);
+    return { user: sanitizeUser(user), ...tokens };
+  }
+
   async register(input: RegisterDto) {
+    if (this.configService.get<string>("DEMO_MODE") === "true") {
+      throw new ForbiddenException("Utilisez le bouton Entrer dans la démo pour découvrir le parcours famille.");
+    }
     if (input.role === Role.ADMIN) {
       throw new BadRequestException("La création d'un compte administrateur est désactivée.");
     }
@@ -201,6 +291,9 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
+    if (this.configService.get<string>("DEMO_MODE") === "true") {
+      throw new ForbiddenException("La connexion par mot de passe est désactivée dans la démonstration.");
+    }
     const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user) {
       throw new UnauthorizedException("Email ou mot de passe incorrect");

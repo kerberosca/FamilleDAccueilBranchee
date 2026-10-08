@@ -11,6 +11,8 @@ import { apiGet, apiPost } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth-context";
 import { FamilySubscriptionSummary, useFamilyReadiness } from "../../../lib/family-readiness";
 
+const IS_FAMILY_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
 type MeResponse = { role: "FAMILY" | "RESOURCE" | "ADMIN" };
 
 type Message = {
@@ -121,7 +123,11 @@ export default function ConversationPage() {
 
         <section className="rounded-[24px] border border-white/20 bg-gradient-to-r from-[#22184f]/85 via-[#261d57]/78 to-[#2e2462]/74 p-6 text-white shadow-[0_20px_52px_-38px_rgba(8,6,26,0.95)]">
           <h1 className="text-2xl font-semibold sm:text-3xl">Conversation</h1>
-          <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">Suivez vos échanges en temps réel.</p>
+          <p className="mt-2 text-sm text-[#ebe6ff] sm:text-base">
+            {IS_FAMILY_DEMO
+              ? "Conversation de démonstration : aucun vrai allié ne reçoit ou ne répond aux messages."
+              : "Suivez vos échanges en temps réel."}
+          </p>
         </section>
 
         <RequireAuth>

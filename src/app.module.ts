@@ -32,6 +32,7 @@ const isProduction = process.env.NODE_ENV === "production";
         JWT_ACCESS_EXPIRES_IN: Joi.string().default("15m"),
         JWT_REFRESH_EXPIRES_IN: Joi.string().default("30d"),
         DEV_BYPASS_AUTH: Joi.string().valid("true", "false").default("false"),
+        DEMO_MODE: Joi.string().valid("true", "false").default("false"),
         CORS_ORIGINS: Joi.string().required(),
         APP_FRONTEND_URL: Joi.string().uri().required(),
         ADMIN_EMAIL: Joi.string().email({ tlds: { allow: false } }).required(),
