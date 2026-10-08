@@ -226,10 +226,11 @@ export default function SearchPage() {
               onSubmit={onSubmit}
               className="rounded-2xl border border-[#ddd8f0] bg-white/95 p-4 text-[#221a43] shadow-[0_22px_42px_-34px_rgba(23,17,54,0.95)] backdrop-blur-sm"
             >
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_190px_auto]">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <Input
                   value={formPostalCode}
                   onChange={(e) => setFormPostalCode(normalizePostalCode(e.target.value))}
+                  aria-label="Code postal"
                   placeholder="Code postal (H2X ou H2X1Y4)"
                   className="!border-[#d7d3ea] !bg-white !text-[#211a3e] placeholder:!text-[#7a7394] focus:!border-[#3469b9] focus:!ring-[#3469b9]/35"
                 />
