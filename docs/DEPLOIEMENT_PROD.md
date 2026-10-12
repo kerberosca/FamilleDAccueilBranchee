@@ -125,3 +125,7 @@ curl -i -X POST https://familledaccueilbranchee.ca/api/v1/auth/login \
   -H "Origin: https://familledaccueilbranchee.ca" \
   --data '{"email":"info@formeducweb.ca","password":"MOT_DE_PASSE"}'
 ```
+
+## Image système de l’API
+
+L’API utilise Node 20 sur Debian 12 (`node:20-bookworm-slim`) dans les étapes de construction et d’exécution. Le build Linux a constaté un téléchargement OpenSSL en erreur 404 avec l’ancienne base Debian 11. Prisma est généré dans l’image cible pour utiliser le moteur OpenSSL approprié. La version Node et les dépendances applicatives restent identiques pour cette publication.

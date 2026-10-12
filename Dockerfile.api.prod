@@ -1,5 +1,5 @@
 # Backend API - production
-FROM node:20-bullseye-slim AS builder
+FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
@@ -11,7 +11,7 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-FROM node:20-bullseye-slim
+FROM node:20-bookworm-slim
 WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
