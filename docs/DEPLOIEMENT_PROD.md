@@ -46,9 +46,17 @@ EMAIL_DELIVERY_MODE=live
 ALLY_TRAINING_ENABLED=true
 ALLY_TRAINING_EMAILS_ENABLED=false
 ALLY_TRAINING_EMAILS_START_AT=
+NEWSLETTER_ENABLED=false
+CYBERIMPACT_API_TOKEN=
+CYBERIMPACT_LAUNCH_GROUP_ID=57
+CYBERIMPACT_CONGRESS_GROUP_ID=58
+NEWSLETTER_FORM_SECRET=
+NEWSLETTER_TRUST_PROXY=true
 ```
 
 `ALLY_TRAINING_EMAILS_ENABLED=false` laisse la formation accessible, mais bloque uniquement ses courriels. Une date ISO valide dans `ALLY_TRAINING_EMAILS_START_AT` est également obligatoire avant toute activation.
+
+Avant de publier les liens d'infolettre ou le code QR du congrès, terminer les tests locaux et réels selon `docs/INFOLETTRE_CYBERIMPACT.md`. Le formulaire FAB utilise l'API Cyberimpact, avec les groupes 57 et 58 et le scénario de bienvenue 45. Renseigner le jeton d'API et un secret aléatoire dédié d'au moins 32 caractères dans le `.env` du VPS, puis activer `NEWSLETTER_ENABLED=true` après validation. Ces secrets restent côté API et hors Git. La migration `20261012000000_newsletter_consent` crée uniquement le journal de consentement FAB. `NEWSLETTER_TRUST_PROXY=true` est réservé au VPS dont les ports API sont liés à `127.0.0.1` derrière Caddy; en local ou avec une API publique directe, garder `false`.
 
 ## Déploiement
 
@@ -117,3 +125,7 @@ curl -i -X POST https://familledaccueilbranchee.ca/api/v1/auth/login \
   -H "Origin: https://familledaccueilbranchee.ca" \
   --data '{"email":"info@formeducweb.ca","password":"MOT_DE_PASSE"}'
 ```
+
+## Image système de l’API
+
+L’API utilise Node 20 sur Debian 12 (`node:20-bookworm-slim`) dans les étapes de construction et d’exécution. Le build Linux a constaté un téléchargement OpenSSL en erreur 404 avec l’ancienne base Debian 11. Prisma est généré dans l’image cible pour utiliser le moteur OpenSSL approprié. La version Node et les dépendances applicatives restent identiques pour cette publication.

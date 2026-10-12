@@ -7,7 +7,7 @@ export default function ConfidentialitePage() {
     <main className="mx-auto max-w-3xl space-y-6 p-6 pb-16">
       <h1 className="text-2xl font-bold text-white">Politique de confidentialité</h1>
       <p className="text-sm text-slate-400">
-        Dernière mise à jour : 5 septembre 2026. Le site FAB est opéré par Forméduc.
+        Dernière mise à jour : 12 octobre 2026. Le site FAB est opéré par Forméduc.
       </p>
 
       <section className="space-y-2">
@@ -21,7 +21,7 @@ export default function ConfidentialitePage() {
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-white">2. À qui s&apos;applique cette politique ?</h2>
         <p className="text-slate-300">
-          Cette politique s&apos;applique au site FAB (Famille d&apos;accueil branchée) et à toutes les données personnelles collectées via ce site : personnes inscrites comme famille ou allié, visiteurs qui nous contactent. Elle décrit quelles données nous recueillons, pour quelles fins, qui y a accès, combien de temps nous les conservons et quels sont vos droits.
+          Cette politique s&apos;applique au site FAB (Famille d&apos;accueil branchée) et aux données personnelles collectées via ce site : personnes inscrites comme famille ou allié, abonnés à l&apos;infolettre et visiteurs qui nous contactent. Elle décrit quelles données nous recueillons, pour quelles fins, qui y a accès, combien de temps nous les conservons et quels sont vos droits.
         </p>
       </section>
 
@@ -36,6 +36,9 @@ export default function ConfidentialitePage() {
         <p className="text-slate-300">
           <strong>Messages :</strong> contenu des échanges entre familles et alliés via la plateforme.
         </p>
+        <p className="text-slate-300">
+          <strong>Infolettre :</strong> prénom et adresse courriel fournis dans le formulaire FAB, puis transmis à Cyberimpact, qui gère la liste d&apos;abonnés, le courriel de bienvenue et les communications sur le lancement. FAB conserve un journal de consentement comprenant ces coordonnées, la date, la provenance de l&apos;inscription, le texte accepté, l&apos;adresse IP et les informations du navigateur, afin de documenter le consentement et de protéger le formulaire contre les abus. Une inscription depuis la page du congrès est aussi associée au groupe « Congrès FAB » pour en mesurer la provenance.
+        </p>
         <h3 id="cookies" className="text-base font-medium text-cyan-300 pt-2">
           Cookies et traceurs
         </h3>
@@ -49,6 +52,9 @@ export default function ConfidentialitePage() {
         <h3 className="text-base font-medium text-cyan-300">4.1 Finalités</h3>
         <p className="text-slate-300">
           Les données sont enregistrées pour : créer et gérer votre compte ; publier votre profil dans le répertoire afin de permettre la mise en relation entre familles et alliés ; permettre les échanges (messages) ; vérifier et modérer les comptes ; administrer le site. Nous n&apos;utilisons pas vos données pour de la prospection non sollicitée, de la revente de listes ou du ciblage publicitaire par des tiers.
+        </p>
+        <p className="text-slate-300">
+          Si vous remplissez le formulaire d&apos;infolettre, nous utilisons votre prénom et votre courriel pour vous envoyer un message de bienvenue, les nouvelles de FAB et les détails de son lancement. Vous pouvez vous désabonner au moyen du lien présent dans chaque courriel.
         </p>
         <h3 className="text-base font-medium text-cyan-300">4.2 Qui peut voir quelles données ?</h3>
         <p className="text-slate-300">
@@ -65,14 +71,14 @@ export default function ConfidentialitePage() {
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-white">5. Combien de temps conservons-nous vos données ?</h2>
         <p className="text-slate-300">
-          Vos données sont conservées tant que votre compte est actif. À la demande de suppression de votre compte, nous supprimons vos données personnelles dans les 30 jours, sauf données que nous devons conserver en vertu de la loi ou données anonymisées à des fins statistiques.
+          Les données de votre compte sont conservées tant que celui-ci est actif. À la demande de suppression de votre compte, nous supprimons vos données personnelles dans les 30 jours, sauf données que nous devons conserver en vertu de la loi ou données anonymisées à des fins statistiques. Les coordonnées de l&apos;infolettre sont conservées dans Cyberimpact jusqu&apos;à votre désabonnement ou votre demande de suppression, sous réserve des données nécessaires à la gestion de ces demandes. Le journal FAB sert uniquement à documenter les inscriptions et leur consentement. Vous pouvez demander sa suppression; les renseignements qui doivent être conservés pour répondre à une obligation légale demeurent soumis à un accès restreint.
         </p>
       </section>
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-white">6. Transfert des données hors du Québec</h2>
         <p className="text-slate-300">
-          Les données sont hébergées au Canada (Toronto, Ontario), chez l&apos;hébergeur Vultr. Lorsque nous faisons appel à des prestataires hors du Québec, nous nous assurons que des garanties appropriées sont en place. Nous ne vendons pas vos données.
+          Les données de la plateforme sont hébergées au Canada (Toronto, Ontario), chez l&apos;hébergeur Vultr. Les coordonnées de l&apos;infolettre sont également transmises à Cyberimpact pour gérer les abonnements et les envois. Lorsque nous faisons appel à des prestataires hors du Québec, nous nous assurons que des garanties appropriées sont en place. Nous ne vendons pas vos données.
         </p>
       </section>
 

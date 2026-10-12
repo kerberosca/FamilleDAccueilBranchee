@@ -473,3 +473,23 @@ model MaintenanceState {
   updatedAt DateTime @updatedAt
   updatedBy String?
 }
+
+// Journal de consentement et de transmission, pas une seconde liste d'envoi.
+model NewsletterConsent {
+  id               String   @id @default(cuid())
+  requestId        String   @unique
+  email            String
+  firstName        String
+  source           String
+  consentVersion   String
+  consentText      String
+  ipAddress        String
+  userAgent        String
+  status           String   @default("PENDING")
+  providerMemberId String?
+  submittedAt      DateTime @default(now())
+  completedAt      DateTime?
+
+  @@index([email, submittedAt])
+  @@index([status, submittedAt])
+}

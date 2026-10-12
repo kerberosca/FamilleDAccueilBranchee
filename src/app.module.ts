@@ -16,6 +16,7 @@ import { SystemStatusModule } from "./modules/system-status/system-status.module
 import { UsersModule } from "./modules/users/users.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { TrainingModule } from "./modules/training/training.module";
+import { NewsletterModule } from "./modules/newsletter/newsletter.module";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -46,6 +47,12 @@ const isProduction = process.env.NODE_ENV === "production";
         RESEND_API_KEY: Joi.string().allow("").optional(),
         EMAIL_FROM: Joi.string().allow("").optional(),
         NOTIFICATION_EMAIL: Joi.string().allow("").optional(),
+        NEWSLETTER_ENABLED: Joi.string().valid("true", "false").default("false"),
+        CYBERIMPACT_API_TOKEN: Joi.string().allow("").optional(),
+        CYBERIMPACT_LAUNCH_GROUP_ID: Joi.string().pattern(/^[1-9]\d*$/).default("57"),
+        CYBERIMPACT_CONGRESS_GROUP_ID: Joi.string().pattern(/^[1-9]\d*$/).default("58"),
+        NEWSLETTER_FORM_SECRET: Joi.string().min(32).allow("").optional(),
+        NEWSLETTER_TRUST_PROXY: Joi.string().valid("true", "false").default("false"),
         EMAIL_DELIVERY_MODE: Joi.string().valid("live", "log", "allowlist").default(isProduction ? "live" : "log"),
         EMAIL_ALLOWLIST: Joi.string().allow("").optional(),
         ALLY_TRAINING_ENABLED: Joi.string().valid("true", "false").default("true"),
@@ -80,6 +87,7 @@ const isProduction = process.env.NODE_ENV === "production";
     SystemStatusModule,
     UsersModule,
     TrainingModule,
+    NewsletterModule,
     ...(!isProduction ? [DevModule] : [])
   ]
 })

@@ -8,3 +8,27 @@ coverage
 .next
 frontend
 frontend/.next
+
+# Secrets, données et artefacts locaux hors du contexte de construction.
+.env*
+!.env.example
+*.ppk
+*.pem
+*.key
+**/*.sql
+!prisma/migrations/**/migration.sql
+**/*.sql.gz
+local-data
+private
+backups
+outputs
+tmp
+Input
+.codex
+.codex_artifacts
+.agents
+test-results
+playwright-report
+output
+backups-vps
+docs/cybersecurite

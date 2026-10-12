@@ -133,6 +133,13 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/infolettre"
+              onClick={handleNavClick}
+              className="rounded-lg bg-[#f17d55] px-3 py-2 text-xs font-semibold text-white no-underline transition-colors hover:bg-[#df6d46] sm:px-4 sm:text-sm"
+            >
+              Infolettre
+            </Link>
             <span
               className="rounded-full border border-slate-600/80 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 backdrop-blur-sm"
               title={isAuthenticated ? "Session connectée" : "Session invitée"}
@@ -169,6 +176,9 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center text-sm text-slate-400 sm:justify-between">
             <span>© FAB — Famille d&apos;accueil branchée</span>
             <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1" aria-label="Liens légaux">
+              <Link href="/infolettre" className="text-slate-400 no-underline hover:text-cyan-400">
+                Infolettre
+              </Link>
               <Link href="/confidentialite" className="text-slate-400 no-underline hover:text-cyan-400">
                 Confidentialité
               </Link>
