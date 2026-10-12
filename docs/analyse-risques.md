@@ -80,3 +80,16 @@ Document d’analyse des risques pour l’application FAB (Famille d’accueil b
 - **Déploiement** : build reproductible, pas de secrets dans le repo.
 
 Ce document peut être complété (nouvelles fonctionnalités, incidents) et relu à chaque release majeure ou incident.
+
+## 6. Infolettre FAB via l’API Cyberimpact
+
+| Risque | Mesure et limite |
+|--------|-----------------|
+| Deux courriels lors d’une inscription | Le formulaire natif appelle l’ajout direct, jamais opt-in. Un seul scénario Cyberimpact est déclenché par le groupe 57, à un passage par contact. Les anciens liens de formulaires ne doivent plus être diffusés. |
+| Absence de preuve de consentement chez Cyberimpact lors de l’ajout direct | Journal FAB durable avant transmission, avec date, provenance, texte accepté, IP et navigateur. Le type par défaut de l’API est tacite; son classement exprès doit être traité avec le fournisseur en utilisant les preuves FAB. L’adresse n’est pas confirmée par double opt-in. |
+| Réinscription involontaire d’une adresse désabonnée | Vérification de l’endpoint des désabonnés avant toute mutation; demande refusée avec instructions pour contacter FAB. Aucun appel API de réinscription. |
+| Doublon ou bienvenue répété | Jeton signé à usage unique, unicité du journal par demande, lecture des groupes existants et ajout des seuls groupes manquants. Scénario limité à un passage/contact. |
+| Inscription abusive d’adresses tierces | Champ piège, délai minimal, jeton lié à la provenance/IP/navigateur, limites par IP. Ces mesures ne prouvent pas la propriété de l’adresse et ne remplacent pas un CAPTCHA. Adapter la protection si des abus sont constatés et valider la capacité avec Cyberimpact avant le congrès. |
+| Fuite du jeton d’API ou des preuves | Secrets serveur hors Git, aucun secret dans le frontend, aucune route publique du journal, pas de coordonnées ni de réponses du fournisseur dans les logs. Les preuves contiennent des données personnelles et restent réservées à l’équipe autorisée. |
+| Réussite affichée malgré une panne | FAB attend la réponse Cyberimpact et la mise à jour du journal. Échec ou délai dépassé : message d’erreur, coordonnées conservées, nouvel essai qui relit les groupes. Une preuve PENDING/FAILED peut correspondre à une transmission partielle et doit être vérifiée chez Cyberimpact avant intervention manuelle. |
+| Limite appliquée à tous les visiteurs derrière le proxy | IP de Caddy utilisée seulement avec NEWSLETTER_TRUST_PROXY=true et API liée à 127.0.0.1. Le réglage reste false pour un accès direct. |

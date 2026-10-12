@@ -59,6 +59,9 @@ jobs:
       - name: Build API
         run: docker build -f Dockerfile.api.prod -t fab-api:latest .
 
+      - name: Verify newsletter migration in API image
+        run: docker run --rm --entrypoint sh fab-api:latest -c 'test -f /app/prisma/migrations/20261012000000_newsletter_consent/migration.sql'
+
       - name: Build Frontend
         run: |
           docker build -f frontend/Dockerfile.prod \

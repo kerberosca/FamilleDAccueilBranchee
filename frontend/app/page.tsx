@@ -109,27 +109,27 @@ export default function HomePage() {
         <div className="relative mx-auto flex min-h-[680px] max-w-6xl items-center px-4 py-16 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#f8c27f]">
-              Famille d'accueil branchée
+              Famille d'accueil branchée · Lancement à venir
             </p>
             <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight sm:text-6xl">
-              Devenez un allié pour une famille d'accueil.
+              Du soutien pour les familles d'accueil, bientôt à portée de main.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-[#f3edff] sm:text-lg">
-              Choisissez votre rôle: gardien compétent, entretien ménage ou tutorat. FAB vous aide à devenir une présence
-              concrète, locale et rassurante pour les familles d'accueil.
+              FAB prépare une plateforme qui rapprochera les familles d'accueil et les alliés. Inscrivez-vous à
+              l'infolettre pour recevoir les nouvelles et les détails du lancement en primeur.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/onboarding/resource"
+                href="/infolettre"
                 className="inline-flex rounded-lg bg-[#f17d55] px-5 py-3 text-sm font-semibold text-white no-underline shadow-[0_16px_36px_-22px_rgba(241,125,85,0.9)] transition-colors hover:bg-[#df6d46]"
               >
-                Commencer comme allié
+                Soyez informé du lancement
               </Link>
               <Link
                 href="/devenir-allie"
                 className="inline-flex rounded-lg border border-white/35 bg-white/10 px-5 py-3 text-sm font-semibold text-white no-underline backdrop-blur-sm transition-colors hover:bg-white/16"
               >
-                Comprendre le rôle
+                Découvrir le rôle d'allié
               </Link>
             </div>
           </div>
