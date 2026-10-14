@@ -3,12 +3,14 @@ import {
   AllyType,
   BackgroundCheckStatus,
   Prisma,
+  ResourceDocumentType,
   ResourceOnboardingState,
   ResourcePublishStatus,
   ResourceRateType,
   ResourceServiceDeliveryMode,
   ResourceVerificationStatus,
-  Role
+  Role,
+  TrainingStatus
 } from "@prisma/client";
 import { AllyWebhooksService } from "../ally-webhooks/ally-webhooks.service";
 import {
@@ -29,6 +31,7 @@ import { ModerateResourceDto } from "./dto/moderate-resource.dto";
 import { UpdateFamilyProfileDto } from "./dto/update-family-profile.dto";
 import { UpdateResourceProfileDto } from "./dto/update-resource-profile.dto";
 import { TrainingService } from "../training/training.service";
+import { ALLY_COURSE_VERSION } from "../training/training-content";
 
 @Injectable()
 export class ProfilesService {
@@ -221,7 +224,11 @@ export class ProfilesService {
   async moderateResource(resourceId: string, dto: ModerateResourceDto, actorUserId?: string) {
     const existing = await this.prisma.resourceProfile.findUnique({
       where: { id: resourceId },
-      include: { user: true }
+      include: {
+        user: true,
+        documents: { where: { deletedAt: null }, select: { type: true } },
+        trainingEnrollments: { where: { courseVersion: ALLY_COURSE_VERSION }, select: { status: true } }
+      }
     });
     if (!existing) {
       throw new NotFoundException("Profil allié introuvable.");
@@ -231,12 +238,21 @@ export class ProfilesService {
         "Ce profil est identifié comme test interne. Retirez ce statut avant de le valider ou de le publier."
       );
     }
+    const needsPublicationChecks = isNewApprovalOrPublication(existing, dto);
+    let requirementsException: ReturnType<ProfilesService["missingPublicationRequirements"]> | undefined;
     if (isPublishing(dto)) {
       if (!existing.user.emailVerifiedAt) {
         throw new BadRequestException("L'adresse de connexion doit être confirmée avant la publication du profil.");
       }
-      await this.resourceDocumentsService.assertResourceDocumentsComplete([resourceId]);
-      await this.trainingService.assertTrainingPassedForPublication(resourceId, existing.publishStatus);
+      if (needsPublicationChecks) {
+        if (dto.overrideRequirements === true) {
+          const missing = this.missingPublicationRequirements(existing);
+          if (missing.missingDocuments.length > 0 || missing.trainingStatus !== null) requirementsException = missing;
+        } else {
+          await this.resourceDocumentsService.assertResourceDocumentsComplete([resourceId]);
+          await this.trainingService.assertTrainingPassedForPublication(resourceId, existing.publishStatus);
+        }
+      }
     }
     const updated = await this.prisma.resourceProfile.update({
       where: { id: resourceId },
@@ -249,7 +265,8 @@ export class ProfilesService {
     });
     if (actorUserId) {
       await this.usersService.logAdminAction(actorUserId, "RESOURCE_MODERATED", "RESOURCE_PROFILE", resourceId, {
-        ...dto
+        ...dto,
+        ...(requirementsException && { requirementsException })
       });
     }
     void this.allyWebhooksService.sendApplicationEvent("ally.application.moderated", {
@@ -269,7 +286,11 @@ export class ProfilesService {
   async bulkModerateResources(resourceIds: string[], dto: BulkModerateResourceDto, actorUserId: string) {
     const existingResources = await this.prisma.resourceProfile.findMany({
       where: { id: { in: resourceIds } },
-      include: { user: true }
+      include: {
+        user: true,
+        documents: { where: { deletedAt: null }, select: { type: true } },
+        trainingEnrollments: { where: { courseVersion: ALLY_COURSE_VERSION }, select: { status: true } }
+      }
     });
     if (isApprovingOrPublishing(dto)) {
       const internalTests = existingResources.filter((resource) => resource.isInternalTest);
@@ -279,6 +300,8 @@ export class ProfilesService {
         );
       }
     }
+    const resourcesNeedingChecks = existingResources.filter((resource) => isNewApprovalOrPublication(resource, dto));
+    const requirementsExceptions: Array<{ resourceId: string; missingDocuments: ResourceDocumentType[]; trainingStatus: TrainingStatus | null }> = [];
     if (isPublishing(dto)) {
       const unverified = existingResources.filter((resource) => !resource.user.emailVerifiedAt);
       if (unverified.length > 0) {
@@ -286,8 +309,18 @@ export class ProfilesService {
           `Adresse de connexion non confirmée pour ${unverified.length} profil(s) allié(s).`
         );
       }
-      await this.resourceDocumentsService.assertResourceDocumentsComplete(resourceIds);
-      await this.trainingService.assertTrainingsPassedForPublication(resourceIds);
+      if (dto.overrideRequirements === true) {
+        for (const resource of resourcesNeedingChecks) {
+          const missing = this.missingPublicationRequirements(resource);
+          if (missing.missingDocuments.length > 0 || missing.trainingStatus !== null) {
+            requirementsExceptions.push({ resourceId: resource.id, ...missing });
+          }
+        }
+      } else {
+        const idsNeedingChecks = resourcesNeedingChecks.map((resource) => resource.id);
+        await this.resourceDocumentsService.assertResourceDocumentsComplete(idsNeedingChecks);
+        await this.trainingService.assertTrainingsPassedForPublication(idsNeedingChecks);
+      }
     }
     const result = await this.prisma.resourceProfile.updateMany({
       where: { id: { in: resourceIds } },
@@ -303,7 +336,9 @@ export class ProfilesService {
       verificationStatus: dto.verificationStatus,
       publishStatus: dto.publishStatus,
       onboardingState: dto.onboardingState,
-      backgroundCheckStatus: dto.backgroundCheckStatus
+      backgroundCheckStatus: dto.backgroundCheckStatus,
+      ...(dto.overrideRequirements === true && { overrideRequirements: true }),
+      ...(requirementsExceptions.length > 0 && { requirementsExceptions })
     });
     for (const resource of existingResources) {
       void this.sendAllyAdminStatusEmail({
@@ -322,6 +357,19 @@ export class ProfilesService {
       });
     }
     return { updatedCount: result.count };
+  }
+
+  private missingPublicationRequirements(resource: {
+    documents: Array<{ type: ResourceDocumentType }>;
+    allyRegistration: unknown;
+    trainingEnrollments: Array<{ status: TrainingStatus }>;
+  }) {
+    const missingDocuments = this.resourceDocumentsService.buildRequirements(
+      resource.documents,
+      resource.allyRegistration
+    ).missing;
+    const trainingStatus = resource.trainingEnrollments[0]?.status ?? TrainingStatus.NOT_STARTED;
+    return { missingDocuments, trainingStatus: trainingStatus === TrainingStatus.PASSED ? null : trainingStatus };
   }
 
   async setInternalTestStatus(resourceId: string, isInternalTest: boolean, actorUserId: string) {
@@ -470,6 +518,7 @@ export class ProfilesService {
             select: {
               id: true,
               email: true,
+              emailVerifiedAt: true,
               status: true,
               role: true,
               createdAt: true,
@@ -515,7 +564,15 @@ export class ProfilesService {
           resource.allyRegistration
         ),
         updatedAt: resource.updatedAt,
-        user: resource.user
+        user: {
+          id: resource.user.id,
+          email: resource.user.email,
+          status: resource.user.status,
+          role: resource.user.role,
+          createdAt: resource.user.createdAt,
+          updatedAt: resource.user.updatedAt,
+          emailVerified: Boolean(resource.user.emailVerifiedAt)
+        }
       }))
     };
   }
@@ -681,6 +738,25 @@ function isPublishing(dto: {
     dto.verificationStatus === ResourceVerificationStatus.VERIFIED ||
     dto.publishStatus === ResourcePublishStatus.PUBLISHED ||
     dto.onboardingState === ResourceOnboardingState.PUBLISHED
+  );
+}
+
+function isNewApprovalOrPublication(
+  existing: {
+    verificationStatus: ResourceVerificationStatus;
+    publishStatus: ResourcePublishStatus;
+    onboardingState: ResourceOnboardingState;
+  },
+  dto: {
+    verificationStatus?: ResourceVerificationStatus;
+    publishStatus?: ResourcePublishStatus;
+    onboardingState?: ResourceOnboardingState;
+  }
+) {
+  return (
+    (dto.verificationStatus === ResourceVerificationStatus.VERIFIED && existing.verificationStatus !== ResourceVerificationStatus.VERIFIED) ||
+    (dto.publishStatus === ResourcePublishStatus.PUBLISHED && existing.publishStatus !== ResourcePublishStatus.PUBLISHED) ||
+    (dto.onboardingState === ResourceOnboardingState.PUBLISHED && existing.onboardingState !== ResourceOnboardingState.PUBLISHED)
   );
 }
 

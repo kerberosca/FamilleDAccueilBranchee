@@ -258,7 +258,7 @@ export const ALLY_TRAINING_LESSONS: TrainingLesson[] = [
         title: "Un réseau uni",
         paragraphs: [
           "FAB facilite la rencontre entre les familles et les alliés, mais la confiance se construit dans chaque geste du quotidien.",
-          "Votre profil sera publié après la réussite de la formation, la réception des documents requis et la validation finale de l'équipe."
+          "L'équipe FAB évalue votre formation et vos documents avant de décider de la publication de votre profil."
         ],
         callout: "Un compte, une plateforme, un suivi : tout votre parcours demeure dans FAB."
       }

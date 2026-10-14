@@ -748,6 +748,172 @@ describe("Smoke e2e", () => {
     expect(result.body.message).toContain("adresse de connexion");
   });
 
+  it("permet une approbation exceptionnelle individuelle et consigne les critères manquants", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const user = await prisma.user.create({
+      data: {
+        email: "exception-individuelle@local.test",
+        passwordHash: "hash",
+        role: Role.RESOURCE,
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
+        resourceProfile: {
+          create: {
+            displayName: "Allié Exception Individuelle",
+            postalCode: "H2X1Y4",
+            city: "Montreal",
+            region: "QC",
+            skillsTags: ["repit"],
+            verificationStatus: ResourceVerificationStatus.PENDING_VERIFICATION,
+            publishStatus: ResourcePublishStatus.HIDDEN,
+            onboardingState: ResourceOnboardingState.PENDING_VERIFICATION,
+            allyRegistration: { section2: { rcrValid: "yes" } },
+            trainingEnrollments: { create: { courseVersion: "faba-v1" } }
+          }
+        }
+      },
+      include: { resourceProfile: true }
+    });
+    const resourceId = user.resourceProfile!.id;
+    const approval = {
+      verificationStatus: ResourceVerificationStatus.VERIFIED,
+      publishStatus: ResourcePublishStatus.PUBLISHED,
+      onboardingState: ResourceOnboardingState.PUBLISHED
+    };
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${resourceId}/moderation`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send(approval)
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${resourceId}/moderation`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ ...approval, overrideRequirements: true })
+      .expect(200);
+
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({
+      where: { action: "RESOURCE_MODERATED", targetId: resourceId },
+      orderBy: { createdAt: "desc" }
+    });
+    expect(audit.payload).toMatchObject({
+      overrideRequirements: true,
+      requirementsException: {
+        missingDocuments: [ResourceDocumentType.BACKGROUND_CHECK, ResourceDocumentType.RCR_PROOF],
+        trainingStatus: TrainingStatus.NOT_STARTED
+      }
+    });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/profiles/resource/${resourceId}/moderation`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ ...approval, backgroundCheckStatus: BackgroundCheckStatus.RECEIVED })
+      .expect(200);
+
+    const pending = await request(app.getHttpServer())
+      .get("/api/v1/profiles/resources/admin?query=Exception Individuelle")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(pending.body.items[0]).toMatchObject({
+      publishStatus: ResourcePublishStatus.PUBLISHED,
+      trainingStatus: TrainingStatus.NOT_STARTED,
+      documentRequirements: { complete: false },
+      user: { emailVerified: true }
+    });
+
+    await prisma.resourceDocument.createMany({
+      data: [ResourceDocumentType.BACKGROUND_CHECK, ResourceDocumentType.RCR_PROOF].map((type) => ({
+        resourceProfileId: resourceId,
+        type,
+        originalName: `${type}.pdf`,
+        storedName: `${type}.pdf`,
+        mimeType: "application/pdf",
+        sizeBytes: 10
+      }))
+    });
+    await prisma.trainingEnrollment.update({
+      where: { resourceProfileId_courseVersion: { resourceProfileId: resourceId, courseVersion: "faba-v1" } },
+      data: { status: TrainingStatus.PASSED }
+    });
+    const complete = await request(app.getHttpServer())
+      .get("/api/v1/profiles/resources/admin?query=Exception Individuelle")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    expect(complete.body.items[0]).toMatchObject({
+      trainingStatus: TrainingStatus.PASSED,
+      documentRequirements: { complete: true, missing: [] }
+    });
+  });
+
+  it("publie une sélection mixte par exception sans outrepasser le courriel ni les profils de test", async () => {
+    const adminToken = await loginAs("ADMIN");
+    const createAlly = async (suffix: string, options: { complete: boolean; emailVerified?: boolean; isInternalTest?: boolean }) => {
+      const user = await prisma.user.create({
+        data: {
+          email: `exception-${suffix}@local.test`,
+          passwordHash: "hash",
+          role: Role.RESOURCE,
+          status: UserStatus.ACTIVE,
+          emailVerifiedAt: options.emailVerified === false ? null : new Date(),
+          resourceProfile: {
+            create: {
+              displayName: `Allié Exception ${suffix}`,
+              postalCode: "H2X1Y4",
+              city: "Montreal",
+              region: "QC",
+              skillsTags: ["repit"],
+              isInternalTest: options.isInternalTest ?? false,
+              verificationStatus: ResourceVerificationStatus.PENDING_VERIFICATION,
+              publishStatus: ResourcePublishStatus.HIDDEN,
+              onboardingState: ResourceOnboardingState.PENDING_VERIFICATION,
+              ...(options.complete && {
+                documents: { create: { type: ResourceDocumentType.BACKGROUND_CHECK, originalName: "check.pdf", storedName: "check.pdf", mimeType: "application/pdf", sizeBytes: 10 } }
+              }),
+              trainingEnrollments: { create: { courseVersion: "faba-v1", status: options.complete ? TrainingStatus.PASSED : TrainingStatus.NOT_STARTED } }
+            }
+          }
+        },
+        include: { resourceProfile: true }
+      });
+      return user.resourceProfile!.id;
+    };
+    const completeId = await createAlly("complete", { complete: true });
+    const incompleteId = await createAlly("incomplete", { complete: false });
+    const unverifiedId = await createAlly("unverified", { complete: false, emailVerified: false });
+    const testId = await createAlly("test", { complete: false, isInternalTest: true });
+    const approval = {
+      verificationStatus: ResourceVerificationStatus.VERIFIED,
+      publishStatus: ResourcePublishStatus.PUBLISHED,
+      onboardingState: ResourceOnboardingState.PUBLISHED
+    };
+    const bulk = (resourceIds: string[], overrideRequirements?: boolean) => request(app.getHttpServer())
+      .patch("/api/v1/profiles/resources/moderation/bulk")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ resourceIds, ...approval, ...(overrideRequirements && { overrideRequirements }) });
+
+    await bulk([completeId, incompleteId]).expect(400);
+    await bulk([completeId, unverifiedId], true).expect(400);
+    await bulk([completeId, testId], true).expect(400);
+    expect((await prisma.resourceProfile.findUniqueOrThrow({ where: { id: completeId } })).publishStatus).toBe(ResourcePublishStatus.HIDDEN);
+
+    await bulk([completeId, incompleteId], true).expect(200, { updatedCount: 2 });
+    const audit = await prisma.adminAuditLog.findFirstOrThrow({
+      where: { action: "RESOURCE_BULK_MODERATED" },
+      orderBy: { createdAt: "desc" }
+    });
+    expect(audit.payload).toMatchObject({
+      overrideRequirements: true,
+      requirementsExceptions: [{
+        resourceId: incompleteId,
+        missingDocuments: [ResourceDocumentType.BACKGROUND_CHECK],
+        trainingStatus: TrainingStatus.NOT_STARTED
+      }]
+    });
+    expect((await prisma.resourceProfile.findUniqueOrThrow({ where: { id: completeId } })).publishStatus).toBe(ResourcePublishStatus.PUBLISHED);
+    expect((await prisma.resourceProfile.findUniqueOrThrow({ where: { id: incompleteId } })).publishStatus).toBe(ResourcePublishStatus.PUBLISHED);
+  });
+
   it("PATCH /api/v1/profiles/resource/:id/moderation envoie un courriel a l'allie", async () => {
     emailSendMock.mockClear();
     const token = await loginAs("ADMIN");

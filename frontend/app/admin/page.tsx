@@ -54,7 +54,7 @@ type ResourceItem = {
   allyDeclarationsAcceptedAt?: string | null;
   serviceDeliveryMode: "IN_PERSON" | "REMOTE" | "BOTH";
   isInternalTest: boolean;
-  user: { id: string; email: string; status: string; role?: string };
+  user: { id: string; email: string; status: string; role?: string; emailVerified?: boolean };
 };
 type ResourcesResponse = PageMeta & { items: ResourceItem[] };
 
@@ -176,6 +176,45 @@ function formatLabel(labels: Record<string, string>, value: string | null | unde
   return labels[value] ?? value;
 }
 
+function missingRequirementLabels(resource: ResourceItem): string[] {
+  const documents = resource.documentRequirements?.missing?.map(
+    (type) => `document manquant : ${formatLabel(DOCUMENT_TYPE_LABELS, type)}`
+  ) ?? [];
+  if (resource.documentRequirements?.complete === false && documents.length === 0) {
+    documents.push("documents requis à vérifier");
+  }
+  if (resource.trainingStatus !== "PASSED") {
+    const trainingLabel = resource.trainingStatus === "ATTENTION_REQUIRED"
+      ? "attention requise"
+      : resource.trainingStatus === "IN_PROGRESS" || resource.trainingStatus === "EXAM_AVAILABLE"
+        ? "en cours"
+        : "non commencée";
+    documents.push(`formation non réussie (${trainingLabel})`);
+  }
+  return documents;
+}
+
+function needsApprovalTransition(resource: ResourceItem): boolean {
+  return resource.verificationStatus !== "VERIFIED" || resource.publishStatus !== "PUBLISHED" || resource.onboardingState !== "PUBLISHED";
+}
+
+function confirmRequirementsException(resources: ResourceItem[]): boolean {
+  const incomplete = resources.filter(
+    (resource) => needsApprovalTransition(resource) && missingRequirementLabels(resource).length > 0
+  );
+  if (incomplete.length === 0) return true;
+  const details = incomplete.map((resource) => `• ${resource.displayName} : ${missingRequirementLabels(resource).join("; ")}`);
+  const introduction = incomplete.length === 1
+    ? "Attention : un dossier allié ne répond pas encore à tous les critères de publication."
+    : `Attention : ${incomplete.length} dossiers alliés ne répondent pas encore à tous les critères de publication.`;
+  const consequence = incomplete.length === 1
+    ? "ce profil sera approuvé, publié et visible des familles."
+    : "ces profils seront approuvés, publiés et visibles des familles.";
+  return window.confirm(
+    `${introduction}\n\n${details.join("\n")}\n\nSi vous confirmez cette exception, ${consequence} Voulez-vous continuer ?`
+  );
+}
+
 function formatBytes(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "0 o";
   const units = ["o", "Ko", "Mo", "Go", "To"];
@@ -244,13 +283,9 @@ export default function AdminPage() {
   const [systemError, setSystemError] = useState<string | null>(null);
 
   const isAdmin = me?.role === "ADMIN";
-  const selectedResourcesComplete = selectedResourceIds.every((id) => {
+  const selectedResourcesEligible = selectedResourceIds.every((id) => {
     const resource = resources.find((item) => item.id === id);
-    return Boolean(
-      resource?.documentRequirements?.complete &&
-      !resource.isInternalTest &&
-      (resource.publishStatus === "PUBLISHED" || resource.trainingStatus === "PASSED")
-    );
+    return Boolean(resource && !resource.isInternalTest && resource.user.emailVerified !== false);
   });
 
   const familiesUrl = useMemo(() => {
@@ -497,7 +532,7 @@ export default function AdminPage() {
 
   const moderateResource = async (
     resourceId: string,
-    payload: { verificationStatus: string; publishStatus: string; onboardingState: string; backgroundCheckStatus?: string }
+    payload: { verificationStatus: string; publishStatus: string; onboardingState: string; backgroundCheckStatus?: string; overrideRequirements?: boolean }
   ) => {
     if (!accessToken) {
       return;
@@ -515,7 +550,17 @@ export default function AdminPage() {
     }
   };
 
-  const bulkModerateResources = async (payload: { verificationStatus: string; publishStatus: string; onboardingState: string }) => {
+  const approveResource = async (resource: ResourceItem) => {
+    if (!confirmRequirementsException([resource])) return;
+    await moderateResource(resource.id, {
+      verificationStatus: "VERIFIED",
+      publishStatus: "PUBLISHED",
+      onboardingState: "PUBLISHED",
+      ...(needsApprovalTransition(resource) && missingRequirementLabels(resource).length > 0 && { overrideRequirements: true })
+    });
+  };
+
+  const bulkModerateResources = async (payload: { verificationStatus: string; publishStatus: string; onboardingState: string; overrideRequirements?: boolean }) => {
     if (!accessToken || selectedResourceIds.length === 0) {
       return;
     }
@@ -534,6 +579,17 @@ export default function AdminPage() {
     } finally {
       setBusyId(null);
     }
+  };
+
+  const approveSelectedResources = async () => {
+    const selected = resources.filter((resource) => selectedResourceIds.includes(resource.id));
+    if (selected.length !== selectedResourceIds.length || !confirmRequirementsException(selected)) return;
+    await bulkModerateResources({
+      verificationStatus: "VERIFIED",
+      publishStatus: "PUBLISHED",
+      onboardingState: "PUBLISHED",
+      ...(selected.some((resource) => needsApprovalTransition(resource) && missingRequirementLabels(resource).length > 0) && { overrideRequirements: true })
+    });
   };
 
   const setFamilyInternalTest = async (family: FamilyItem) => {
@@ -914,14 +970,8 @@ export default function AdminPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="secondary"
-                    disabled={busyId === "bulk-resource" || selectedResourceIds.length === 0 || !selectedResourcesComplete}
-                    onClick={() =>
-                      void bulkModerateResources({
-                        verificationStatus: "VERIFIED",
-                        publishStatus: "PUBLISHED",
-                        onboardingState: "PUBLISHED"
-                      })
-                    }
+                    disabled={busyId === "bulk-resource" || selectedResourceIds.length === 0 || !selectedResourcesEligible}
+                    onClick={() => void approveSelectedResources()}
                   >
                     Approuver sélection ({selectedResourceIds.length})
                   </Button>
@@ -972,6 +1022,11 @@ export default function AdminPage() {
                               Publication bloquée tant que le statut de test interne est actif.
                             </p>
                           ) : null}
+                          {resource.user.emailVerified === false ? (
+                            <p className="text-xs font-medium text-amber-200">
+                              Courriel de connexion non confirmé : publication bloquée.
+                            </p>
+                          ) : null}
                           {resource.streetAddress ? (
                             <p className="break-words text-slate-400">Adresse : {resource.streetAddress}</p>
                           ) : null}
@@ -987,6 +1042,11 @@ export default function AdminPage() {
                               ? ` - manquants: ${resource.documentRequirements.missing.map((type) => formatLabel(DOCUMENT_TYPE_LABELS, type)).join(", ")}`
                               : null}
                           </p>
+                          {resource.verificationStatus === "VERIFIED" && resource.publishStatus === "PUBLISHED" && missingRequirementLabels(resource).length > 0 ? (
+                            <p className="text-xs font-medium text-amber-200">
+                              Approuvé avec critères en attente : {missingRequirementLabels(resource).join("; ")}.
+                            </p>
+                          ) : null}
                           <details className="mt-1 text-xs">
                             <summary className="cursor-pointer text-cyan-400">Documents privés</summary>
                             <div className="mt-2">
@@ -1043,16 +1103,9 @@ export default function AdminPage() {
                           disabled={
                             busyId === resource.id ||
                             resource.isInternalTest ||
-                            !resource.documentRequirements?.complete ||
-                            (resource.publishStatus !== "PUBLISHED" && resource.trainingStatus !== "PASSED")
+                            resource.user.emailVerified === false
                           }
-                          onClick={() =>
-                            void moderateResource(resource.id, {
-                              verificationStatus: "VERIFIED",
-                              publishStatus: "PUBLISHED",
-                              onboardingState: "PUBLISHED"
-                            })
-                          }
+                          onClick={() => void approveResource(resource)}
                         >
                           Approuver + publier
                         </Button>

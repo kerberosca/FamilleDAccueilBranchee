@@ -5,7 +5,7 @@ import {
   ResourcePublishStatus,
   ResourceVerificationStatus
 } from "@prisma/client";
-import { IsEnum, IsOptional } from "class-validator";
+import { IsBoolean, IsEnum, IsOptional } from "class-validator";
 
 export class ModerateResourceDto {
   @ApiPropertyOptional({ enum: ResourceVerificationStatus })
@@ -27,4 +27,9 @@ export class ModerateResourceDto {
   @IsOptional()
   @IsEnum(BackgroundCheckStatus)
   backgroundCheckStatus?: BackgroundCheckStatus;
+
+  @ApiPropertyOptional({ description: "Autorise une publication exceptionnelle sans tous les documents requis ou la formation réussie." })
+  @IsOptional()
+  @IsBoolean()
+  overrideRequirements?: boolean;
 }

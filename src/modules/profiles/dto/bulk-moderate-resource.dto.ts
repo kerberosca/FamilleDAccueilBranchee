@@ -5,7 +5,7 @@ import {
   ResourcePublishStatus,
   ResourceVerificationStatus
 } from "@prisma/client";
-import { ArrayMinSize, IsArray, IsEnum, IsOptional, IsString } from "class-validator";
+import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from "class-validator";
 
 export class BulkModerateResourceDto {
   @ApiProperty({ type: [String] })
@@ -33,4 +33,9 @@ export class BulkModerateResourceDto {
   @IsOptional()
   @IsEnum(BackgroundCheckStatus)
   backgroundCheckStatus?: BackgroundCheckStatus;
+
+  @ApiPropertyOptional({ description: "Autorise une publication exceptionnelle sans tous les documents requis ou la formation réussie." })
+  @IsOptional()
+  @IsBoolean()
+  overrideRequirements?: boolean;
 }

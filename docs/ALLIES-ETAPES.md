@@ -18,6 +18,7 @@ Document de planification du parcours d’inscription et de gestion des **allié
 
 - Inscription avec rôle **RESOURCE** : formulaire (email, mot de passe, nom, code postal, ville, région, bio, tags) → compte + `ResourceProfile` créés, état **PENDING_VERIFICATION**. L'inscription allié est gratuite.
 - Ensuite : passage direct vers la candidature, les documents, la formation et la validation. Aucun paiement allié.
+- La publication exige normalement les documents requis et la réussite de la formation. Un administrateur peut confirmer une exception pour ces deux critères après avoir vu les éléments manquants. Le courriel de connexion confirmé et l'absence de statut « test interne » restent obligatoires. L'exception est inscrite à l'audit et les critères en attente restent visibles dans l'administration jusqu'à leur régularisation.
 - **Objectif** : inscription **gratuite** pour les alliés, choix du **type** (Ménage, Gardiens, Autres), puis **questionnaire** et **demande de vérification d’antécédents judiciaires**.
 
 ---
